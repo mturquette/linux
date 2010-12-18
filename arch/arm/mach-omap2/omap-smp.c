@@ -29,14 +29,29 @@
 
 #include "clockdomain.h"
 
+/* FIXME: This is not needed when WakeupGen support is available */
+#define WKUPGEN_BASE		0x48281000
+#define AUX_CORE_BOOT_0		0x800
+#define AUX_CORE_BOOT_1		0x804
+
 /* SCU base address */
 static void __iomem *scu_base;
+/* Wakeupgen Base addres */
+static void __iomem *wakeupgen_base;
 
 static DEFINE_SPINLOCK(boot_lock);
 
 void __iomem *omap4_get_scu_base(void)
 {
 	return scu_base;
+}
+
+static inline unsigned int get_a15_core_count(void)
+{
+	unsigned int ncores;
+
+	asm volatile("mrc p15, 1, %0, c9, c0, 2\n" : "=r" (ncores));
+	return ((ncores >> 24) & 3) + 1;
 }
 
 void __cpuinit platform_secondary_init(unsigned int cpu)
@@ -83,7 +98,11 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	 * the AuxCoreBoot1 register is updated with cpu state
 	 * A barrier is added to ensure that write buffer is drained
 	 */
-	omap_modify_auxcoreboot0(0x200, 0xfffffdff);
+	if (cpu_is_omap44xx())
+		omap_modify_auxcoreboot0(0x200, 0xfffffdff);
+	else
+		__raw_writel(0x200, wakeupgen_base + AUX_CORE_BOOT_0);
+
 	flush_cache_all();
 	smp_wmb();
 
@@ -122,14 +141,20 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 
 static void __init wakeup_secondary(void)
 {
+	extern void omap5_secondary_startup(void);
 	/*
 	 * Write the address of secondary startup routine into the
 	 * AuxCoreBoot1 where ROM code will jump and start executing
 	 * on secondary core once out of WFE
 	 * A barrier is added to ensure that write buffer is drained
 	 */
-	omap_auxcoreboot_addr(virt_to_phys(omap_secondary_startup));
-	smp_wmb();
+	if (cpu_is_omap44xx())
+		omap_auxcoreboot_addr(virt_to_phys(omap_secondary_startup));
+	else
+		__raw_writel(virt_to_phys(omap5_secondary_startup),
+					wakeupgen_base + AUX_CORE_BOOT_1);
+
+	wmb();
 
 	/*
 	 * Send a 'sev' to wake the secondary core from WFE.
@@ -145,20 +170,24 @@ static void __init wakeup_secondary(void)
  */
 void __init smp_init_cpus(void)
 {
-	unsigned int i, ncores;
+	unsigned int i, ncores = 1;
 
-	/* Never released */
-	scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
-	BUG_ON(!scu_base);
-
-	ncores = scu_get_core_count(scu_base);
+	/* Static mapping, never released */
+	if (cpu_is_omap44xx()) {
+		scu_base = ioremap(OMAP44XX_SCU_BASE, SZ_256);
+		BUG_ON(!scu_base);
+		ncores = scu_get_core_count(scu_base);
+	} else if (cpu_is_omap54xx()) {
+		wakeupgen_base = ioremap(WKUPGEN_BASE, SZ_4K);
+		BUG_ON(!wakeupgen_base);
+		ncores = get_a15_core_count();
+	}
 
 	/* sanity check */
 	if (ncores > NR_CPUS) {
-		printk(KERN_WARNING
-		       "OMAP4: no. of cores (%d) greater than configured "
-		       "maximum of %d - clipping\n",
-		       ncores, NR_CPUS);
+		pr_warn("OMAP4: no. of cores (%d) greater than configured "
+			"maximum of %d - clipping\n",
+			ncores, NR_CPUS);
 		ncores = NR_CPUS;
 	}
 
@@ -175,6 +204,7 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
 	 * Initialise the SCU and wake up the secondary core using
 	 * wakeup_secondary().
 	 */
-	scu_enable(scu_base);
+	if (scu_base)
+		scu_enable(scu_base);
 	wakeup_secondary();
 }
