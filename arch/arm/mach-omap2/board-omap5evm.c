@@ -16,6 +16,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/i2c/atmel_mxt224.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -180,6 +181,18 @@ static struct omap_board_data keypad_data = {
 	.pads_cnt               = ARRAY_SIZE(keypad_pads),
 };
 
+static struct atmel_mxt224_platform_data atmel_mxt224_ts_platform_data[] = {
+	{
+		.x_line = 17,
+		.y_line = 13,
+		.x_size = 1023,
+		.y_size = 767,
+		.blen = 1,
+		.threshold = 30,
+		.orient = 4,
+	},
+};
+
 static void __init omap_5430evm_init_early(void)
 {
 	omap2_init_common_infrastructure();
@@ -205,10 +218,18 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
+static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("atmel_mxt224", 0x4b),
+		.platform_data = &atmel_mxt224_ts_platform_data[0],
+		.irq = 35,
+	},
+};
 
 static int __init omap_5430evm_i2c_init(void)
 {
-	omap_register_i2c_bus(1, 400, NULL, 0);
+	omap_register_i2c_bus(1, 400, omap5evm_i2c_1_boardinfo,
+				ARRAY_SIZE(omap5evm_i2c_1_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
 	omap_register_i2c_bus(4, 400, NULL, 0);
