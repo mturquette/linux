@@ -433,21 +433,17 @@ static int device_resume_noirq(struct device *dev, pm_message_t state)
 		error = pm_noirq_op(dev, dev->bus->pm, state);
 		if (error)
 			goto End;
-	}
-
-	if (dev->type && dev->type->pm) {
+	} else if (dev->type && dev->type->pm) {
 		pm_dev_dbg(dev, state, "EARLY type ");
 		error = pm_noirq_op(dev, dev->type->pm, state);
 		if (error)
 			goto End;
-	}
-
-	if (dev->class && dev->class->pm) {
+	} else if (dev->class && dev->class->pm) {
 		pm_dev_dbg(dev, state, "EARLY class ");
 		error = pm_noirq_op(dev, dev->class->pm, state);
 	}
 
-End:
+ End:
 	TRACE_RESUME(error);
 	return error;
 }
@@ -532,21 +528,18 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 		if (dev->bus->pm) {
 			pm_dev_dbg(dev, state, "");
 			error = pm_op(dev, dev->bus->pm, state);
+			goto End;
 		} else if (dev->bus->resume) {
 			pm_dev_dbg(dev, state, "legacy ");
 			error = legacy_resume(dev, dev->bus->resume);
-		}
-		if (error)
 			goto End;
+		}
 	}
 
-	if (dev->type) {
-		if (dev->type->pm) {
-			pm_dev_dbg(dev, state, "type ");
-			error = pm_op(dev, dev->type->pm, state);
-		}
-		if (error)
-			goto End;
+	if (dev->type && dev->type->pm) {
+		pm_dev_dbg(dev, state, "type ");
+		error = pm_op(dev, dev->type->pm, state);
+		goto End;
 	}
 
 	if (dev->class) {
@@ -558,6 +551,7 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 			error = legacy_resume(dev, dev->class->resume);
 		}
 	}
+
  End:
 	device_unlock(dev);
 	complete_all(&dev->power.completion);
@@ -644,19 +638,18 @@ static void device_complete(struct device *dev, pm_message_t state)
 		dev->pwr_domain->ops.complete(dev);
 	}
 
-	if (dev->class && dev->class->pm && dev->class->pm->complete) {
-		pm_dev_dbg(dev, state, "completing class ");
-		dev->class->pm->complete(dev);
-	}
-
-	if (dev->type && dev->type->pm && dev->type->pm->complete) {
-		pm_dev_dbg(dev, state, "completing type ");
-		dev->type->pm->complete(dev);
-	}
-
-	if (dev->bus && dev->bus->pm && dev->bus->pm->complete) {
+	if (dev->bus && dev->bus->pm) {
 		pm_dev_dbg(dev, state, "completing ");
-		dev->bus->pm->complete(dev);
+		if (dev->bus->pm->complete)
+			dev->bus->pm->complete(dev);
+	} else if (dev->type && dev->type->pm) {
+		pm_dev_dbg(dev, state, "completing type ");
+		if (dev->type->pm->complete)
+			dev->type->pm->complete(dev);
+	} else if (dev->class && dev->class->pm) {
+		pm_dev_dbg(dev, state, "completing class ");
+		if (dev->class->pm->complete)
+			dev->class->pm->complete(dev);
 	}
 
 	device_unlock(dev);
@@ -742,27 +735,23 @@ static pm_message_t resume_event(pm_message_t sleep_state)
  */
 static int device_suspend_noirq(struct device *dev, pm_message_t state)
 {
-	int error = 0;
-
-	if (dev->class && dev->class->pm) {
-		pm_dev_dbg(dev, state, "LATE class ");
-		error = pm_noirq_op(dev, dev->class->pm, state);
-		if (error)
-			goto End;
-	}
-
-	if (dev->type && dev->type->pm) {
-		pm_dev_dbg(dev, state, "LATE type ");
-		error = pm_noirq_op(dev, dev->type->pm, state);
-		if (error)
-			goto End;
-	}
+	int error;
 
 	if (dev->bus && dev->bus->pm) {
 		pm_dev_dbg(dev, state, "LATE ");
 		error = pm_noirq_op(dev, dev->bus->pm, state);
 		if (error)
-			goto End;
+			return error;
+	} else if (dev->type && dev->type->pm) {
+		pm_dev_dbg(dev, state, "LATE type ");
+		error = pm_noirq_op(dev, dev->type->pm, state);
+		if (error)
+			return error;
+	} else if (dev->class && dev->class->pm) {
+		pm_dev_dbg(dev, state, "LATE class ");
+		error = pm_noirq_op(dev, dev->class->pm, state);
+		if (error)
+			return error;
 	}
 
 	if (dev->pwr_domain) {
@@ -770,8 +759,7 @@ static int device_suspend_noirq(struct device *dev, pm_message_t state)
 		pm_noirq_op(dev, &dev->pwr_domain->ops, state);
 	}
 
-End:
-	return error;
+	return 0;
 }
 
 /**
@@ -858,6 +846,24 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 		goto End;
 	}
 
+	if (dev->bus) {
+		if (dev->bus->pm) {
+			pm_dev_dbg(dev, state, "");
+			error = pm_op(dev, dev->bus->pm, state);
+			goto Domain;
+		} else if (dev->bus->suspend) {
+			pm_dev_dbg(dev, state, "legacy ");
+			error = legacy_suspend(dev, state, dev->bus->suspend);
+			goto Domain;
+		}
+	}
+
+	if (dev->type && dev->type->pm) {
+		pm_dev_dbg(dev, state, "type ");
+		error = pm_op(dev, dev->type->pm, state);
+		goto Domain;
+	}
+
 	if (dev->class) {
 		if (dev->class->pm) {
 			pm_dev_dbg(dev, state, "class ");
@@ -866,32 +872,10 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 			pm_dev_dbg(dev, state, "legacy class ");
 			error = legacy_suspend(dev, state, dev->class->suspend);
 		}
-		if (error)
-			goto End;
 	}
 
-	if (dev->type) {
-		if (dev->type->pm) {
-			pm_dev_dbg(dev, state, "type ");
-			error = pm_op(dev, dev->type->pm, state);
-		}
-		if (error)
-			goto End;
-	}
-
-	if (dev->bus) {
-		if (dev->bus->pm) {
-			pm_dev_dbg(dev, state, "");
-			error = pm_op(dev, dev->bus->pm, state);
-		} else if (dev->bus->suspend) {
-			pm_dev_dbg(dev, state, "legacy ");
-			error = legacy_suspend(dev, state, dev->bus->suspend);
-		}
-		if (error)
-			goto End;
-	}
-
-	if (dev->pwr_domain) {
+ Domain:
+	if (!error && dev->pwr_domain) {
 		pm_dev_dbg(dev, state, "power domain ");
 		pm_op(dev, &dev->pwr_domain->ops, state);
 	}
@@ -986,25 +970,24 @@ static int device_prepare(struct device *dev, pm_message_t state)
 
 	device_lock(dev);
 
-	if (dev->bus && dev->bus->pm && dev->bus->pm->prepare) {
+	if (dev->bus && dev->bus->pm) {
 		pm_dev_dbg(dev, state, "preparing ");
-		error = dev->bus->pm->prepare(dev);
+		if (dev->bus->pm->prepare)
+			error = dev->bus->pm->prepare(dev);
 		suspend_report_result(dev->bus->pm->prepare, error);
 		if (error)
 			goto End;
-	}
-
-	if (dev->type && dev->type->pm && dev->type->pm->prepare) {
+	} else if (dev->type && dev->type->pm) {
 		pm_dev_dbg(dev, state, "preparing type ");
-		error = dev->type->pm->prepare(dev);
+		if (dev->type->pm->prepare)
+			error = dev->type->pm->prepare(dev);
 		suspend_report_result(dev->type->pm->prepare, error);
 		if (error)
 			goto End;
-	}
-
-	if (dev->class && dev->class->pm && dev->class->pm->prepare) {
+	} else if (dev->class && dev->class->pm) {
 		pm_dev_dbg(dev, state, "preparing class ");
-		error = dev->class->pm->prepare(dev);
+		if (dev->class->pm->prepare)
+			error = dev->class->pm->prepare(dev);
 		suspend_report_result(dev->class->pm->prepare, error);
 		if (error)
 			goto End;
