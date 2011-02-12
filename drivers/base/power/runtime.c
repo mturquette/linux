@@ -214,9 +214,9 @@ static int rpm_idle(struct device *dev, int rpmflags)
 
 	dev->power.idle_notification = true;
 
-	if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_idle)
+	if (dev->bus && dev->bus->pm)
 		callback = dev->bus->pm->runtime_idle;
-	else if (dev->type && dev->type->pm && dev->type->pm->runtime_idle)
+	else if (dev->type && dev->type->pm)
 		callback = dev->type->pm->runtime_idle;
 	else if (dev->class && dev->class->pm)
 		callback = dev->class->pm->runtime_idle;
@@ -382,9 +382,9 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 
 	__update_runtime_status(dev, RPM_SUSPENDING);
 
-	if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_suspend)
+	if (dev->bus && dev->bus->pm)
 		callback = dev->bus->pm->runtime_suspend;
-	else if (dev->type && dev->type->pm && dev->type->pm->runtime_suspend)
+	else if (dev->type && dev->type->pm)
 		callback = dev->type->pm->runtime_suspend;
 	else if (dev->class && dev->class->pm)
 		callback = dev->class->pm->runtime_suspend;
@@ -584,9 +584,9 @@ static int rpm_resume(struct device *dev, int rpmflags)
 	if (dev->pwr_domain)
 		rpm_callback(dev->pwr_domain->ops.runtime_resume, dev);
 
-	if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_resume)
+	if (dev->bus && dev->bus->pm)
 		callback = dev->bus->pm->runtime_resume;
-	else if (dev->type && dev->type->pm && dev->type->pm->runtime_resume)
+	else if (dev->type && dev->type->pm)
 		callback = dev->type->pm->runtime_resume;
 	else if (dev->class && dev->class->pm)
 		callback = dev->class->pm->runtime_resume;
