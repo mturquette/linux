@@ -23,6 +23,7 @@
 
 #include "control.h"
 #include "omap_opp_data.h"
+#include "pm.h"
 
 /* 34xx */
 
@@ -152,7 +153,7 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 /**
  * omap3_opp_init() - initialize omap3 opp table
  */
-static int __init omap3_opp_init(void)
+int __init omap3_opp_init(void)
 {
 	int r = -ENODEV;
 
