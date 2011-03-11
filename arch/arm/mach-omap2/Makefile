@@ -89,12 +89,14 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
 					   vp44xx_data.o
 
 # OMAP voltage domains
+ifeq ($(CONFIG_PM),y)
 voltagedomain-common			:= voltage.o
 obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common)
 obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
 					   voltagedomains3xxx_data.o
 obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
 					   voltagedomains44xx_data.o
+endif
 
 # OMAP powerdomain framework
 powerdomain-common			+= powerdomain.o powerdomain-common.o
