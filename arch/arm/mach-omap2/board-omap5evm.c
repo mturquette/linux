@@ -24,6 +24,7 @@
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
 #include <plat/common.h>
+#include <plat/usb.h>
 
 static void __init omap_5430evm_init_early(void)
 {
@@ -45,6 +46,7 @@ static void __init omap_5430evm_init(void)
 {
 	omap_5430evm_i2c_init();
 	omap_serial_init();
+	usb_dwc3_init();
 }
 
 static void __init omap_5430evm_map_io(void)
