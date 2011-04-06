@@ -823,9 +823,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
 	 * on init.  Now that omap_device is ready, ensure full idle
 	 * before doing omap_device_enable().
 	 */
-	if (cpu_is_omap54xx()) {
-		pr_err("FIXME : Remove this after clock fw is available\n");
-	} else {
+	if (!cpu_is_omap54xx()) {
 		omap_hwmod_idle(uart->oh);
 		omap_device_enable(uart->pdev);
 		omap_uart_idle_init(uart);

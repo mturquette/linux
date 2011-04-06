@@ -519,11 +519,11 @@ static int _init_main_clk(struct omap_hwmod *oh)
 			   oh->name, oh->main_clk);
 		return -EINVAL;
 	}
-
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
 	if (!oh->_clk->clkdm)
 		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
 			   oh->main_clk, oh->_clk->name);
-
+#endif
 	return ret;
 }
 
@@ -1727,8 +1727,10 @@ static int _setup(struct omap_hwmod *oh, void *data)
 
 	r = _enable(oh);
 	if (r) {
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
 		pr_warning("omap_hwmod: %s: cannot be enabled (%d)\n",
 			   oh->name, oh->_state);
+#endif
 		return 0;
 	}
 

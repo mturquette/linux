@@ -8,8 +8,6 @@ config ARCH_OMAP2PLUS_TYPICAL
 	select AEABI
 	select REGULATOR
 	select PM_RUNTIME
-	select VFP
-	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || ARCH_OMAP5
 	select SERIAL_OMAP
 	select SERIAL_OMAP_CONSOLE
 	select I2C
@@ -335,6 +333,10 @@ config MACH_OMAP4_PANDA
 config MACH_OMAP_5430EVM
 	bool "OMAP5 EVM board"
 	depends on ARCH_OMAP5
+
+config MACH_OMAP_5430ZEBU
+	bool "OMAP5 ZEBU"
+	depends on ARCH_OMAP5 && MACH_OMAP_5430EVM
 
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
