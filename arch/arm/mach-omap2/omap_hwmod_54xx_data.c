@@ -5670,7 +5670,9 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_l3_main_3_hwmod,
 
 	/* l4 class */
+#if 0
 	&omap54xx_l4_abe_hwmod,
+#endif
 	&omap54xx_l4_cfg_hwmod,
 	&omap54xx_l4_per_hwmod,
 	&omap54xx_l4_wkup_hwmod,
@@ -5687,12 +5689,13 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	/* dma class */
 	&omap54xx_dma_system_hwmod,
 
+#if 0
 	/* dmic class */
 	&omap54xx_dmic_hwmod,
 
 	/* dsp class */
 	&omap54xx_dsp_hwmod,
-
+#endif
 	/* dss class */
 	&omap54xx_dss_hwmod,
 	&omap54xx_dss_dispc_hwmod,
@@ -5798,7 +5801,6 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_uart4_hwmod,
 	&omap54xx_uart5_hwmod,
 	&omap54xx_uart6_hwmod,
-
 	/* usb_otg_ss class */
 	&omap54xx_usb_otg_ss_hwmod,
 
