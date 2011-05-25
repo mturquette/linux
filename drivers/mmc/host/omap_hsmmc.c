@@ -905,7 +905,10 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 	cmdreg = (cmd->opcode << 24) | (resptype << 16) | (cmdtype << 22);
 
 	if (data) {
-		cmdreg |= DP_SELECT | MSBS | BCE;
+		if (host->use_dma)
+			cmdreg |= DP_SELECT | MSBS | BCE;
+		else
+			cmdreg |= DP_SELECT ;
 		if (data->flags & MMC_DATA_READ)
 			cmdreg |= DDIR;
 		else

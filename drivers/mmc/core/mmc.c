@@ -306,9 +306,12 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 		break;
 	default:
 		/* MMC v4 spec says this cannot happen */
+		card->ext_csd.hs_max_dtr = 52000000;
+		card->ext_csd.card_type = EXT_CSD_CARD_TYPE_DDR_1_8V;
 		printk(KERN_WARNING "%s: card is mmc v4 but doesn't "
 			"support any high-speed modes.\n",
 			mmc_hostname(card->host));
+		break;
 	}
 
 	card->ext_csd.raw_s_a_timeout = ext_csd[EXT_CSD_S_A_TIMEOUT];
