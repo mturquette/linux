@@ -25,12 +25,34 @@
 #include <mach/omap4-common.h>
 #include <plat/common.h>
 #include <plat/usb.h>
+#include <plat/mmc.h>
+#include "hsmmc.h"
 
 static void __init omap_5430evm_init_early(void)
 {
 	omap2_init_common_infrastructure();
 	omap2_init_common_devices(NULL, NULL);
 }
+
+static struct omap2_hsmmc_info mmc[] = {
+	{
+		.mmc		= 1,
+		.caps		= MMC_CAP_4_BIT_DATA,
+		.gpio_cd	= -EINVAL,
+		.gpio_wp	= -EINVAL,
+		.ocr_mask	= MMC_VDD_29_30,
+	},
+	{
+		.mmc		= 2,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.gpio_cd	= -EINVAL,
+		.gpio_wp	= -EINVAL,
+		.nonremovable	= true,
+		.ocr_mask	= MMC_VDD_29_30,
+	},
+	{}	/* Terminator */
+};
+
 
 static int __init omap_5430evm_i2c_init(void)
 {
@@ -45,6 +67,7 @@ static void __init omap_5430evm_init(void)
 {
 	omap_5430evm_i2c_init();
 	omap_serial_init();
+	omap2_hsmmc_init(mmc);
 	usb_dwc3_init();
 }
 
