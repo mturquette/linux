@@ -484,9 +484,23 @@ static inline int omap_hsmmc_have_reg(void)
 
 #else
 
+static int omap_hsmmc_4_set_sleep(struct device *dev, int slot, int sleep,
+					int vdd, int cardsleep)
+{
+	return 0;
+}
+
+static int omap_hsmmc_4_set_power(struct device *dev, int slot, int power_on,
+					int vdd)
+{
+	return 0;
+}
+
 static inline int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
 {
-	return -EINVAL;
+	mmc_slot(host).set_power = omap_hsmmc_4_set_power;
+	mmc_slot(host).set_sleep = omap_hsmmc_4_set_sleep;
+	return 0;
 }
 
 static inline void omap_hsmmc_reg_put(struct omap_hsmmc_host *host)
@@ -2036,13 +2050,16 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 		}
 	}
 
+#ifdef CONFIG_REGULATOR
 	if (omap_hsmmc_have_reg() && !mmc_slot(host).set_power) {
 		ret = omap_hsmmc_reg_get(host);
 		if (ret)
 			goto err_reg;
 		host->use_reg = 1;
 	}
-
+#else
+	omap_hsmmc_reg_get(host);
+#endif
 	mmc->ocr_avail = mmc_slot(host).ocr_mask;
 
 	/* Request IRQ for card detect */
@@ -2090,7 +2107,9 @@ err_slot_name:
 err_irq_cd:
 	if (host->use_reg)
 		omap_hsmmc_reg_put(host);
+#ifdef CONFIG_REGULATOR
 err_reg:
+#endif
 	if (host->pdata->cleanup)
 		host->pdata->cleanup(&pdev->dev);
 err_irq_cd_init:
