@@ -62,13 +62,10 @@ extern int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state);
 
 extern u32 wakeup_timer_seconds;
 extern u32 wakeup_timer_milliseconds;
-extern struct omap_dm_timer *gptimer_wakeup;
 
 #ifdef CONFIG_PM_DEBUG
-extern void omap2_pm_wakeup_on_timer(u32 seconds, u32 milliseconds);
 extern u32 enable_off_mode;
 #else
-#define omap2_pm_wakeup_on_timer(seconds, milliseconds)	do {} while (0);
 #define enable_off_mode 0
 #endif
 
