@@ -1973,12 +1973,14 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 
 	spin_lock_init(&host->irq_lock);
 
+#ifndef CONFIG_OMAP5_VIRTIO
 	host->fclk = clk_get(&pdev->dev, "fck");
 	if (IS_ERR(host->fclk)) {
 		ret = PTR_ERR(host->fclk);
 		host->fclk = NULL;
 		goto err1;
 	}
+#endif
 
 	omap_hsmmc_context_save(host);
 
@@ -2146,7 +2148,9 @@ err_irq:
 		clk_disable(host->dbclk);
 		clk_put(host->dbclk);
 	}
+#ifndef CONFIG_OMAP5_VIRTIO
 err1:
+#endif
 	iounmap(host->base);
 	platform_set_drvdata(pdev, NULL);
 	mmc_free_host(mmc);
