@@ -1362,6 +1362,7 @@ static int _reset(struct omap_hwmod *oh)
 static int _enable(struct omap_hwmod *oh)
 {
 	int r;
+	int hwsup = 0;
 
 	if (oh->_state != _HWMOD_STATE_INITIALIZED &&
 	    oh->_state != _HWMOD_STATE_IDLE &&
@@ -1380,6 +1381,19 @@ static int _enable(struct omap_hwmod *oh)
 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
 
 	_add_initiator_dep(oh, mpu_oh);
+
+	/*
+	 * A clockdomain must be in SW_SUP before enabling completely the
+	 * module. The clockdomain can be set in HW_AUTO only when the module
+	 * become ready.
+	 */
+	hwsup = clkdm_allows_idle(oh->clkdm);
+	r = clkdm_hwmod_enable(oh->clkdm, oh);
+	if (r) {
+		WARN(1, "omap_hwmod: %s: could not enable clockdomain %s: %d\n",
+		     oh->name, oh->clkdm->name, r);
+		return r;
+	}
 	_enable_clocks(oh);
 	_enable_module(oh);
 
@@ -1394,6 +1408,13 @@ static int _enable(struct omap_hwmod *oh)
 
 	r = _wait_target_ready(oh);
 	if (!r) {
+		/*
+		 * Set the clockdomain to HW_AUTO only if the target is ready,
+		 * assuming that the previous state was HW_AUTO
+		 */
+		if (hwsup)
+			clkdm_allow_idle(oh->clkdm);
+
 		oh->_state = _HWMOD_STATE_ENABLED;
 
 		/* Access the sysconfig only if the target is ready */
@@ -1404,7 +1425,8 @@ static int _enable(struct omap_hwmod *oh)
 		}
 	} else {
 		_disable_clocks(oh);
-		pr_debug("omap_hwmod: %s: _wait_target_ready: %d\n",
+		clkdm_hwmod_disable(oh->clkdm, oh);
+		pr_debug("omap_hwmod: %s: _wait_target_ready failed: %d\n",
 			 oh->name, r);
 	}
 
@@ -1446,6 +1468,7 @@ static int _idle(struct omap_hwmod *oh)
 	 * transition to complete properly.
 	 */
 	_disable_clocks(oh);
+	clkdm_hwmod_disable(oh->clkdm, oh);
 
 	/* Mux pins for device idle if populated */
 	if (oh->mux && oh->mux->pads_dynamic)
@@ -1543,6 +1566,7 @@ static int _shutdown(struct omap_hwmod *oh)
 			pr_debug("omap_hwmod: %s: _wait_target_disable failed\n",
 				   oh->name);
 		_disable_clocks(oh);
+		clkdm_hwmod_disable(oh->clkdm, oh);
 	}
 	/* XXX Should this code also force-disable the optional clocks? */
 
