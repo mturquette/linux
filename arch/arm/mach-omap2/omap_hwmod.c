@@ -1031,6 +1031,36 @@ static int _wait_target_ready(struct omap_hwmod *oh)
 }
 
 /**
+ * _wait_target_disable - wait for a module to be disabled
+ * @oh: struct omap_hwmod *
+ *
+ * Wait for a module @oh to leave slave idle.  Returns 0 if the module
+ * does not have an IDLEST bit or if the module successfully leaves
+ * slave idle; otherwise, pass along the return value of the
+ * appropriate *_cm_wait_module_ready() function.
+ */
+static int _wait_target_disable(struct omap_hwmod *oh)
+{
+	if (!oh)
+		return -EINVAL;
+
+	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
+		return 0;
+
+	if (oh->flags & HWMOD_NO_IDLEST)
+		return 0;
+
+	/* TODO: For now just handle OMAP4+ */
+	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+		return 0;
+
+	return omap4_cm_wait_module_idle(oh->clkdm->prcm_partition,
+					 oh->clkdm->cm_inst,
+					 oh->clkdm->clkdm_offs,
+					 oh->prcm.omap4.clkctrl_offs);
+}
+
+/**
  * _lookup_hardreset - fill register bit info for this hwmod/reset line
  * @oh: struct omap_hwmod *
  * @name: name of the reset line in the context of this hwmod
@@ -1337,6 +1367,8 @@ static int _enable(struct omap_hwmod *oh)
  */
 static int _idle(struct omap_hwmod *oh)
 {
+	int ret;
+
 	if (oh->_state != _HWMOD_STATE_ENABLED) {
 		WARN(1, "omap_hwmod: %s: idle state can only be entered from "
 		     "enabled state\n", oh->name);
@@ -1349,6 +1381,10 @@ static int _idle(struct omap_hwmod *oh)
 		_idle_sysc(oh);
 	_del_initiator_dep(oh, mpu_oh);
 	_disable_clocks(oh);
+	ret = _wait_target_disable(oh);
+	if (ret)
+		pr_debug("omap_hwmod: %s: _wait_target_disable failed\n",
+			   oh->name);
 
 	/* Mux pins for device idle if populated */
 	if (oh->mux && oh->mux->pads_dynamic)
@@ -1441,6 +1477,10 @@ static int _shutdown(struct omap_hwmod *oh)
 		_del_initiator_dep(oh, mpu_oh);
 		/* XXX what about the other system initiators here? dma, dsp */
 		_disable_clocks(oh);
+		ret = _wait_target_disable(oh);
+		if (ret)
+			pr_debug("omap_hwmod: %s: _wait_target_disable failed\n",
+				   oh->name);
 	}
 	/* XXX Should this code also force-disable the optional clocks? */
 
