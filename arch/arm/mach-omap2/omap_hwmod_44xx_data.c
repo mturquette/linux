@@ -1141,7 +1141,7 @@ static struct omap_hwmod omap44xx_dsp_c0_hwmod = {
 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_dsp_c0_resets),
 	.prcm = {
 		.omap4 = {
-			.rstctrl_reg = OMAP4430_RM_TESLA_RSTCTRL,
+			.rstctrl_offs = OMAP4_RM_TESLA_RSTCTRL_OFFSET,
 		},
 	},
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
@@ -1159,7 +1159,7 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_TESLA_TESLA_CLKCTRL_OFFSET,
-			.rstctrl_reg = OMAP4430_RM_TESLA_RSTCTRL,
+			.rstctrl_offs = OMAP4_RM_TESLA_RSTCTRL_OFFSET,
 		},
 	},
 	.slaves		= omap44xx_dsp_slaves,
@@ -2525,7 +2525,7 @@ static struct omap_hwmod omap44xx_ipu_c0_hwmod = {
 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_ipu_c0_resets),
 	.prcm = {
 		.omap4 = {
-			.rstctrl_reg = OMAP4430_RM_DUCATI_RSTCTRL,
+			.rstctrl_offs = OMAP4_RM_DUCATI_RSTCTRL_OFFSET,
 		},
 	},
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
@@ -2541,7 +2541,7 @@ static struct omap_hwmod omap44xx_ipu_c1_hwmod = {
 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_ipu_c1_resets),
 	.prcm = {
 		.omap4 = {
-			.rstctrl_reg = OMAP4430_RM_DUCATI_RSTCTRL,
+			.rstctrl_offs = OMAP4_RM_DUCATI_RSTCTRL_OFFSET,
 		},
 	},
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
@@ -2559,7 +2559,7 @@ static struct omap_hwmod omap44xx_ipu_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_DUCATI_DUCATI_CLKCTRL_OFFSET,
-			.rstctrl_reg = OMAP4430_RM_DUCATI_RSTCTRL,
+			.rstctrl_offs = OMAP4_RM_DUCATI_RSTCTRL_OFFSET,
 		},
 	},
 	.slaves		= omap44xx_ipu_slaves,
@@ -2725,7 +2725,7 @@ static struct omap_hwmod omap44xx_iva_seq0_hwmod = {
 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_iva_seq0_resets),
 	.prcm = {
 		.omap4 = {
-			.rstctrl_reg = OMAP4430_RM_IVAHD_RSTCTRL,
+			.rstctrl_offs = OMAP4_RM_IVAHD_RSTCTRL_OFFSET,
 		},
 	},
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
@@ -2741,7 +2741,7 @@ static struct omap_hwmod omap44xx_iva_seq1_hwmod = {
 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_iva_seq1_resets),
 	.prcm = {
 		.omap4 = {
-			.rstctrl_reg = OMAP4430_RM_IVAHD_RSTCTRL,
+			.rstctrl_offs = OMAP4_RM_IVAHD_RSTCTRL_OFFSET,
 		},
 	},
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
@@ -2759,7 +2759,7 @@ static struct omap_hwmod omap44xx_iva_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP4_CM_IVAHD_IVAHD_CLKCTRL_OFFSET,
-			.rstctrl_reg = OMAP4430_RM_IVAHD_RSTCTRL,
+			.rstctrl_offs = OMAP4_RM_IVAHD_RSTCTRL_OFFSET,
 		},
 	},
 	.slaves		= omap44xx_iva_slaves,
