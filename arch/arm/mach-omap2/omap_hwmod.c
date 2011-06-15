@@ -145,7 +145,7 @@
 #include <plat/prcm.h>
 
 #include "cm2xxx_3xxx.h"
-#include "cm44xx.h"
+#include "cminst44xx.h"
 #include "prm2xxx_3xxx.h"
 #include "prm44xx.h"
 #include "mux.h"
@@ -1016,7 +1016,13 @@ static int _wait_target_ready(struct omap_hwmod *oh)
 						 oh->prcm.omap2.idlest_reg_id,
 						 oh->prcm.omap2.idlest_idle_bit);
 	} else if (cpu_is_omap44xx()) {
-		ret = omap4_cm_wait_module_ready(oh->prcm.omap4.clkctrl_reg);
+		if (!oh->clkdm)
+			return -EINVAL;
+
+		ret = omap4_cm_wait_module_ready(oh->clkdm->prcm_partition,
+						 oh->clkdm->cm_inst,
+						 oh->clkdm->clkdm_offs,
+						 oh->prcm.omap4.clkctrl_offs);
 	} else {
 		BUG();
 	};

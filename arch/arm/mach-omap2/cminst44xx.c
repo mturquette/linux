@@ -2,6 +2,7 @@
  * OMAP4 CM instance functions
  *
  * Copyright (C) 2009 Nokia Corporation
+ * Copyright (C) 2011 Texas Instruments, Inc.
  * Paul Walmsley
  *
  * This program is free software; you can redistribute it and/or modify
@@ -199,9 +200,20 @@ void omap4_cminst_clkdm_force_wakeup(u8 part, s16 inst, u16 cdoffs)
  *
  */
 
+static u32 _clkctrl_idlest(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
+{
+	u32 v = omap4_cminst_read_inst_reg(part, inst, clkctrl_offs);
+	v &= OMAP4430_IDLEST_MASK;
+	v >>= OMAP4430_IDLEST_SHIFT;
+	return v;
+}
+
 /**
  * omap4_cm_wait_module_ready - wait for a module to be in 'func' state
- * @clkctrl_reg: CLKCTRL module address
+ * @part: PRCM partition ID that the CM_CLKCTRL register exists in
+ * @inst: CM instance register offset (*_INST macro)
+ * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+ * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
  *
  * Wait for the module IDLEST to be functional. If the idle state is in any
  * the non functional state (trans, idle or disabled), module and thus the
@@ -217,17 +229,16 @@ void omap4_cminst_clkdm_force_wakeup(u8 part, s16 inst, u16 cdoffs)
  *   0x3 disabled: Module is disabled and cannot be accessed
  *
  */
-int omap4_cm_wait_module_ready(void __iomem *clkctrl_reg)
+int omap4_cm_wait_module_ready(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
 {
 	int i = 0;
 
-	if (!clkctrl_reg)
+	if (!clkctrl_offs)
 		return 0;
 
 	omap_test_timeout((
-		((__raw_readl(clkctrl_reg) & OMAP4430_IDLEST_MASK) == 0) ||
-		 (((__raw_readl(clkctrl_reg) & OMAP4430_IDLEST_MASK) >>
-		  OMAP4430_IDLEST_SHIFT) == 0x2)),
+		_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) == 0 ||
+		_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) == 0x2),
 		MAX_MODULE_READY_TIME, i);
 
 	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
