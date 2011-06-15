@@ -1,7 +1,7 @@
 /*
  * OMAP4 Clock Management (CM) definitions
  *
- * Copyright (C) 2007-2009 Texas Instruments, Inc.
+ * Copyright (C) 2007-2011 Texas Instruments, Inc.
  * Copyright (C) 2007-2009 Nokia Corporation
  *
  * Written by Paul Walmsley
@@ -26,7 +26,6 @@
 /* Function prototypes */
 # ifndef __ASSEMBLER__
 
-extern int omap4_cm_wait_module_ready(void __iomem *clkctrl_reg);
 
 # endif
 #endif
