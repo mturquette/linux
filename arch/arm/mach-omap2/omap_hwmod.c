@@ -463,13 +463,13 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
  */
 static int _add_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
 {
-	if (!oh->_clk)
+	if (!oh->clkdm)
 		return -EINVAL;
 
-	if (oh->_clk->clkdm && oh->_clk->clkdm->flags & CLKDM_NO_AUTODEPS)
+	if (oh->clkdm->flags & CLKDM_NO_AUTODEPS)
 		return 0;
 
-	return clkdm_add_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
+	return clkdm_add_sleepdep(oh->clkdm, init_oh->clkdm);
 }
 
 /**
@@ -487,13 +487,13 @@ static int _add_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
  */
 static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
 {
-	if (!oh->_clk)
+	if (!oh->clkdm)
 		return -EINVAL;
 
-	if (oh->_clk->clkdm && oh->_clk->clkdm->flags & CLKDM_NO_AUTODEPS)
+	if (oh->clkdm->flags & CLKDM_NO_AUTODEPS)
 		return 0;
 
-	return clkdm_del_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
+	return clkdm_del_sleepdep(oh->clkdm, init_oh->clkdm);
 }
 
 /**
@@ -517,10 +517,6 @@ static int _init_main_clk(struct omap_hwmod *oh)
 			   oh->name, oh->main_clk);
 		return -EINVAL;
 	}
-
-	if (!oh->_clk->clkdm)
-		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
-			   oh->main_clk, oh->_clk->name);
 
 	return ret;
 }
@@ -2106,24 +2102,10 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
  */
 struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
 {
-	struct clk *c;
-
-	if (!oh)
+	if (!oh || !oh->clkdm)
 		return NULL;
 
-	if (oh->_clk) {
-		c = oh->_clk;
-	} else {
-		if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
-			return NULL;
-		c = oh->slaves[oh->_mpu_port_index]->_clk;
-	}
-
-	if (!c->clkdm)
-		return NULL;
-
-	return c->clkdm->pwrdm.ptr;
-
+	return oh->clkdm->pwrdm.ptr;
 }
 
 /**
