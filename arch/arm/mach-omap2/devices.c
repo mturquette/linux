@@ -32,6 +32,7 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 #include <plat/omap4-keypad.h>
+#include <plat/sata.h>
 
 #include "mux.h"
 #include "control.h"
@@ -690,6 +691,13 @@ static int __init omap2_init_devices(void)
 	omap_hdq_init();
 	omap_init_sti();
 	omap_init_sham();
+
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
+#if defined(CONFIG_SATA_AHCI_PLATFORM) || \
+	defined(CONFIG_SATA_AHCI_PLATFORM_MODULE)
+	omap_sata_init();
+#endif
+#endif
 	omap_init_aes();
 	omap_init_vout();
 
