@@ -888,8 +888,17 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 		if (cmd->flags & MMC_RSP_136)
 			resptype = 1;
 		else if (cmd->flags & MMC_RSP_BUSY) {
-			resptype = 3;
-			host->response_busy = 1;
+			#ifdef CONFIG_MACH_OMAP_5430ZEBU
+				resptype = 3;
+				host->response_busy = 1;
+			#else
+				if (cmd->opcode == 6 || cmd->opcode == 38)
+					host->response_busy = 0;
+				else {
+					resptype = 3;
+					host->response_busy = 1;
+					}
+			#endif
 		} else
 			resptype = 2;
 	}
