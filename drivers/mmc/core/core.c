@@ -1058,6 +1058,7 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, bool cmd11
 	 * Send CMD11 only if the request is to switch the card to
 	 * 1.8V signalling.
 	 */
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
 	if ((signal_voltage != MMC_SIGNAL_VOLTAGE_330) && cmd11) {
 		cmd.opcode = SD_SWITCH_VOLTAGE;
 		cmd.arg = 0;
@@ -1070,7 +1071,7 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, bool cmd11
 		if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR))
 			return -EIO;
 	}
-
+#endif
 	host->ios.signal_voltage = signal_voltage;
 
 	if (host->ops->start_signal_voltage_switch)
