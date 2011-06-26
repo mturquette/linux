@@ -48,9 +48,13 @@
 #define OMAP3_SRAM_VA           0xfe400000
 #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
 #define OMAP3_SRAM_PUB_VA       (OMAP3_SRAM_VA + 0x8000)
-#define OMAP4_SRAM_VA		0xfe400000
+#ifdef CONFIG_OMAP4_ERRATA_I688
+#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
+#define OMAP4_SRAM_PUB_VA	OMAP4_SRAM_VA
+#else
 #define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
 #define OMAP4_SRAM_PUB_VA	(OMAP4_SRAM_VA + 0x4000)
+#endif
 
 #if defined(CONFIG_ARCH_OMAP2PLUS)
 #define SRAM_BOOTLOADER_SZ	0x00
@@ -203,6 +207,11 @@ static void __init omap_map_sram(void)
 	if (omap_sram_size == 0)
 		return;
 
+#ifdef CONFIG_OMAP4_ERRATA_I688
+		omap_sram_base += PAGE_SIZE;
+		omap_sram_start += PAGE_SIZE;
+		omap_sram_size -= SZ_16K;
+#endif
 	if (cpu_is_omap34xx()) {
 		/*
 		 * SRAM must be marked as non-cached on OMAP3 since the
