@@ -687,7 +687,7 @@ MACHINE_START(CM_T3730, "Compulab CM-T3730")
 	.reserve        = omap_reserve,
 	.map_io         = omap3_map_io,
 	.init_early     = cm_t35_init_early,
-	.init_irq       = omap_init_irq,
+	.init_irq       = omap3_init_irq,
 	.init_machine   = cm_t3730_init,
-	.timer          = &omap_timer,
+	.timer          = &omap3_timer,
 MACHINE_END
