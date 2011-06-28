@@ -701,7 +701,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
  *  emif1
  *  emif2
  *  fdif
- *  gpmc
  *  gpu
  *  hdq1w
  *  mcasp
@@ -2191,6 +2190,80 @@ static struct omap_hwmod omap44xx_gpio6_hwmod = {
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap44xx_gpio6_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio6_slaves),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
+};
+
+/*
+ * 'gpmc' class
+ * general purpose memory controller
+ */
+
+static struct omap_hwmod_class_sysconfig omap44xx_gpmc_sysc = {
+	.rev_offs	= 0x0000,
+	.sysc_offs	= 0x0010,
+	.syss_offs	= 0x0014,
+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.sysc_fields	= &omap_hwmod_sysc_type1,
+};
+
+static struct omap_hwmod_class omap44xx_gpmc_hwmod_class = {
+	.name	= "gpmc",
+	.sysc	= &omap44xx_gpmc_sysc,
+};
+
+/* gpmc */
+static struct omap_hwmod omap44xx_gpmc_hwmod;
+static struct omap_hwmod_irq_info omap44xx_gpmc_irqs[] = {
+	{ .irq = 20 + OMAP44XX_IRQ_GIC_START },
+};
+
+static struct omap_hwmod_dma_info omap44xx_gpmc_sdma_reqs[] = {
+	{ .dma_req = 3 + OMAP44XX_DMA_REQ_START },
+};
+
+static struct omap_hwmod_addr_space omap44xx_gpmc_addrs[] = {
+	{
+		.pa_start	= 0x50000000,
+		.pa_end		= 0x500003ff,
+		.flags		= ADDR_TYPE_RT
+	},
+};
+
+/* l3_main_2 -> gpmc */
+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__gpmc = {
+	.master		= &omap44xx_l3_main_2_hwmod,
+	.slave		= &omap44xx_gpmc_hwmod,
+	.clk		= "l3_div_ck",
+	.addr		= omap44xx_gpmc_addrs,
+	.addr_cnt	= ARRAY_SIZE(omap44xx_gpmc_addrs),
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* gpmc slave ports */
+static struct omap_hwmod_ocp_if *omap44xx_gpmc_slaves[] = {
+	&omap44xx_l3_main_2__gpmc,
+};
+
+static struct omap_hwmod omap44xx_gpmc_hwmod = {
+	.name		= "gpmc",
+	.class		= &omap44xx_gpmc_hwmod_class,
+	.clkdm_name	= "l3_2_clkdm",
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+	.mpu_irqs	= omap44xx_gpmc_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpmc_irqs),
+	.sdma_reqs	= omap44xx_gpmc_sdma_reqs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_gpmc_sdma_reqs),
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP4_CM_L3_2_GPMC_CLKCTRL_OFFSET,
+			.context_offs = OMAP4_RM_L3_2_GPMC_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+	.slaves		= omap44xx_gpmc_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpmc_slaves),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
 };
 
@@ -5391,6 +5464,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_gpio4_hwmod,
 	&omap44xx_gpio5_hwmod,
 	&omap44xx_gpio6_hwmod,
+
+	/* gpmc class */
+	&omap44xx_gpmc_hwmod,
 
 	/* hsi class */
 /*	&omap44xx_hsi_hwmod, */
