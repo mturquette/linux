@@ -37,11 +37,9 @@
 
 extern void s3c2412_sleep_enter(void);
 
-static void s3c2412_cpu_suspend(void)
+static void s3c2412_cpu_suspend(unsigned long arg)
 {
 	unsigned long tmp;
-
-	flush_cache_all();
 
 	/* set our standby method to sleep */
 
