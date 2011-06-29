@@ -3487,7 +3487,6 @@ static struct omap_hwmod omap3xxx_mmc1_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_mmc1_slaves),
 	.class		= &omap34xx_mmc_class,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
 };
 
 /* MMC/SD/SDIO2 */
@@ -3531,7 +3530,6 @@ static struct omap_hwmod omap3xxx_mmc2_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_mmc2_slaves),
 	.class		= &omap34xx_mmc_class,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
 };
 
 /* MMC/SD/SDIO3 */
