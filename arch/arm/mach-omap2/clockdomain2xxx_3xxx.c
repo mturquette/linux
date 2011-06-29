@@ -13,6 +13,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/errno.h>
 #include <plat/prcm.h>
 #include "prm.h"
 #include "prm2xxx_3xxx.h"
@@ -146,6 +147,15 @@ static void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
 		_clkdm_del_autodeps(clkdm);
 }
 
+static int omap2_clkdm_allows_idle(struct clockdomain *clkdm)
+{
+	if (!clkdm->clktrctrl_mask)
+		return -EINVAL;
+
+	return omap2_cm_is_clkdm_in_hwsup(clkdm->pwrdm.ptr->prcm_offs,
+				clkdm->clktrctrl_mask);
+}
+
 static void _enable_hwsup(struct clockdomain *clkdm)
 {
 	if (cpu_is_omap24xx())
@@ -183,7 +193,8 @@ static int omap2_clkdm_clk_enable(struct clockdomain *clkdm)
 		_clkdm_add_autodeps(clkdm);
 		_enable_hwsup(clkdm);
 	} else {
-		clkdm_wakeup(clkdm);
+		if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
+			omap2_clkdm_wakeup(clkdm);
 	}
 
 	return 0;
@@ -205,7 +216,8 @@ static int omap2_clkdm_clk_disable(struct clockdomain *clkdm)
 		_clkdm_del_autodeps(clkdm);
 		_enable_hwsup(clkdm);
 	} else {
-		clkdm_sleep(clkdm);
+		if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
+			omap2_clkdm_sleep(clkdm);
 	}
 
 	return 0;
@@ -252,6 +264,7 @@ struct clkdm_ops omap2_clkdm_operations = {
 	.clkdm_wakeup		= omap2_clkdm_wakeup,
 	.clkdm_allow_idle	= omap2_clkdm_allow_idle,
 	.clkdm_deny_idle	= omap2_clkdm_deny_idle,
+	.clkdm_allows_idle	= omap2_clkdm_allows_idle,
 	.clkdm_clk_enable	= omap2_clkdm_clk_enable,
 	.clkdm_clk_disable	= omap2_clkdm_clk_disable,
 };
@@ -269,6 +282,7 @@ struct clkdm_ops omap3_clkdm_operations = {
 	.clkdm_wakeup		= omap3_clkdm_wakeup,
 	.clkdm_allow_idle	= omap3_clkdm_allow_idle,
 	.clkdm_deny_idle	= omap3_clkdm_deny_idle,
+	.clkdm_allows_idle	= omap2_clkdm_allows_idle,
 	.clkdm_clk_enable	= omap2_clkdm_clk_enable,
 	.clkdm_clk_disable	= omap2_clkdm_clk_disable,
 };
