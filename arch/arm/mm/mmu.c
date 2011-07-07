@@ -273,6 +273,16 @@ static struct mem_type mem_types[] = {
 		.prot_l1   = PMD_TYPE_TABLE,
 		.domain    = DOMAIN_KERNEL,
 	},
+	[MT_DMA_COHERENT] = {
+		.prot_sect	= PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+				  PMD_SECT_S,
+		.domain		= DOMAIN_IO,
+	},
+	[MT_WC_COHERENT] = {
+		.prot_sect	= PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+				  PMD_SECT_S,
+		.domain		= DOMAIN_IO,
+	},
 };
 
 const struct mem_type *get_mem_type(unsigned int type)
@@ -353,6 +363,7 @@ static void __init build_mem_type_table(void)
 			mem_types[MT_DEVICE_NONSHARED].prot_sect |= PMD_SECT_XN;
 			mem_types[MT_DEVICE_CACHED].prot_sect |= PMD_SECT_XN;
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_XN;
+			mem_types[MT_DMA_COHERENT].prot_sect |= PMD_SECT_XN;
 		}
 		if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {
 			/*
@@ -457,13 +468,24 @@ static void __init build_mem_type_table(void)
 			/* Non-cacheable Normal is XCB = 001 */
 			mem_types[MT_MEMORY_NONCACHED].prot_sect |=
 				PMD_SECT_BUFFERED;
+			mem_types[MT_WC_COHERENT].prot_sect |=
+				PMD_SECT_BUFFERED;
+			mem_types[MT_DMA_COHERENT].prot_sect |=
+				PMD_SECT_BUFFERED;
 		} else {
 			/* For both ARMv6 and non-TEX-remapping ARMv7 */
 			mem_types[MT_MEMORY_NONCACHED].prot_sect |=
 				PMD_SECT_TEX(1);
+			mem_types[MT_WC_COHERENT].prot_sect |=
+				PMD_SECT_TEX(1);
+#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+			mem_types[MT_DMA_COHERENT].prot_sect |=
+				PMD_SECT_TEX(1);
+#endif
 		}
 	} else {
 		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_BUFFERABLE;
+		mem_types[MT_WC_COHERENT].prot_sect |= PMD_SECT_BUFFERED;
 	}
 
 	for (i = 0; i < 16; i++) {
@@ -975,6 +997,8 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 		map.type = MT_LOW_VECTORS;
 		create_mapping(&map);
 	}
+
+	dma_coherent_mapping();
 
 	/*
 	 * Ask the machine support to map in the statically mapped devices.

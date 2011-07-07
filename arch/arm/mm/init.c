@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/gfp.h>
 #include <linux/memblock.h>
+#include <linux/poison.h>
 #include <linux/sort.h>
 
 #include <asm/mach-types.h>
@@ -353,6 +354,7 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 
 	arm_mm_memblock_reserve();
 	arm_dt_memblock_reserve();
+	dma_coherent_reserve();
 
 	/* reserve any platform specific memblock areas */
 	if (mdesc->reserve)
@@ -708,6 +710,8 @@ void free_initmem(void)
 				    __phys_to_pfn(__pa(&__tcm_end)),
 				    "TCM link");
 #endif
+
+	memset(__init_begin, POISON_FREE_INITMEM, __init_end - __init_begin);
 
 	if (!machine_is_integrator() && !machine_is_cintegrator())
 		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
