@@ -268,6 +268,9 @@ void omap2_clk_disable(struct clk *clk)
 		clk->ops->disable(clk);
 	}
 
+	if (clk->clkdm)
+		clkdm_clk_disable(clk->clkdm, clk);
+
 	if (clk->parent)
 		omap2_clk_disable(clk->parent);
 }
@@ -305,18 +308,30 @@ int omap2_clk_enable(struct clk *clk)
 		}
 	}
 
+	if (clk->clkdm) {
+		ret = clkdm_clk_enable(clk->clkdm, clk);
+		if (ret) {
+			WARN(1, "clock: %s: could not enable clockdomain %s: "
+			     "%d\n", clk->name, clk->clkdm->name, ret);
+			goto oce_err2;
+		}
+	}
+
 	if (clk->ops && clk->ops->enable) {
 		trace_clock_enable(clk->name, 1, smp_processor_id());
 		ret = clk->ops->enable(clk);
 		if (ret) {
 			WARN(1, "clock: %s: could not enable: %d\n",
 			     clk->name, ret);
-			goto oce_err2;
+			goto oce_err3;
 		}
 	}
 
 	return 0;
 
+oce_err3:
+	if (clk->clkdm)
+		clkdm_clk_disable(clk->clkdm, clk);
 oce_err2:
 	if (clk->parent)
 		omap2_clk_disable(clk->parent);
