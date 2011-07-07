@@ -17,9 +17,11 @@
 #define __ARCH_ARM_MACH_OMAP2_CLOCKDOMAIN_H
 
 #include <linux/init.h>
+#include <linux/spinlock.h>
 
 #include "powerdomain.h"
 #include <plat/clock.h>
+#include <plat/omap_hwmod.h>
 #include <plat/cpu.h>
 
 /*
@@ -122,6 +124,7 @@ struct clockdomain {
 	const struct omap_chip_id omap_chip;
 	atomic_t usecount;
 	struct list_head node;
+	spinlock_t lock;
 };
 
 /**
@@ -138,6 +141,7 @@ struct clockdomain {
  * @clkdm_wakeup: Force a clockdomain to wakeup
  * @clkdm_allow_idle: Enable hw supervised idle transitions for clock domain
  * @clkdm_deny_idle: Disable hw supervised idle transitions for clock domain
+ * @clkdm_allows_idle: Check if hw supervised idle transitions are enabled
  * @clkdm_clk_enable: Put the clkdm in right state for a clock enable
  * @clkdm_clk_disable: Put the clkdm in right state for a clock disable
  */
@@ -154,6 +158,7 @@ struct clkdm_ops {
 	int	(*clkdm_wakeup)(struct clockdomain *clkdm);
 	void	(*clkdm_allow_idle)(struct clockdomain *clkdm);
 	void	(*clkdm_deny_idle)(struct clockdomain *clkdm);
+	int	(*clkdm_allows_idle)(struct clockdomain *clkdm);
 	int	(*clkdm_clk_enable)(struct clockdomain *clkdm);
 	int	(*clkdm_clk_disable)(struct clockdomain *clkdm);
 };
@@ -177,12 +182,15 @@ int clkdm_clear_all_sleepdeps(struct clockdomain *clkdm);
 
 void clkdm_allow_idle(struct clockdomain *clkdm);
 void clkdm_deny_idle(struct clockdomain *clkdm);
+int clkdm_allows_idle(struct clockdomain *clkdm);
 
 int clkdm_wakeup(struct clockdomain *clkdm);
 int clkdm_sleep(struct clockdomain *clkdm);
 
 int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk);
 int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk);
+int clkdm_hwmod_enable(struct clockdomain *clkdm, struct omap_hwmod *oh);
+int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh);
 
 extern void __init omap2xxx_clockdomains_init(void);
 extern void __init omap3xxx_clockdomains_init(void);
