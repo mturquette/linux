@@ -1,8 +1,9 @@
 /*
  * board-cm-t35.c (CompuLab CM-T35 module)
  *
- * Copyright (C) 2009 CompuLab, Ltd.
- * Author: Mike Rapoport <mike@compulab.co.il>
+ * Copyright (C) 2009-2011 CompuLab, Ltd.
+ * Authors: Mike Rapoport <mike@compulab.co.il>
+ *	    Igor Grinberg <grinberg@compulab.co.il>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -12,11 +13,6 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301 USA
  *
  */
 
@@ -149,12 +145,12 @@ static struct mtd_partition cm_t35_nand_partitions[] = {
 	},
 	{
 		.name           = "linux",
-		.offset         = MTDPART_OFS_APPEND,	/* Offset = 0x280000 */
+		.offset         = MTDPART_OFS_APPEND,	/* Offset = 0x2A0000 */
 		.size           = 32 * NAND_BLOCK_SIZE,
 	},
 	{
 		.name           = "rootfs",
-		.offset         = MTDPART_OFS_APPEND,	/* Offset = 0x680000 */
+		.offset         = MTDPART_OFS_APPEND,	/* Offset = 0x6A0000 */
 		.size           = MTDPART_SIZ_FULL,
 	},
 };
@@ -162,9 +158,7 @@ static struct mtd_partition cm_t35_nand_partitions[] = {
 static struct omap_nand_platform_data cm_t35_nand_data = {
 	.parts			= cm_t35_nand_partitions,
 	.nr_parts		= ARRAY_SIZE(cm_t35_nand_partitions),
-	.dma_channel		= -1,	/* disable DMA in OMAP NAND driver */
 	.cs			= 0,
-
 };
 
 static void __init cm_t35_init_nand(void)
@@ -337,19 +331,21 @@ static void __init cm_t35_init_display(void)
 	}
 }
 
-static struct regulator_consumer_supply cm_t35_vmmc1_supply = {
-	.supply			= "vmmc",
+static struct regulator_consumer_supply cm_t35_vmmc1_supply[] = {
+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
 };
 
-static struct regulator_consumer_supply cm_t35_vsim_supply = {
-	.supply			= "vmmc_aux",
+static struct regulator_consumer_supply cm_t35_vsim_supply[] = {
+	REGULATOR_SUPPLY("vmmc_aux", "omap_hsmmc.0"),
 };
 
-static struct regulator_consumer_supply cm_t35_vdac_supply =
-	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc");
+static struct regulator_consumer_supply cm_t35_vdac_supply[] = {
+	REGULATOR_SUPPLY("vdda_dac", "omapdss_venc"),
+};
 
-static struct regulator_consumer_supply cm_t35_vdvi_supply =
-	REGULATOR_SUPPLY("vdvi", "omapdss");
+static struct regulator_consumer_supply cm_t35_vdvi_supply[] = {
+	REGULATOR_SUPPLY("vdvi", "omapdss"),
+};
 
 /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
 static struct regulator_init_data cm_t35_vmmc1 = {
@@ -362,8 +358,8 @@ static struct regulator_init_data cm_t35_vmmc1 = {
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
-	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &cm_t35_vmmc1_supply,
+	.num_consumer_supplies	= ARRAY_SIZE(cm_t35_vmmc1_supply),
+	.consumer_supplies	= cm_t35_vmmc1_supply,
 };
 
 /* VSIM for MMC1 pins DAT4..DAT7 (2 mA, plus card == max 50 mA) */
@@ -377,8 +373,8 @@ static struct regulator_init_data cm_t35_vsim = {
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
-	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &cm_t35_vsim_supply,
+	.num_consumer_supplies	= ARRAY_SIZE(cm_t35_vsim_supply),
+	.consumer_supplies	= cm_t35_vsim_supply,
 };
 
 /* VDAC for DSS driving S-Video (8 mA unloaded, max 65 mA) */
@@ -391,8 +387,8 @@ static struct regulator_init_data cm_t35_vdac = {
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
-	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &cm_t35_vdac_supply,
+	.num_consumer_supplies	= ARRAY_SIZE(cm_t35_vdac_supply),
+	.consumer_supplies	= cm_t35_vdac_supply,
 };
 
 /* VPLL2 for digital video outputs */
@@ -406,8 +402,8 @@ static struct regulator_init_data cm_t35_vpll2 = {
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
-	.num_consumer_supplies	= 1,
-	.consumer_supplies	= &cm_t35_vdvi_supply,
+	.num_consumer_supplies	= ARRAY_SIZE(cm_t35_vdvi_supply),
+	.consumer_supplies	= cm_t35_vdvi_supply,
 };
 
 static struct twl4030_usb_data cm_t35_usb_data = {
@@ -470,9 +466,9 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
 	if (gpio_request_one(wlan_rst, GPIOF_OUT_INIT_HIGH, "WLAN RST") == 0) {
 		gpio_export(wlan_rst, 0);
 		udelay(10);
-		gpio_set_value(wlan_rst, 0);
+		gpio_set_value_cansleep(wlan_rst, 0);
 		udelay(10);
-		gpio_set_value(wlan_rst, 1);
+		gpio_set_value_cansleep(wlan_rst, 1);
 	} else {
 		pr_err("CM-T35: could not obtain gpio for WiFi reset\n");
 	}
@@ -480,10 +476,6 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
 	mmc[0].gpio_cd = gpio + 0;
 	omap2_hsmmc_init(mmc);
-
-	/* link regulators to MMC adapters */
-	cm_t35_vmmc1_supply.dev = mmc[0].dev;
-	cm_t35_vsim_supply.dev = mmc[0].dev;
 
 	return 0;
 }
@@ -646,7 +638,7 @@ MACHINE_START(CM_T35, "Compulab CM-T35")
 	.reserve	= omap_reserve,
 	.map_io		= omap3_map_io,
 	.init_early	= cm_t35_init_early,
-	.init_irq	= omap_init_irq,
+	.init_irq	= omap3_init_irq,
 	.init_machine	= cm_t35_init,
-	.timer		= &omap_timer,
+	.timer		= &omap3_timer,
 MACHINE_END
