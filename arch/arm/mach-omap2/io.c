@@ -395,7 +395,11 @@ void __init omap2_init_common_infrastructure(void)
 	 * XXX ideally we could detect whether the MPU WDT was currently
 	 * enabled here and make this conditional
 	 */
+#ifdef CONFIG_PM_RUNTIME
 	postsetup_state = _HWMOD_STATE_DISABLED;
+#else
+	postsetup_state = _HWMOD_STATE_ENABLED;
+#endif
 	omap_hwmod_for_each_by_class("wd_timer",
 				     _set_hwmod_postsetup_state,
 				     &postsetup_state);
