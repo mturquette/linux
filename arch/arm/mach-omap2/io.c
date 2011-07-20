@@ -423,8 +423,10 @@ void __init omap2_init_common_infrastructure(void)
 		omap44xx_clockdomains_init();
 		omap44xx_hwmod_init();
 	} else if (cpu_is_omap54xx()) {
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
 		omap54xx_powerdomains_init();
 		omap54xx_clockdomains_init();
+#endif
 		omap54xx_hwmod_init();
 	} else {
 		pr_err("Could not init hwmod data - unknown SoC\n");
@@ -469,10 +471,13 @@ void __init omap2_init_common_infrastructure(void)
 		omap3xxx_clk_init();
 	else if (cpu_is_omap44xx())
 		omap4xxx_clk_init();
-	else if (cpu_is_omap54xx())
+	else if (cpu_is_omap54xx()) {
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
 		omap5xxx_clk_init();
-	else
+#endif
+	} else {
 		pr_err("Could not init clock framework - unknown SoC\n");
+	}
 }
 
 void __init omap2_init_common_devices(struct omap_sdrc_params *sdrc_cs0,

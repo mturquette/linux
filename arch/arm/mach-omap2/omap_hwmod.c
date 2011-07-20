@@ -498,6 +498,7 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
 	return clkdm_del_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
 }
 
+#if !defined(CONFIG_OMAP5_VIRTIO)
 /**
  * _init_main_clk - get a struct clk * for the the hwmod's main functional clk
  * @oh: struct omap_hwmod *
@@ -587,7 +588,7 @@ static int _init_opt_clks(struct omap_hwmod *oh)
 
 	return ret;
 }
-
+#endif
 /**
  * _enable_clocks - enable hwmod main clock and interface clocks
  * @oh: struct omap_hwmod *
@@ -679,6 +680,7 @@ static void _disable_optional_clocks(struct omap_hwmod *oh)
 		}
 }
 
+#if !defined(CONFIG_OMAP5_VIRTIO)
 /**
  * _enable_module - enable CLKCTRL modulemode on OMAP4
  * @oh: struct omap_hwmod *
@@ -728,7 +730,7 @@ static void _disable_module(struct omap_hwmod *oh)
 				    oh->clkdm->clkdm_offs,
 				    oh->prcm.omap4.clkctrl_offs);
 }
-
+#endif
 /**
  * _count_mpu_irqs - count the number of MPU IRQ lines associated with @oh
  * @oh: struct omap_hwmod *oh
@@ -1041,6 +1043,8 @@ static struct omap_hwmod *_lookup(const char *name)
 
 	return oh;
 }
+
+#if !defined(CONFIG_OMAP5_VIRTIO)
 /**
  * _init_clkdm - look up a clockdomain name, store pointer in omap_hwmod
  * @oh: struct omap_hwmod *
@@ -1071,6 +1075,7 @@ static int _init_clkdm(struct omap_hwmod *oh)
 
 	return 0;
 }
+#endif
 
 /**
  * _init_clocks - clk_get() all clocks associated with this hwmod. Retrieve as
@@ -1090,13 +1095,12 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
 		return 0;
 
 	pr_debug("omap_hwmod: %s: looking up clocks\n", oh->name);
-	if (!cpu_is_omap54xx()) {
+#if !defined(CONFIG_OMAP5_VIRTIO)
 		ret |= _init_main_clk(oh);
 		ret |= _init_interface_clks(oh);
 		ret |= _init_opt_clks(oh);
 		ret |= _init_clkdm(oh);
-	}
-
+#endif
 	if (!ret)
 		oh->_state = _HWMOD_STATE_CLKS_INITED;
 	else
@@ -1104,7 +1108,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
 
 	return ret;
 }
-
+#if !defined(CONFIG_OMAP5_VIRTIO)
 /**
  * _wait_target_ready - wait for a module to leave slave idle
  * @oh: struct omap_hwmod *
@@ -1182,6 +1186,7 @@ static int _wait_target_disable(struct omap_hwmod *oh)
 					     oh->clkdm->clkdm_offs,
 					     oh->prcm.omap4.clkctrl_offs);
 }
+#endif
 
 /**
  * _lookup_hardreset - fill register bit info for this hwmod/reset line
@@ -1238,12 +1243,14 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
 		return omap2_prm_assert_hardreset(oh->prcm.omap2.module_offs,
 						  ohri.rst_shift);
-	else if (cpu_is_omap44xx())
+	else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+#if !defined(CONFIG_OMAP5_VIRTIO)
 		return omap4_prminst_assert_hardreset(ohri.rst_shift,
 				  oh->clkdm->pwrdm.ptr->prcm_partition,
 				  oh->clkdm->pwrdm.ptr->prcm_offs,
 				  oh->prcm.omap4.rstctrl_offs);
-	else
+#endif
+	} else {
 		return -EINVAL;
 	}
 
@@ -1317,11 +1324,13 @@ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
 		return omap2_prm_is_hardreset_asserted(oh->prcm.omap2.module_offs,
 						       ohri.st_shift);
-	} else if (cpu_is_omap44xx()) {
+	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+#if !defined(CONFIG_OMAP5_VIRTIO)
 		return omap4_prminst_is_hardreset_asserted(ohri.rst_shift,
 				  oh->clkdm->pwrdm.ptr->prcm_partition,
 				  oh->clkdm->pwrdm.ptr->prcm_offs,
 				  oh->prcm.omap4.rstctrl_offs);
+#endif
 	} else {
 		return -EINVAL;
 	}
@@ -1443,8 +1452,9 @@ static int _reset(struct omap_hwmod *oh)
 static int _enable(struct omap_hwmod *oh)
 {
 	int r;
+#if !defined(CONFIG_OMAP5_VIRTIO)
 	int hwsup = 0;
-
+#endif
 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
 
 	if (oh->_state != _HWMOD_STATE_INITIALIZED &&
@@ -1458,8 +1468,7 @@ static int _enable(struct omap_hwmod *oh)
 	}
 
 
-/* FIXME: Remove this hack ASAP */
-#ifndef CONFIG_ARCH_OMAP5
+#if !defined(CONFIG_OMAP5_VIRTIO)
 	/*
 	 * If an IP contains only one HW reset line, then de-assert it in order
 	 * to allow the module state transition. Otherwise the PRCM will return
@@ -1520,8 +1529,9 @@ static int _enable(struct omap_hwmod *oh)
 		if (oh->clkdm)
 			clkdm_hwmod_disable(oh->clkdm, oh);
 	}
-#endif
+#else
 	oh->_state = _HWMOD_STATE_ENABLED;
+#endif
 	return r;
 }
 
@@ -1535,8 +1545,9 @@ static int _enable(struct omap_hwmod *oh)
  */
 static int _idle(struct omap_hwmod *oh)
 {
+#if !defined(CONFIG_OMAP5_VIRTIO)
 	int ret;
-
+#endif
 	pr_debug("omap_hwmod: %s: idling\n", oh->name);
 
 	if (oh->_state != _HWMOD_STATE_ENABLED) {
@@ -1548,11 +1559,13 @@ static int _idle(struct omap_hwmod *oh)
 	if (oh->class->sysc)
 		_idle_sysc(oh);
 	_del_initiator_dep(oh, mpu_oh);
+#if !defined(CONFIG_OMAP5_VIRTIO)
 	_disable_module(oh);
 	ret = _wait_target_disable(oh);
 	if (ret)
 		pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
 			oh->name);
+#endif
 	/*
 	 * The module must be in idle mode before disabling any parents
 	 * clocks. Otherwise, the parent clock might be disabled before
@@ -1560,9 +1573,10 @@ static int _idle(struct omap_hwmod *oh)
 	 * transition to complete properly.
 	 */
 	_disable_clocks(oh);
+#if !defined(CONFIG_OMAP5_VIRTIO)
 	if (oh->clkdm)
 		clkdm_hwmod_disable(oh->clkdm, oh);
-
+#endif
 	/* Mux pins for device idle if populated */
 	if (oh->mux && oh->mux->pads_dynamic)
 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
@@ -1652,15 +1666,19 @@ static int _shutdown(struct omap_hwmod *oh)
 	/* clocks and deps are already disabled in idle */
 	if (oh->_state == _HWMOD_STATE_ENABLED) {
 		_del_initiator_dep(oh, mpu_oh);
+#if !defined(CONFIG_OMAP5_VIRTIO)
 		/* XXX what about the other system initiators here? dma, dsp */
 		_disable_module(oh);
 		ret = _wait_target_disable(oh);
 		if (ret)
 			pr_warn("omap_hwmod: %s: _wait_target_disable failed\n",
 				oh->name);
+#endif
 		_disable_clocks(oh);
+#if !defined(CONFIG_OMAP5_VIRTIO)
 		if (oh->clkdm)
 			clkdm_hwmod_disable(oh->clkdm, oh);
+#endif
 	}
 	/* XXX Should this code also force-disable the optional clocks? */
 
@@ -2319,11 +2337,12 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res)
  */
 struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
 {
+#if !defined(CONFIG_OMAP5_VIRTIO)
 	struct clk *c;
-
+#endif
 	if (!oh)
 		return NULL;
-
+#if !defined(CONFIG_OMAP5_VIRTIO)
 	if (oh->_clk) {
 		c = oh->_clk;
 	} else {
@@ -2336,7 +2355,9 @@ struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
 		return NULL;
 
 	return c->clkdm->pwrdm.ptr;
-
+#else
+	return 0;
+#endif
 }
 
 /**

@@ -338,6 +338,10 @@ config MACH_OMAP_5430ZEBU
 	bool "OMAP5 ZEBU"
 	depends on ARCH_OMAP5 && MACH_OMAP_5430EVM
 
+config OMAP5_VIRTIO
+	bool "OMAP5 VIRTIO"
+	depends on ARCH_OMAP5 && MACH_OMAP_5430EVM
+
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
 	depends on ARCH_OMAP3
