@@ -25,9 +25,6 @@ struct voltagedomain;
  * struct omap_vc_common - per-VC register/bitfield data
  * @cmd_on_mask: ON bitmask in PRM_VC_CMD_VAL* register
  * @valid: VALID bitmask in PRM_VC_BYPASS_VAL register
- * @smps_sa_reg: Offset of PRM_VC_SMPS_SA reg from PRM start
- * @smps_volra_reg: Offset of PRM_VC_SMPS_VOL_RA reg from PRM start
- * @bypass_val_reg: Offset of PRM_VC_BYPASS_VAL reg from PRM start
  * @data_shift: DATA field shift in PRM_VC_BYPASS_VAL register
  * @slaveaddr_shift: SLAVEADDR field shift in PRM_VC_BYPASS_VAL register
  * @regaddr_shift: REGADDR field shift in PRM_VC_BYPASS_VAL register
@@ -45,9 +42,6 @@ struct voltagedomain;
 struct omap_vc_common {
 	u32 cmd_on_mask;
 	u32 valid;
-	u8 smps_sa_reg;
-	u8 smps_volra_reg;
-	u8 smps_cmdra_reg;
 	u8 bypass_val_reg;
 	u8 data_shift;
 	u8 slaveaddr_shift;
@@ -56,7 +50,6 @@ struct omap_vc_common {
 	u8 cmd_onlp_shift;
 	u8 cmd_ret_shift;
 	u8 cmd_off_shift;
-	u8 cfg_channel_reg;
 	u8 i2c_cfg_reg;
 	u8 i2c_cfg_hsen_mask;
 	u8 i2c_mcode_mask;
@@ -72,6 +65,9 @@ struct omap_vc_common {
  * @common: pointer to VC common data for this platform
  * @smps_sa_mask: i2c slave address bitmask in the PRM_VC_SMPS_SA register
  * @smps_volra_mask: VOLRA* bitmask in the PRM_VC_VOL_RA register
+ * @smps_sa_reg: Offset of PRM_VC_SMPS_SA reg from PRM start
+ * @smps_volra_reg: Offset of PRM_VC_SMPS_VOL_RA reg from PRM start
+ * @bypass_val_reg: Offset of PRM_VC_BYPASS_VAL reg from PRM start
  */
 struct omap_vc_channel {
 	u8 flags;
@@ -90,6 +86,10 @@ struct omap_vc_channel {
 	u32 smps_volra_mask;
 	u32 smps_cmdra_mask;
 	u8 cmdval_reg;
+	u8 smps_sa_reg;
+	u8 smps_volra_reg;
+	u8 smps_cmdra_reg;
+	u8 cfg_channel_reg;
 	u8 cfg_channel_sa_shift;
 };
 
