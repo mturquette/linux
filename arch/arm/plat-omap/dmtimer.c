@@ -136,17 +136,19 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
 	int ret;
 
 	timer->fclk = clk_get(&timer->pdev->dev, "fck");
+#ifndef CONFIG_OMAP5_VIRTIO
 	if (WARN_ON_ONCE(IS_ERR_OR_NULL(timer->fclk))) {
 		timer->fclk = NULL;
 		dev_err(&timer->pdev->dev, ": No fclk handle.\n");
 		return -EINVAL;
 	}
-
+#endif
 	if (pdata->needs_manual_reset)
 		omap_dm_timer_reset(timer);
 
-	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
-
+#ifndef CONFIG_OMAP5_VIRTIO
+	omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+#endif
 	timer->posted = 1;
 	return ret;
 }

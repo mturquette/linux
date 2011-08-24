@@ -25,15 +25,10 @@
 #include <mach/omap4-common.h>
 #include <plat/common.h>
 
-#include "timer-gp.h"
-
 static void __init omap_5430evm_init_early(void)
 {
 	omap2_init_common_infrastructure();
 	omap2_init_common_devices(NULL, NULL);
-#ifdef CONFIG_OMAP_32K_TIMER
-	omap2_gp_clockevent_set_gptimer(1);
-#endif
 }
 
 static int __init omap_5430evm_i2c_init(void)
@@ -66,5 +61,5 @@ MACHINE_START(OMAP_5430EVM, "OMAP5430 evm board")
 	.init_early	= omap_5430evm_init_early,
 	.init_irq	= gic_init_irq,
 	.init_machine	= omap_5430evm_init,
-	.timer		= &omap_timer,
+	.timer		= &omap5_timer,
 MACHINE_END
