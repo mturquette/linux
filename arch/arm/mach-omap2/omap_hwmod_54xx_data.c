@@ -31,6 +31,7 @@
 
 #include "omap_hwmod_common_data.h"
 
+#include "smartreflex.h"
 #include "cm1_54xx.h"
 #include "cm2_54xx.h"
 #include "prm54xx.h"
@@ -4236,6 +4237,11 @@ static struct omap_hwmod_class omap54xx_smartreflex_hwmod_class = {
 };
 
 /* smartreflex_core */
+/* smartreflex_core */
+static struct omap_smartreflex_dev_attr smartreflex_core_dev_attr = {
+	.sensor_voltdm_name   = "core",
+};
+
 static struct omap_hwmod omap54xx_smartreflex_core_hwmod;
 static struct omap_hwmod_irq_info omap54xx_smartreflex_core_irqs[] = {
 	{ .irq = 19 + OMAP54XX_IRQ_GIC_START },
@@ -4271,7 +4277,6 @@ static struct omap_hwmod omap54xx_smartreflex_core_hwmod = {
 	.clkdm_name	= "coreaon_clkdm",
 	.mpu_irqs	= omap54xx_smartreflex_core_irqs,
 	.main_clk	= "wkupaon_clk_mux_ck",
-	.vdd_name	= "core",
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP54XX_CM_COREAON_SMARTREFLEX_CORE_CLKCTRL_OFFSET,
@@ -4281,10 +4286,15 @@ static struct omap_hwmod omap54xx_smartreflex_core_hwmod = {
 	},
 	.slaves		= omap54xx_smartreflex_core_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_smartreflex_core_slaves),
+	.dev_attr       = &smartreflex_core_dev_attr,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 };
 
 /* smartreflex_mm */
+static struct omap_smartreflex_dev_attr smartreflex_mm_dev_attr = {
+	.sensor_voltdm_name   = "mm",
+};
+
 static struct omap_hwmod omap54xx_smartreflex_mm_hwmod;
 static struct omap_hwmod_irq_info omap54xx_smartreflex_mm_irqs[] = {
 	{ .irq = 102 + OMAP54XX_IRQ_GIC_START },
@@ -4320,7 +4330,6 @@ static struct omap_hwmod omap54xx_smartreflex_mm_hwmod = {
 	.clkdm_name	= "coreaon_clkdm",
 	.mpu_irqs	= omap54xx_smartreflex_mm_irqs,
 	.main_clk	= "wkupaon_clk_mux_ck",
-	.vdd_name	= "mm",
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP54XX_CM_COREAON_SMARTREFLEX_MM_CLKCTRL_OFFSET,
@@ -4330,10 +4339,14 @@ static struct omap_hwmod omap54xx_smartreflex_mm_hwmod = {
 	},
 	.slaves		= omap54xx_smartreflex_mm_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_smartreflex_mm_slaves),
+	.dev_attr       = &smartreflex_mm_dev_attr,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 };
 
 /* smartreflex_mpu */
+static struct omap_smartreflex_dev_attr smartreflex_mpu_dev_attr = {
+	.sensor_voltdm_name   = "mpu",
+};
 static struct omap_hwmod omap54xx_smartreflex_mpu_hwmod;
 static struct omap_hwmod_irq_info omap54xx_smartreflex_mpu_irqs[] = {
 	{ .irq = 18 + OMAP54XX_IRQ_GIC_START },
@@ -4369,7 +4382,6 @@ static struct omap_hwmod omap54xx_smartreflex_mpu_hwmod = {
 	.clkdm_name	= "coreaon_clkdm",
 	.mpu_irqs	= omap54xx_smartreflex_mpu_irqs,
 	.main_clk	= "wkupaon_clk_mux_ck",
-	.vdd_name	= "mpu",
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP54XX_CM_COREAON_SMARTREFLEX_MPU_CLKCTRL_OFFSET,
@@ -4379,6 +4391,7 @@ static struct omap_hwmod omap54xx_smartreflex_mpu_hwmod = {
 	},
 	.slaves		= omap54xx_smartreflex_mpu_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_smartreflex_mpu_slaves),
+	.dev_attr       = &smartreflex_mpu_dev_attr,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 };
 
