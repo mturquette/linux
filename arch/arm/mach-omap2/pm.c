@@ -423,7 +423,7 @@ static void __init omap5_init_voltages(void)
 
 static int __init omap2_common_pm_init(void)
 {
-#ifndef CONFIG_MACH_OMAP_5430ZEBU
+#ifdef CONFIG_OMAP5_VIRTIO
 	if (cpu_is_omap54xx()) {
 		pr_err("FIXME: omap2_common_pm_init\n");
 		return 0;
@@ -445,10 +445,10 @@ postcore_initcall(omap2_common_pm_init);
 
 static int __init omap2_common_pm_late_init(void)
 {
-	if (cpu_is_omap54xx()) {
-		pr_err("FIXME: omap2_common_pm_late_init\n");
+#ifdef CONFIG_OMAP5_VIRTIO
+	if (cpu_is_omap54xx())
 		return 0;
-	}
+#endif
 
 	/* Init the OMAP TWL parameters */
 	omap_init_all_pmic();
