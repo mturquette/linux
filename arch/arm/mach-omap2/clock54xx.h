@@ -12,5 +12,6 @@
 
 int omap5xxx_clk_init(void);
 int omap5_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate);
+int omap5_core_dpll_h12_set_rate(struct clk *clk, unsigned long rate);
 
 #endif

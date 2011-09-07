@@ -112,6 +112,72 @@ int omap5_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	return 0;
 }
 
+/**
+ * omap5_core_dpll_m5_set_rate - set CORE DPLL M5 divider
+ * @clk: struct clk * of DPLL to set
+ * @rate: rounded target rate
+ *
+ * Programs the CM shadow registers to update CORE DPLL M5
+ * divider. M5 divider is used to clock l3 and GPMC. GPMC
+ * reconfiguration on frequency change is managed through a
+ * hardware sequencer using shadow registers.
+ * Returns -EINVAL/-1 on error and 0 on success.
+ */
+int omap5_core_dpll_h12_set_rate(struct clk *clk, unsigned long rate)
+{
+	int i = 0;
+	u32 validrate = 0, shadow_freq_cfg2 = 0, shadow_freq_cfg1, new_div = 0;
+	int ret = 0;
+	if (!clk || !rate)
+		return -EINVAL;
+
+	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
+	if (validrate != rate)
+		return -EINVAL;
+
+	/*
+	 * FREQ_UPDATE sequence:
+	 * - DPLL_CORE_M5_DIV with new value of M5 post-divider on L3 clock generation path
+	 * - CLKSEL_L3=1 (unchanged)
+	 * - CLKSEL_CORE=0 (unchanged)
+	 * - GPMC_FREQ_UPDATE=1
+	 */
+
+	shadow_freq_cfg2 = (new_div << OMAP54XX_DPLL_CORE_H12_DIV_SHIFT) |
+						(1 << OMAP54XX_CLKSEL_L3_1_1_SHIFT) |
+						(1 << OMAP54XX_FREQ_UPDATE_SHIFT);
+
+	__raw_writel(shadow_freq_cfg2, OMAP54XX_CM_SHADOW_FREQ_CONFIG2_OFFSET);
+
+	/* Write to FREQ_UPDATE of SHADOW_FREQ_CONFIG1 to trigger transition */
+	shadow_freq_cfg1 = __raw_readl(OMAP54XX_CM_SHADOW_FREQ_CONFIG1_OFFSET);
+	shadow_freq_cfg1 |= (1 << OMAP54XX_FREQ_UPDATE_SHIFT);
+	__raw_writel(shadow_freq_cfg1, OMAP54XX_CM_SHADOW_FREQ_CONFIG1_OFFSET);
+
+	/* wait for the configuration to be applied by Polling FREQ_UPDATE of SHADOW_FREQ_CONFIG1 */
+	omap_test_timeout(((__raw_readl(OMAP54XX_CM_SHADOW_FREQ_CONFIG1_OFFSET)
+				& OMAP54XX_GPMC_FREQ_UPDATE_MASK) == 0),
+				MAX_FREQ_UPDATE_TIMEOUT, i);
+
+	if (i == MAX_FREQ_UPDATE_TIMEOUT) {
+		pr_err("%s: Frequency update for CORE DPLL M2 change failed\n",
+				__func__);
+		ret = -1;
+		goto out;
+	}
+
+	/* Update the clock change */
+	clk->rate = validrate;
+
+out:
+	/* Disable GPMC FREQ_UPDATE */
+	shadow_freq_cfg2 &= ~(1 << OMAP54XX_FREQ_UPDATE_SHIFT);
+	__raw_writel(shadow_freq_cfg2, OMAP54XX_CM_SHADOW_FREQ_CONFIG2_OFFSET);
+
+	return ret;
+}
+
+
 int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 {
 	struct dpll_data *dd;
