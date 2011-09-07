@@ -11,5 +11,6 @@
 #define OMAP54XX_MAX_DPLL_DIV  128
 
 int omap5xxx_clk_init(void);
+int omap5_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate);
 
 #endif

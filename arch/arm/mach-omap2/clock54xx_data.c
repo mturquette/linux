@@ -709,7 +709,7 @@ static struct clk dpll_core_m2_ck = {
 	.ops		= &clkops_omap4_dpllmx_ops,
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
-	.set_rate	= &omap2_clksel_set_rate,
+	.set_rate	= &omap5_core_dpll_m2_set_rate,
 };
 
 static struct clk dpll_core_x2_ck = {
@@ -850,8 +850,8 @@ static struct clk virt_dpll_mpu_ck = {
 	.name		= "virt_dpll_mpu_ck",
 	.parent		= &dpll_mpu_ck,
 	.clksel		= dpll_mpu_m2_div,
-	.clksel_reg	= OMAP5430_CM_DIV_M2_DPLL_MPU,
-	.clksel_mask	= OMAP5430_DIVHS_0_4_MASK,
+	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_MPU,
+	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
