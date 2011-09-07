@@ -106,6 +106,49 @@ struct omap_vdd_dep_info omap54xx_vddmm_dep_info[] = {
 };
 
 
+/* Dependency of domains are as follows for OMAP5430 (OPP based):
+ *
+ *	MPU	IVA	CORE
+ *	50	50	50+
+ *	50	100+	100
+ *	100+	50	100
+ *	100+	100+	100
+ */
+
+/* OMAP 4430 MPU Core VDD dependency table */
+static struct omap_vdd_dep_volt omap543x_vdd_mpu_core_dep_data[] = {
+	{.main_vdd_volt = OMAP5430_VDD_MPU_OPP_LOW, .dep_vdd_volt = OMAP5430_VDD_CORE_OPP_LOW},
+	{.main_vdd_volt = OMAP5430_VDD_MPU_OPP_NOM, .dep_vdd_volt = OMAP5430_VDD_CORE_OPP_NOM},
+	{.main_vdd_volt = OMAP5430_VDD_MPU_OPP_HIGH, .dep_vdd_volt = OMAP5430_VDD_CORE_OPP_NOM},
+	{.main_vdd_volt = OMAP5430_VDD_MPU_OPP_SB, .dep_vdd_volt = OMAP5430_VDD_CORE_OPP_NOM},
+};
+
+struct omap_vdd_dep_info omap543x_vddmpu_dep_info[] = {
+	{
+		.name	= "core",
+		.dep_table = omap543x_vdd_mpu_core_dep_data,
+		.nr_dep_entries = ARRAY_SIZE(omap543x_vdd_mpu_core_dep_data),
+	},
+	{.name = NULL, .dep_table = NULL, .nr_dep_entries = 0},
+};
+
+/* OMAP 4430 MPU IVA VDD dependency table */
+static struct omap_vdd_dep_volt omap543x_vdd_mm_core_dep_data[] = {
+	{.main_vdd_volt = OMAP5430_VDD_MM_OPP_LOW, .dep_vdd_volt = OMAP5430_VDD_CORE_OPP_LOW},
+	{.main_vdd_volt = OMAP5430_VDD_MM_OPP_NOM, .dep_vdd_volt = OMAP5430_VDD_CORE_OPP_NOM},
+	{.main_vdd_volt = OMAP5430_VDD_MM_OPP_OD, .dep_vdd_volt = OMAP5430_VDD_CORE_OPP_NOM},
+};
+
+struct omap_vdd_dep_info omap543x_vddmm_dep_info[] = {
+	{
+		.name	= "core",
+		.dep_table = omap543x_vdd_mm_core_dep_data,
+		.nr_dep_entries = ARRAY_SIZE(omap543x_vdd_mm_core_dep_data),
+	},
+	{.name = NULL, .dep_table = NULL, .nr_dep_entries = 0},
+};
+
+
 static struct omap_opp_def __initdata omap54xx_opp_def_list[] = {
 	/* MPU OPP1 - OPPLOW */
 	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 550000000, OMAP5430_VDD_MPU_OPP_LOW),
