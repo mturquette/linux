@@ -741,6 +741,61 @@ static struct clk dpll_core_m3x2_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static const struct clksel dpll_core_h12_x2_div[] = {
+	{ .parent = &dpll_core_x2_ck, .rates = div63_1to63_rates },
+	{ .parent = NULL },
+};
+
+static struct clk dpll_core_h12_x2_ck = {
+	.name		= "dpll_core_h12_x2_ck",
+	.parent		= &dpll_core_x2_ck,
+	.clksel		= dpll_core_h12_x2_div,
+	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_CORE,
+	.clksel_mask	= OMAP54XX_DIVHS_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+
+static struct clk dpll_core_h14_x2_ck = {
+	.name		= "dpll_core_h14_x2_ck",
+	.parent		= &dpll_core_x2_ck,
+	.clksel		= dpll_core_h12_x2_div,
+	.clksel_reg	= OMAP54XX_CM_DIV_H14_DPLL_CORE,
+	.clksel_mask	= OMAP54XX_DIVHS_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static struct clk dpll_core_h22_x2_ck = {
+	.name		= "dpll_core_h22_x2_ck",
+	.parent		= &dpll_core_x2_ck,
+	.clksel		= dpll_core_h12_x2_div,
+	.clksel_reg	= OMAP54XX_CM_DIV_H22_DPLL_CORE,
+	.clksel_mask	= OMAP54XX_DIVHS_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static struct clk dpll_core_h23_x2_ck = {
+	.name		= "dpll_core_h23_x2_ck",
+	.parent		= &dpll_core_x2_ck,
+	.clksel		= dpll_core_h12_x2_div,
+	.clksel_reg	= OMAP54XX_CM_DIV_H23_DPLL_CORE,
+	.clksel_mask	= OMAP54XX_DIVHS_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+
 /* DPLL_IVA */
 static struct dpll_data dpll_iva_dd = {
 	.mult_div1_reg	= OMAP54XX_CM_CLKSEL_DPLL_IVA,
@@ -772,6 +827,14 @@ static struct clk dpll_iva_ck = {
 	.set_rate	= &omap3_noncore_dpll_set_rate,
 };
 
+static struct clk dpll_iva_x2_ck = {
+	.name		= "dpll_iva_x2_ck",
+	.parent		= &dpll_iva_ck,
+	.flags		= CLOCK_CLKOUTX2,
+	.ops		= &clkops_null,
+	.recalc		= &omap3_clkoutx2_recalc,
+};
+
 static const struct clksel dpll_iva_h11_div[] = {
 	{ .parent = &dpll_iva_ck, .rates = div31_1to31_rates },
 	{ .parent = NULL },
@@ -793,6 +856,35 @@ static struct clk dpll_iva_h12_ck = {
 	.name		= "dpll_iva_h12_ck",
 	.parent		= &dpll_iva_ck,
 	.clksel		= dpll_iva_h11_div,
+	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_IVA,
+	.clksel_mask	= OMAP54XX_DIVHS_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static const struct clksel dpll_iva_h11_x2_div[] = {
+	{ .parent = &dpll_iva_x2_ck, .rates = div31_1to31_rates },
+	{ .parent = NULL },
+};
+
+static struct clk dpll_iva_h11_x2_ck = {
+	.name		= "dpll_iva_h11_x2_ck",
+	.parent		= &dpll_iva_x2_ck,
+	.clksel		= dpll_iva_h11_x2_div,
+	.clksel_reg	= OMAP54XX_CM_DIV_H11_DPLL_IVA,
+	.clksel_mask	= OMAP54XX_DIVHS_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static struct clk dpll_iva_h12_x2_ck = {
+	.name		= "dpll_iva_h12_x2_ck",
+	.parent		= &dpll_iva_x2_ck,
+	.clksel		= dpll_iva_h11_x2_div,
 	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_IVA,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
@@ -938,6 +1030,18 @@ static struct clk dpll_per_m3x2_ck = {
 	.clksel		= dpll_per_m2x2_div,
 	.clksel_reg	= OMAP54XX_CM_DIV_M3_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static struct clk dpll_per_h14_x2_ck = {
+	.name		= "dpll_per_h14_x2_ck",
+	.parent		= &dpll_per_x2_ck,
+	.clksel		= dpll_per_m2x2_div,
+	.clksel_reg	= OMAP54XX_CM_DIV_H14_DPLL_PER,
+	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
@@ -2247,10 +2351,17 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_core_h23_ck",		&dpll_core_h23_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m2_ck",		&dpll_core_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_x2_ck",		&dpll_core_x2_ck,	CK_54XX),
-	CLK(NULL,	"dpll_core_m3x2_ck",		&dpll_core_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_m3x2_ck",	&dpll_core_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_h12_x2_ck",	&dpll_core_h12_x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_h14_x2_ck",	&dpll_core_h14_x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_h22_x2_ck",	&dpll_core_h22_x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_h23_x2_ck",	&dpll_core_h23_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_ck",			&dpll_iva_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_h11_ck",		&dpll_iva_h11_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_h12_ck",		&dpll_iva_h12_ck,	CK_54XX),
+	CLK(NULL,	"dpll_iva_x2_ck",		&dpll_iva_x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_iva_h11_x2_ck",	&dpll_iva_h11_x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_iva_h12_x2_ck",	&dpll_iva_h12_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_mpu_ck",			&dpll_mpu_ck,	CK_54XX),
 	CLK(NULL,	"dpll_mpu_m2_ck",		&dpll_mpu_m2_ck,	CK_54XX),
 	CLK(NULL,	"virt_dpll_mpu_ck",		&virt_dpll_mpu_ck,	CK_54XX),
@@ -2260,6 +2371,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_per_x2_ck",		&dpll_per_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m2x2_ck",		&dpll_per_m2x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m3x2_ck",		&dpll_per_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_per_h14_x2_ck",	&dpll_per_h14_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_ck",		&dpll_unipro1_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_clkdcoldo_ck",	&dpll_unipro1_clkdcoldo_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_m2_ck",		&dpll_unipro1_m2_ck,	CK_54XX),
