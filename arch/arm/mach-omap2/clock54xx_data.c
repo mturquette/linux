@@ -709,7 +709,11 @@ static struct clk dpll_core_m2_ck = {
 	.ops		= &clkops_omap4_dpllmx_ops,
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
+#ifndef CONFIG_MACH_OMAP_5430ZEBU	
 	.set_rate	= &omap5_core_dpll_m2_set_rate,
+#else
+	.set_rate	= &omap2_clksel_set_rate,
+#endif
 };
 
 static struct clk dpll_core_x2_ck = {
