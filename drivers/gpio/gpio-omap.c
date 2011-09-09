@@ -42,6 +42,8 @@ struct gpio_regs {
 	u32 risingdetect;
 	u32 fallingdetect;
 	u32 dataout;
+	u32 debounce;
+	u32 debounce_en;
 };
 
 struct gpio_bank {
@@ -219,6 +221,9 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
 
 	__raw_writel(val, reg);
 	clk_disable(bank->dbck);
+
+	bank->context.debounce = debounce;
+	bank->context.debounce_en = val;
 }
 
 static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
@@ -1347,6 +1352,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
 	__raw_writel(bank->context.fallingdetect,
 				bank->base + bank->regs->fallingdetect);
 	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
+	if (bank->dbck_enable_mask) {
+		__raw_writel(bank->context.debounce, bank->base +
+					bank->regs->debounce);
+		__raw_writel(bank->context.debounce_en,
+					bank->base + bank->regs->debounce_en);
+	}
 }
 #else
 #define omap_gpio_suspend NULL
