@@ -26,19 +26,12 @@
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
 #include <mach/omap-secure.h>
+#include <mach/omap-wakeupgen.h>
 
 #include "clockdomain.h"
 
-/* FIXME: This is not needed when WakeupGen support is available */
-#define WKUPGEN_BASE		0x48281000
-#define AUX_CORE_BOOT_0		0x800
-#define AUX_CORE_BOOT_1		0x804
-
 /* SCU base address */
 static void __iomem *scu_base;
-/* Wakeupgen Base addres */
-static void __iomem *wakeupgen_base;
-
 static DEFINE_SPINLOCK(boot_lock);
 
 void __iomem *omap4_get_scu_base(void)
@@ -86,6 +79,8 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	static struct clockdomain *cpu1_clkdm;
 	static bool booted;
+	void __iomem *base = omap_get_wakeupgen_base();
+
 	/*
 	 * Set synchronisation state between this boot processor
 	 * and the secondary one
@@ -99,9 +94,9 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	 * A barrier is added to ensure that write buffer is drained
 	 */
 	if (cpu_is_omap44xx())
-		omap_modify_auxcoreboot0(0x200, 0xfffffdff);
+		omap_modify_auxcoreboot0(0x200, OMAP_AUX_CORE1_MASK);
 	else
-		__raw_writel(0x200, wakeupgen_base + AUX_CORE_BOOT_0);
+		__raw_writel(0x200, base + OMAP_AUX_CORE_BOOT_0);
 
 	flush_cache_all();
 	smp_wmb();
@@ -141,7 +136,8 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 
 static void __init wakeup_secondary(void)
 {
-	extern void omap5_secondary_startup(void);
+	void __iomem *base = omap_get_wakeupgen_base();
+
 	/*
 	 * Write the address of secondary startup routine into the
 	 * AuxCoreBoot1 where ROM code will jump and start executing
@@ -152,7 +148,7 @@ static void __init wakeup_secondary(void)
 		omap_auxcoreboot_addr(virt_to_phys(omap_secondary_startup));
 	else
 		__raw_writel(virt_to_phys(omap5_secondary_startup),
-					wakeupgen_base + AUX_CORE_BOOT_1);
+						base + OMAP_AUX_CORE_BOOT_1);
 
 	wmb();
 
@@ -178,8 +174,6 @@ void __init smp_init_cpus(void)
 		BUG_ON(!scu_base);
 		ncores = scu_get_core_count(scu_base);
 	} else if (cpu_is_omap54xx()) {
-		wakeupgen_base = ioremap(WKUPGEN_BASE, SZ_4K);
-		BUG_ON(!wakeupgen_base);
 		ncores = get_a15_core_count();
 	}
 

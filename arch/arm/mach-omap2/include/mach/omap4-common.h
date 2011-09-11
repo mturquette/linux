@@ -18,6 +18,8 @@
 /* Used to implement memory barrier on DRAM path */
 #define OMAP4_DRAM_BARRIER_VA			0xfe600000
 
+#define OMAP_AUX_CORE1_MASK			0xffffffdf
+
 #ifndef __ASSEMBLER__
 
 #ifdef CONFIG_CACHE_L2X0
@@ -45,6 +47,7 @@ extern void omap_secondary_startup(void);
 extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
 extern void omap_auxcoreboot_addr(u32 cpu_addr);
 extern u32 omap_read_auxcoreboot0(void);
+extern void omap5_secondary_startup(void);
 #endif
 
 #if defined(CONFIG_SMP) && defined(CONFIG_PM)
