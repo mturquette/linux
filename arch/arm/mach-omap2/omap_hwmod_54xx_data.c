@@ -5707,8 +5707,9 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_dmic_hwmod,
 
 	/* dsp class */
-	&omap54xx_dsp_hwmod,
+
 #endif
+	&omap54xx_dsp_hwmod,
 	/* dss class */
 	&omap54xx_dss_hwmod,
 	&omap54xx_dss_dispc_hwmod,
