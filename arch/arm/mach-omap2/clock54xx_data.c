@@ -1049,6 +1049,18 @@ static struct clk dpll_per_m3x2_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static struct clk dpll_per_h11_x2_ck = {
+	.name		= "dpll_per_h11_x2_ck",
+	.parent		= &dpll_per_x2_ck,
+	.clksel		= dpll_per_m2x2_div,
+	.clksel_reg	= OMAP54XX_CM_DIV_H11_DPLL_PER,
+	.clksel_mask	= OMAP54XX_DIVHS_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+
 static struct clk dpll_per_h14_x2_ck = {
 	.name		= "dpll_per_h14_x2_ck",
 	.parent		= &dpll_per_x2_ck,
@@ -1436,38 +1448,70 @@ static struct clk mcbsp3_gfclk = {
 	.recalc		= &followparent_recalc,
 };
 
-static const struct clksel mmc1_fclk_mux_sel[] = {
-	{ .parent = &dpll_per_h11_ck, .rates = div_1_0_rates },
+static const struct clksel mmc_fclk_mux_sel[] = {
+	{ .parent = &dpll_per_h11_x2_ck, .rates = div_1_0_rates },
 	{ .parent = &dpll_per_m2x2_ck, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
 static struct clk mmc1_fclk_mux = {
-	.name		= "mmc1_fclk_mux",
-	.parent		= &dpll_per_h11_ck,
+	.name		= "mmc1_fclk_mux_ck",
+	.parent		= &dpll_per_h11_x2_ck,
+	.clksel		= mmc_fclk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_L3INIT_MMC1_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_MASK,
 	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static const struct clksel mmc1_clksel[] = {
+	{ .parent = &mmc1_fclk_mux, .rates = div_1_0_rates },
+	{ .parent = NULL },
 };
 
 static struct clk mmc1_fclk = {
 	.name		= "mmc1_fclk",
 	.parent		= &mmc1_fclk_mux,
-	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.clksel		= mmc1_clksel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_L3INIT_MMC1_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_DIV_SHIFT,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_MMC1_CLKCTRL,
+	.enable_bit	= OMAP54XX_MODULEMODE_SWCTRL,
+	.clkdm_name	= "l3init_clkdm",
 };
 
 static struct clk mmc2_fclk_mux = {
-	.name		= "mmc2_fclk_mux",
-	.parent		= &dpll_per_h11_ck,
+	.name		= "mmc2_fclk_mux_ck",
+	.parent		= &dpll_per_h11_x2_ck,
+	.clksel		= mmc_fclk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_L3INIT_MMC2_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_MASK,
 	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static const struct clksel mmc2_clksel[] = {
+	{ .parent = &mmc2_fclk_mux, .rates = div_1_0_rates },
+	{ .parent = NULL },
 };
 
 static struct clk mmc2_fclk = {
 	.name		= "mmc2_fclk",
 	.parent		= &mmc2_fclk_mux,
-	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.clksel		= mmc2_clksel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP54XX_CM_L3INIT_MMC2_CLKCTRL,
+	.clksel_mask	= OMAP54XX_CLKSEL_DIV_SHIFT,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP54XX_CM_L3INIT_MMC2_CLKCTRL,
+	.enable_bit	= OMAP54XX_MODULEMODE_SWCTRL,
+	.clkdm_name	= "l3init_clkdm",
 };
 
 static struct clk per_abe_24m_fclk = {
@@ -2385,6 +2429,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_per_x2_ck",		&dpll_per_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m2x2_ck",		&dpll_per_m2x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m3x2_ck",		&dpll_per_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_per_h11_x2_ck",	&dpll_per_h11_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_h14_x2_ck",	&dpll_per_h14_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_ck",		&dpll_unipro1_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_clkdcoldo_ck",	&dpll_unipro1_clkdcoldo_ck,	CK_54XX),
