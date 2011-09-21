@@ -51,6 +51,9 @@
 #include "sdrc.h"
 #include "control.h"
 
+extern int pm_dbg_regset_init(int reg_set);
+extern int pm_dbg_regset_save(int reg_set);
+
 /* pm34xx errata defined in pm.h */
 u16 pm34xx_errata;
 
@@ -302,6 +305,9 @@ void omap_sram_idle(void)
 	    core_next_state == PWRDM_POWER_OFF)
 		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
 
+	if (is_suspending())
+		pm_dbg_regset_save(1);
+
 	/*
 	 * omap3_arm_context is the location where some ARM context
 	 * get saved. The rest is placed on the stack, and restored
@@ -320,6 +326,9 @@ void omap_sram_idle(void)
 	     omap_type() == OMAP2_DEVICE_TYPE_SEC) &&
 	    core_next_state == PWRDM_POWER_OFF)
 		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
+
+	if (is_suspending())
+		pm_dbg_regset_save(2);
 
 	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
@@ -663,6 +672,9 @@ int __init omap3_pm_init(void)
 
 	if (!omap3_has_io_chain_ctrl())
 		pr_warning("PM: no software I/O chain control; some wakeups may be lost\n");
+
+	pm_dbg_regset_init(1);
+	pm_dbg_regset_init(2);
 
 	pm_errata_configure();
 
