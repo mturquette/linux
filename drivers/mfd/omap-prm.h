@@ -32,6 +32,8 @@ struct omap_prcm_irq {
 	.priority = _priority				\
 	}
 
+extern const struct dev_pm_ops omap_prm_pm_ops;
+
 void omap_prcm_irq_cleanup(void);
 int omap_prcm_register_chain_handler(int irq, void __iomem *base,
 	const struct omap_prcm_irq_setup *irq_setup,

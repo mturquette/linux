@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/err.h>
+#include <linux/platform_device.h>
 
 #include "omap-prm.h"
 
@@ -35,6 +36,7 @@ struct omap_prm_device {
 	int base_irq;
 	int irq;
 	void __iomem *base;
+	int suspended;
 };
 
 static struct omap_prm_device prm_dev;
@@ -92,12 +94,20 @@ static void prcm_irq_handler(unsigned int irq, struct irq_desc *desc)
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 	unsigned int virtirq;
 	int nr_irqs = prm_dev.irq_setup->nr_regs * 32;
+	int i;
+
+	if (prm_dev.suspended)
+		for (i = 0; i < prm_dev.irq_setup->nr_regs; i++) {
+			prm_dev.saved_mask[i] =
+				prm_read_reg(prm_dev.irq_setup->mask + i * 4);
+			prm_write_reg(0, prm_dev.irq_setup->mask + i * 4);
+		}
 
 	/*
 	 * Loop until all pending irqs are handled, since
 	 * generic_handle_irq() can cause new irqs to come
 	 */
-	while (1) {
+	while (!prm_dev.suspended) {
 		prm_pending_events(pending);
 
 		/* No bit set, then all IRQs are handled */
@@ -257,6 +267,28 @@ err:
 	omap_prcm_irq_cleanup();
 	return -ENOMEM;
 }
+
+static int omap_prm_prepare(struct device *kdev)
+{
+	prm_dev.suspended = 1;
+	return 0;
+}
+
+static void omap_prm_complete(struct device *kdev)
+{
+	int i;
+
+	prm_dev.suspended = 0;
+
+	for (i = 0; i < prm_dev.irq_setup->nr_regs; i++)
+		prm_write_reg(prm_dev.saved_mask[i],
+			prm_dev.irq_setup->mask + i * 4);
+}
+
+const struct dev_pm_ops omap_prm_pm_ops = {
+	.prepare = omap_prm_prepare,
+	.complete = omap_prm_complete,
+};
 
 MODULE_AUTHOR("Tero Kristo <t-kristo@ti.com>");
 MODULE_DESCRIPTION("OMAP PRM core driver");

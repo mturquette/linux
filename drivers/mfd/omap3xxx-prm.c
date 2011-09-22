@@ -66,6 +66,7 @@ static struct platform_driver omap3xxx_prm_driver = {
 	.driver		= {
 		.owner	= THIS_MODULE,
 		.name	= DRIVER_NAME,
+		.pm	= &omap_prm_pm_ops,
 	},
 };
 
