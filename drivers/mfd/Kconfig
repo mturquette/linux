@@ -770,6 +770,13 @@ config MFD_AAT2870_CORE
 	  additional drivers must be enabled in order to use the
 	  functionality of the device.
 
+config OMAP_PRM
+	bool "OMAP Power and Reset Management driver"
+	depends on (ARCH_OMAP) && PM
+	help
+	  Say Y to enable support for the OMAP Power and Reset Management
+	  driver.
+
 endif # MFD_SUPPORT
 
 menu "Multimedia Capabilities Port drivers"
