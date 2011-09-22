@@ -21,11 +21,37 @@
 #include <linux/platform_device.h>
 #include <linux/mfd/omap-prm.h>
 
+#include "omap-prm.h"
+
 #define DRIVER_NAME "prm4xxx"
+
+#define OMAP4_PRM_IRQSTATUS_OFFSET	0x10
+#define OMAP4_PRM_IRQENABLE_OFFSET	0x18
+
+static const struct omap_prcm_irq_setup omap4_prcm_irq_setup = {
+	.ack		= OMAP4_PRM_IRQSTATUS_OFFSET,
+	.mask		= OMAP4_PRM_IRQENABLE_OFFSET,
+	.nr_regs	= 2,
+};
+
+static const struct omap_prcm_irq omap4_prcm_irqs[] = {
+	OMAP_PRCM_IRQ("io",	9,	1),
+};
 
 static int __devinit omap4xxx_prm_probe(struct platform_device *pdev)
 {
-	return 0;
+	int ret = 0;
+	struct omap_prm_platform_config *pdata = pdev->dev.platform_data;
+
+	ret = omap_prcm_register_chain_handler(pdata->irq, pdata->base,
+		&omap4_prcm_irq_setup, omap4_prcm_irqs,
+		ARRAY_SIZE(omap4_prcm_irqs));
+
+	if (ret) {
+		pr_err("%s: chain handler register failed: %d\n", __func__,
+			ret);
+	}
+	return ret;
 }
 
 static int __devexit omap4xxx_prm_remove(struct platform_device *pdev)
