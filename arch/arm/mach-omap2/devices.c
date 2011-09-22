@@ -419,6 +419,51 @@ static void omap_init_pmu(void)
 	platform_device_register(&omap_pmu_device);
 }
 
+#ifdef CONFIG_OMAP_PRM
+
+#include <linux/mfd/omap-prm.h>
+
+static const char * const omap_prm_devnames[] = {
+	"prm3xxx",
+	"prm4xxx",
+	NULL,
+};
+
+static void omap_init_prm(void)
+{
+	struct platform_device *pdev;
+	struct omap_hwmod *oh = NULL;
+	struct omap_prm_platform_config *pdata;
+	int i = 0;
+
+	while (!oh && omap_prm_devnames[i]) {
+		oh = omap_hwmod_lookup(omap_prm_devnames[i]);
+		i++;
+	}
+
+	if (!oh) {
+		pr_info("prm hwmod not available\n");
+		return;
+	}
+
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+
+	if (!pdata) {
+		pr_err("%s: kzalloc failed\n", __func__);
+		return;
+	}
+
+	pdata->irq = oh->mpu_irqs[0].irq;
+	pdata->base = omap_hwmod_get_mpu_rt_va(oh);
+
+	pdev = omap_device_build(oh->name, -1, oh, pdata,
+		sizeof(*pdata), NULL, 0, 0);
+
+	WARN(IS_ERR(pdev), "Unable to build omap device for PRM\n");
+}
+#else
+static inline void omap_init_prm(void) { }
+#endif
 
 #if defined(CONFIG_CRYPTO_DEV_OMAP_SHAM) || defined(CONFIG_CRYPTO_DEV_OMAP_SHAM_MODULE)
 
@@ -687,6 +732,7 @@ static int __init omap2_init_devices(void)
 	omap_init_mbox();
 	omap_init_mcspi();
 	omap_init_pmu();
+	omap_init_prm();
 	omap_hdq_init();
 	omap_init_sti();
 	omap_init_sham();
