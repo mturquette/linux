@@ -111,6 +111,7 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
 				input_report_key(input_dev,
 						 keypad_data->keymap[code],
 						 key_state[row] & (1 << col));
+				printk("Key press\n");
 			}
 		}
 	}
@@ -184,6 +185,9 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 	unsigned int row_shift, max_keys;
 	int irq;
 	int error;
+
+
+	printk("%s: Register Qwerty Keypad ......!!!!!\n", __func__);
 
 	/* platform data */
 	pdata = pdev->dev.platform_data;
