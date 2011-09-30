@@ -32,6 +32,7 @@
 #include <plat/clock.h>
 #include <plat/omap-pm.h>
 #include <plat/common.h>
+#include <plat/omap_device.h>
 
 #include <mach/hardware.h>
 
@@ -252,7 +253,7 @@ static int __init omap_cpufreq_init(void)
 		return -EINVAL;
 	}
 
-	mpu_dev = omap2_get_mpuss_device();
+	mpu_dev = omap_device_get_by_hwmod_name("mpu");
 	if (!mpu_dev) {
 		pr_warning("%s: unable to get the mpu device\n", __func__);
 		return -EINVAL;
