@@ -45,7 +45,6 @@
 
 /* Backward references (IPs with Bus Master capability) */
 static struct omap_hwmod omap54xx_aess_hwmod;
-static struct omap_hwmod omap54xx_debug_logic_hwmod;
 static struct omap_hwmod omap54xx_dma_system_hwmod;
 static struct omap_hwmod omap54xx_dmm_hwmod;
 static struct omap_hwmod omap54xx_dsp_hwmod;
@@ -69,7 +68,6 @@ static struct omap_hwmod omap54xx_mmc2_hwmod;
 static struct omap_hwmod omap54xx_mpu_hwmod;
 static struct omap_hwmod omap54xx_mpu_private_hwmod;
 static struct omap_hwmod omap54xx_sata_hwmod;
-static struct omap_hwmod omap54xx_sl2_hwmod;
 static struct omap_hwmod omap54xx_usb_otg_ss_hwmod;
 
 /*
@@ -427,7 +425,6 @@ static struct omap_hwmod_ocp_if omap54xx_usb_otg_ss__l3_main_2 = {
 
 /* l3_main_2 slave ports */
 static struct omap_hwmod_ocp_if *omap54xx_l3_main_2_slaves[] = {
-	&omap54xx_debug_logic__l3_main_2,
 	&omap54xx_dma_system__l3_main_2,
 	&omap54xx_gpu__l3_main_2,
 	&omap54xx_hsi__l3_main_2,
@@ -1142,7 +1139,6 @@ static struct omap_hwmod_ocp_if *omap54xx_dsp_masters[] = {
 	&omap54xx_dsp__l3_main_1,
 	&omap54xx_dsp__l4_abe,
 	&omap54xx_dsp__iva,
-	&omap54xx_dsp__sl2,
 };
 
 /* l4_cfg -> dsp */
@@ -2174,6 +2170,7 @@ static struct omap_hwmod omap54xx_gpio7_hwmod = {
 	.name		= "gpio7",
 	.class		= &omap54xx_gpio_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
+	.flags          = HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 	.mpu_irqs	= omap54xx_gpio7_irqs,
 	.prcm = {
 		.omap4 = {
@@ -2228,6 +2225,7 @@ static struct omap_hwmod omap54xx_gpio8_hwmod = {
 	.name		= "gpio8",
 	.class		= &omap54xx_gpio_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
+	.flags          = HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 	.mpu_irqs	= omap54xx_gpio8_irqs,
 	.prcm = {
 		.omap4 = {
@@ -2952,7 +2950,6 @@ static struct omap_hwmod_rst_info omap54xx_iva_resets[] = {
 static struct omap_hwmod_ocp_if *omap54xx_iva_masters[] = {
 	&omap54xx_iva__l3_main_2,
 	&omap54xx_iva__l3_instr,
-	&omap54xx_iva__sl2,
 };
 
 static struct omap_hwmod_addr_space omap54xx_iva_addrs[] = {
