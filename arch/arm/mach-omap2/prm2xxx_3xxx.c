@@ -260,7 +260,7 @@ void omap3_trigger_wuclk_ctrl(void)
 {
 	int i = 0;
 
-	if (omap_rev() >= OMAP3430_REV_ES3_1) {
+	if ((omap_rev() >= OMAP3430_REV_ES3_1) && omap3_has_io_wakeup()) {
 		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
 				     PM_WKEN);
 		/* Do a readback to assure write has been done */
