@@ -10,6 +10,7 @@
  */
 
 #include "abb.h"
+#include "vp.h"
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
 
@@ -32,13 +33,13 @@ static const struct omap_abb_common omap4_abb_common = {
 struct omap_abb_instance omap4_abb_mpu = {
 	.setup_offs		= OMAP4_PRM_LDO_ABB_MPU_SETUP_OFFSET,
 	.ctrl_offs		= OMAP4_PRM_LDO_ABB_MPU_CTRL_OFFSET,
-	.prm_irq_id		= OMAP4_PRM_IRQ_VDD_MPU_ID,
+	.prm_irq_id		= OMAP4_VP_VDD_MPU_ID,
 	.common			= &omap4_abb_common,
 };
 
 struct omap_abb_instance omap4_abb_iva = {
 	.setup_offs		= OMAP4_PRM_LDO_ABB_IVA_SETUP_OFFSET,
 	.ctrl_offs		= OMAP4_PRM_LDO_ABB_IVA_CTRL_OFFSET,
-	.prm_irq_id		= OMAP4_PRM_IRQ_VDD_IVA_ID,
+	.prm_irq_id		= OMAP4_VP_VDD_IVA_ID,
 	.common			= &omap4_abb_common,
 };
