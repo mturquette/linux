@@ -19,6 +19,7 @@
 
 #include <linux/serial_core.h>
 #include <linux/platform_device.h>
+#include <linux/pm_qos_params.h>
 
 #include <plat/mux.h>
 
@@ -68,6 +69,7 @@ struct omap_uart_port_info {
 	unsigned int		dma_rx_timeout;
 	unsigned int		autosuspend_timeout;
 	unsigned int		dma_rx_poll_rate;
+	u8			use_pm_qos;
 
 	u32 (*get_context_loss_count)(struct device *);
 	void (*set_forceidle)(struct platform_device *);
@@ -129,6 +131,12 @@ struct uart_omap_port {
 	u32			context_loss_cnt;
 	u32			errata;
 	u8			wakeups_enabled;
+
+	struct pm_qos_request_list pm_qos_request;
+	u32			latency;
+	u32			calc_latency;
+	struct work_struct	qos_work;
+	u8			use_pm_qos;
 };
 
 #endif /* __OMAP_SERIAL_H__ */

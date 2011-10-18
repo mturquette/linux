@@ -440,20 +440,10 @@ void omap_sram_idle(void)
 	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
 }
 
-int omap3_can_sleep(void)
-{
-	if (!omap_uart_can_sleep())
-		return 0;
-	return 1;
-}
-
 static void omap3_pm_idle(void)
 {
 	local_irq_disable();
 	local_fiq_disable();
-
-	if (!omap3_can_sleep())
-		goto out;
 
 	if (omap_irq_pending() || need_resched())
 		goto out;

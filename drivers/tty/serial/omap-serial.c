@@ -51,6 +51,8 @@ static void serial_omap_rxdma_poll(unsigned long uart_no);
 static int serial_omap_start_rxdma(struct uart_omap_port *up);
 static void serial_omap_mdr1_errataset(struct uart_omap_port *up, u8 mdr1);
 
+static struct workqueue_struct *serial_omap_uart_wq;
+
 static inline unsigned int serial_in(struct uart_omap_port *up, int offset)
 {
 	offset <<= up->port.regshift;
@@ -671,6 +673,13 @@ serial_omap_configure_xonxoff
 	serial_out(up, UART_LCR, up->lcr);
 }
 
+static void serial_omap_uart_qos_work(struct work_struct *work)
+{
+	struct uart_omap_port *up = container_of(work, struct uart_omap_port,
+						qos_work);
+	pm_qos_update_request(&up->pm_qos_request, up->latency);
+}
+
 static void
 serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 			struct ktermios *old)
@@ -710,6 +719,14 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 
 	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/13);
 	quot = serial_omap_get_divisor(port, baud);
+
+	if (up->use_pm_qos) {
+		/* calculate wakeup latency constraint */
+		up->calc_latency = (1000000 * up->port.fifosize) /
+					(1000 * baud / 8);
+		up->latency = up->calc_latency;
+		schedule_work(&up->qos_work);
+	}
 
 	up->dll = quot & 0xff;
 	up->dlh = quot >> 8;
@@ -866,6 +883,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_omap_configure_xonxoff(up, termios);
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
+
 	pm_runtime_put(&up->pdev->dev);
 	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->pdev->id);
 }
@@ -1145,8 +1163,12 @@ static int serial_omap_suspend(struct device *dev)
 {
 	struct uart_omap_port *up = dev_get_drvdata(dev);
 
-	if (up)
+	if (up) {
 		uart_suspend_port(&serial_omap_reg, &up->port);
+		if (up->use_pm_qos)
+			flush_work_sync(&up->qos_work);
+	}
+
 	return 0;
 }
 
@@ -1369,6 +1391,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 	up->port.uartclk = omap_up_info->uartclk;
 	up->uart_dma.uart_base = mem->start;
 	up->errata = omap_up_info->errata;
+	up->use_pm_qos = omap_up_info->use_pm_qos;
 
 	if (omap_up_info->dma_enabled) {
 		up->uart_dma.uart_dma_tx = dma_tx->start;
@@ -1381,6 +1404,15 @@ static int serial_omap_probe(struct platform_device *pdev)
 		spin_lock_init(&(up->uart_dma.rx_lock));
 		up->uart_dma.tx_dma_channel = OMAP_UART_DMA_CH_FREE;
 		up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
+	}
+
+	if (up->use_pm_qos) {
+		up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+		up->calc_latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+		pm_qos_add_request(&up->pm_qos_request,
+			PM_QOS_CPU_DMA_LATENCY, up->latency);
+		serial_omap_uart_wq = create_singlethread_workqueue(up->name);
+		INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
 	}
 
 	pm_runtime_use_autosuspend(&pdev->dev);
@@ -1416,6 +1448,9 @@ static int serial_omap_remove(struct platform_device *dev)
 	if (up) {
 		pm_runtime_disable(&up->pdev->dev);
 		uart_remove_one_port(&serial_omap_reg, &up->port);
+		if (up->use_pm_qos)
+			pm_qos_remove_request(&up->pm_qos_request);
+
 		kfree(up);
 	}
 
@@ -1517,6 +1552,11 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	if (up->use_dma && pdata->set_forceidle)
 		pdata->set_forceidle(up->pdev);
 
+	if (up->use_pm_qos) {
+		up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+		schedule_work(&up->qos_work);
+	}
+
 	return 0;
 }
 
@@ -1536,6 +1576,11 @@ static int serial_omap_runtime_resume(struct device *dev)
 		/* Errata i291 */
 		if (up->use_dma && pdata->set_noidle)
 			pdata->set_noidle(up->pdev);
+
+		if (up->use_pm_qos) {
+			up->latency = up->calc_latency;
+			schedule_work(&up->qos_work);
+		}
 	}
 
 	return 0;

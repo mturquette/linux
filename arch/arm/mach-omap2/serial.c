@@ -78,6 +78,7 @@ static struct omap_uart_port_info omap_serial_default_info[] __initdata = {
 		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
 		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
 		.autosuspend_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+		.use_pm_qos = true,
 	},
 };
 
@@ -117,28 +118,6 @@ static struct omap_device_pm_latency console_uart_latency[] = {
 };
 
 #ifdef CONFIG_PM
-
-int omap_uart_can_sleep(void)
-{
-	struct omap_uart_state *uart;
-	int can_sleep = 1;
-
-	list_for_each_entry(uart, &uart_list, node) {
-		if (!uart->clocked)
-			continue;
-
-		if (!uart->can_sleep) {
-			can_sleep = 0;
-			continue;
-		}
-
-		/* This UART can now safely sleep. */
-		omap_uart_allow_sleep(uart);
-	}
-
-	return can_sleep;
-}
-
 static void omap_uart_enable_wakeup(struct platform_device *pdev, bool enable)
 {
 	struct omap_device *od = to_omap_device(pdev);
@@ -414,6 +393,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
 	omap_up.dma_rx_timeout = info->dma_rx_timeout;
 	omap_up.dma_rx_poll_rate = info->dma_rx_poll_rate;
 	omap_up.autosuspend_timeout = info->autosuspend_timeout;
+	omap_up.use_pm_qos = info->use_pm_qos;
 
 	/* Enable the MDR1 errata for OMAP3 */
 	if (cpu_is_omap34xx() && !cpu_is_ti816x())
