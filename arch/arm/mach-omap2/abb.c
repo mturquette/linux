@@ -29,11 +29,13 @@ int omap_abb_set_opp(struct voltagedomain *voltdm)
 {
 	struct omap_abb_instance *abb = voltdm->abb;
 	struct omap_volt_data *volt_data;
+	u32 nominal_volt;
 	int ret, timeout;
 	u8 opp_sel;
 
 	/* fetch the ABB ldo OPP_SEL value for the new voltage */
-	volt_data = omap_voltage_get_voltdata(voltdm, voltdm->curr_volt);
+	nominal_volt = voltdm_get_voltage(voltdm);
+	volt_data = omap_voltage_get_voltdata(voltdm, nominal_volt);
 
 	if (IS_ERR_OR_NULL(volt_data))
 		return -EINVAL;
