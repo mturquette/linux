@@ -88,10 +88,11 @@ int voltdm_scale(struct voltagedomain *voltdm,
 
 	if (voltdm->abb) {
 		ret = omap_abb_pre_scale(voltdm, target_volt);
-		if (ret)
+		if (ret) {
 			pr_err("%s: abb prescale failed for vdd%s: %d\n",
 					__func__, voltdm->name, ret);
-		goto out;
+			goto out;
+		}
 	}
 
 	ret = voltdm->scale(voltdm, target_volt);
@@ -103,10 +104,11 @@ int voltdm_scale(struct voltagedomain *voltdm,
 
 	if (voltdm->abb) {
 		ret = omap_abb_post_scale(voltdm, target_volt);
-		if (ret)
+		if (ret) {
 			pr_err("%s: abb postscale failed for vdd%s: %d\n",
 					__func__, voltdm->name, ret);
-		goto out;
+			goto out;
+		}
 	}
 
 	if (!ret)
