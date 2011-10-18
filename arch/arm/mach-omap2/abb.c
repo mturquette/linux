@@ -30,6 +30,8 @@ int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
 	struct omap_abb_instance *abb = voltdm->abb;
 	int ret, timeout;
 
+	pr_err("%s: voltdm->name is %s, abb->_opp_sel is %d, opp_sel is %d\n",
+			__func__, voltdm->name, abb->_opp_sel, opp_sel);
 	/* bail early if no transition is necessary */
 	if (opp_sel == abb->_opp_sel)
 		return 0;
@@ -97,15 +99,14 @@ int omap_abb_pre_scale(struct voltagedomain *voltdm,
 	struct omap_abb_instance *abb = voltdm->abb;
 	struct omap_volt_data *target_volt_data;
 	u32 nominal_volt;
-	int ret = 0;
 	u8 opp_sel;
 
-	pr_err("%s: voltdm->nominal_volt is %lu, target_volt is %lu\n",
-			__func__, voltdm->nominal_volt, target_volt);
+	pr_err("%s: vdd is %s, voltdm->nominal_volt is %lu, target_volt is %lu\n",
+			__func__, voltdm->name, voltdm->nominal_volt, target_volt);
 	/* bail if the sequence is wrong */
 	nominal_volt = voltdm_get_voltage(voltdm);
 	if (target_volt > nominal_volt)
-		return ret;
+		return 0;
 
 	/* fetch the abb_type for this voltage */
 	target_volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
@@ -116,7 +117,7 @@ int omap_abb_pre_scale(struct voltagedomain *voltdm,
 
 	/* bail early if no transition is necessary */
 	if (opp_sel == abb->_opp_sel)
-		return ret;
+		return 0;
 
 	return omap_abb_set_opp(voltdm, opp_sel);
 }
@@ -135,8 +136,8 @@ int omap_abb_post_scale(struct voltagedomain *voltdm,
 	int ret = 0;
 	u8 opp_sel;
 
-	pr_err("%s: voltdm->nominal_volt is %lu, target_volt is %lu\n",
-			__func__, voltdm->nominal_volt, target_volt);
+	pr_err("%s: vdd is %s, voltdm->nominal_volt is %lu, target_volt is %lu\n",
+			__func__, voltdm->name, voltdm->nominal_volt, target_volt);
 	/* bail if the sequence is wrong */
 	nominal_volt = voltdm_get_voltage(voltdm);
 	if (target_volt < nominal_volt)
