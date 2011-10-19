@@ -426,6 +426,7 @@ static void omap_init_pmu(void)
 static const char * const omap_prm_devnames[] = {
 	"prm3xxx",
 	"prm4xxx",
+	"prm5xxx",
 	NULL,
 };
 
@@ -440,6 +441,8 @@ static void omap_init_prm(void)
 		oh = omap_hwmod_lookup(omap_prm_devnames[i]);
 		i++;
 	}
+
+	i--;
 
 	if (!oh) {
 		pr_info("prm hwmod not available\n");
@@ -456,7 +459,11 @@ static void omap_init_prm(void)
 	pdata->irq = oh->mpu_irqs[0].irq;
 	pdata->base = omap_hwmod_get_mpu_rt_va(oh);
 
-	pdev = omap_device_build(oh->name, -1, oh, pdata,
+	/* use prm4xxx driver for omap5 */
+	if (!strcmp(oh->name, "prm5xxx"))
+		i--;
+
+	pdev = omap_device_build(omap_prm_devnames[i], -1, oh, pdata,
 		sizeof(*pdata), NULL, 0, 0);
 
 	WARN(IS_ERR(pdev), "Unable to build omap device for PRM\n");
