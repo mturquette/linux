@@ -84,7 +84,7 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 			} else {
 				WARN(1, "%s: round_rate for clock %s failed\n",
 					__func__, opp_def->clk_name);
-				goto next; /* skip Bad OPP */
+//				goto next; /* skip Bad OPP */
 			}
 		} else {
 			WARN(1, "%s: No clock by name %s found\n", __func__,
