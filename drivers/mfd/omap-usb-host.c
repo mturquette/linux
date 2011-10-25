@@ -58,11 +58,14 @@
 #define	OMAP_TLL_SHARED_CONF_FCLK_IS_ON			(1 << 0)
 
 #define	OMAP_TLL_CHANNEL_CONF(num)			(0x040 + 0x004 * num)
+#define	OMAP_TLL_CHANNEL_CONF_DRVVBUS			(1 << 16)
+#define	OMAP_TLL_CHANNEL_CONF_CHRGVBUS			(1 << 15)
 #define OMAP_TLL_CHANNEL_CONF_FSLSMODE_SHIFT		24
 #define	OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF		(1 << 11)
 #define	OMAP_TLL_CHANNEL_CONF_ULPI_ULPIAUTOIDLE		(1 << 10)
 #define	OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE		(1 << 9)
 #define	OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE		(1 << 8)
+#define	OMAP_TLL_CHANNEL_CONF_CHANMODE_TRANSPARENT_UTMI	(2 << 1)
 #define OMAP_TLL_CHANNEL_CONF_CHANMODE_FSLS		(1 << 1)
 #define	OMAP_TLL_CHANNEL_CONF_CHANEN			(1 << 0)
 
@@ -387,6 +390,34 @@ static unsigned ohci_omap3_fslsmode(enum usbhs_omap_port_mode mode)
 	}
 }
 
+static void usbhs_omap_hsic_init(struct device *dev, u8 tll_channel_count)
+{
+	struct usbhs_hcd_omap           *omap = dev_get_drvdata(dev);
+	unsigned reg;
+	int i;
+
+	/* Enable channels now */
+	for (i = 0; i < tll_channel_count; i++) {
+		reg = usbhs_read(omap->tll_base,
+				OMAP_TLL_CHANNEL_CONF(i));
+
+		reg |= OMAP_TLL_CHANNEL_CONF_CHANMODE_TRANSPARENT_UTMI
+				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
+				| OMAP_TLL_CHANNEL_CONF_DRVVBUS
+				| OMAP_TLL_CHANNEL_CONF_CHRGVBUS
+				| OMAP_TLL_CHANNEL_CONF_CHANEN;
+
+		usbhs_write(omap->tll_base,
+				OMAP_TLL_CHANNEL_CONF(i), reg);
+
+		usbhs_writeb(omap->tll_base,
+				OMAP_TLL_ULPI_SCRATCH_REGISTER(i), 0xbe);
+		dev_dbg(dev, "ULPI_SCRATCH_REG[ch=%d]= 0x%02x\n",
+				i+1, usbhs_readb(omap->tll_base,
+				OMAP_TLL_ULPI_SCRATCH_REGISTER(i)));
+	}
+}
+
 static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 {
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
@@ -658,6 +689,22 @@ static void omap_usbhs_init(struct device *dev)
 			usbhs_omap_tll_init(dev, OMAP_REV2_TLL_CHANNEL_COUNT);
 		else
 			usbhs_omap_tll_init(dev, OMAP_TLL_CHANNEL_COUNT);
+	}
+
+	if (is_ehci_hsic_mode(pdata->port_mode[0]) ||
+		is_ehci_hsic_mode(pdata->port_mode[1]) ||
+		is_ehci_hsic_mode(pdata->port_mode[1])) {
+
+		/* Enable UTMI mode for required hsic channels
+		 * OMAP5 and OMAP3 has 3 channels and OMAP4 has
+		 * 2 channels.
+		 * TODO: Check how can we pass channel count as 3
+		 * for OMAP5
+		 */
+		if (is_omap_usbhs_rev2(omap))
+			usbhs_omap_hsic_init(dev, OMAP_REV2_TLL_CHANNEL_COUNT);
+		else
+			usbhs_omap_hsic_init(dev, OMAP_TLL_CHANNEL_COUNT);
 	}
 
 	if (pdata->ehci_data->phy_reset) {
