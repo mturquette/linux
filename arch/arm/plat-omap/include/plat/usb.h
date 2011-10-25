@@ -8,6 +8,10 @@
 
 #define OMAP3_HS_USB_PORTS	3
 
+#define is_ehci_phy_mode(x)	(x == OMAP_EHCI_PORT_MODE_PHY)
+#define is_ehci_tll_mode(x)	(x == OMAP_EHCI_PORT_MODE_TLL)
+#define is_ehci_hsic_mode(x)	(x == OMAP_EHCI_PORT_MODE_HSIC)
+
 enum usbhs_omap_port_mode {
 	OMAP_USBHS_PORT_MODE_UNUSED,
 	OMAP_EHCI_PORT_MODE_PHY,
