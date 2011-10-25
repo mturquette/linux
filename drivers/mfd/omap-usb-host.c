@@ -156,8 +156,17 @@ struct usbhs_hcd_omap {
 	struct clk			*utmi_p2_fck;
 	struct clk			*usbhost_p2_fck;
 	struct clk			*usbtll_p2_fck;
+	struct clk			*utmi_p3_fck;
+	struct clk			*usbhost_p3_fck;
+	struct clk			*usbtll_p3_fck;
 	struct clk			*init_60m_fclk;
 	struct clk			*ehci_logic_fck;
+	struct clk			*usb_host_hs_hsic60m_p1_clk;
+	struct clk			*usb_host_hs_hsic480m_p1_clk;
+	struct clk			*usb_host_hs_hsic60m_p2_clk;
+	struct clk			*usb_host_hs_hsic480m_p2_clk;
+	struct clk			*usb_host_hs_hsic60m_p3_clk;
+	struct clk			*usb_host_hs_hsic480m_p3_clk;
 
 	void __iomem			*uhh_base;
 	void __iomem			*tll_base;
@@ -440,16 +449,42 @@ static int usbhs_runtime_resume(struct device *dev)
 	if (omap->ehci_logic_fck && !IS_ERR(omap->ehci_logic_fck))
 		clk_enable(omap->ehci_logic_fck);
 
-	if (is_ehci_tll_mode(pdata->port_mode[0])) {
+	switch (pdata->port_mode[0]) {
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		clk_enable(omap->usb_host_hs_hsic60m_p1_clk);
+		clk_enable(omap->usb_host_hs_hsic480m_p1_clk);
+	case OMAP_EHCI_PORT_MODE_TLL:
 		clk_enable(omap->usbhost_p1_fck);
 		clk_enable(omap->usbtll_p1_fck);
+	default:
+		break;
 	}
-	if (is_ehci_tll_mode(pdata->port_mode[1])) {
+
+	switch (pdata->port_mode[1]) {
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		clk_enable(omap->usb_host_hs_hsic60m_p2_clk);
+		clk_enable(omap->usb_host_hs_hsic480m_p2_clk);
+	case OMAP_EHCI_PORT_MODE_TLL:
 		clk_enable(omap->usbhost_p2_fck);
 		clk_enable(omap->usbtll_p2_fck);
+	default:
+		break;
 	}
+
+	switch (pdata->port_mode[2]) {
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		clk_enable(omap->usb_host_hs_hsic60m_p3_clk);
+		clk_enable(omap->usb_host_hs_hsic480m_p3_clk);
+	case OMAP_EHCI_PORT_MODE_TLL:
+		clk_enable(omap->usbhost_p3_fck);
+		clk_enable(omap->usbtll_p3_fck);
+	default:
+		break;
+	}
+
 	clk_enable(omap->utmi_p1_fck);
 	clk_enable(omap->utmi_p2_fck);
+	clk_enable(omap->utmi_p3_fck);
 
 	spin_unlock_irqrestore(&omap->lock, flags);
 
@@ -471,14 +506,40 @@ static int usbhs_runtime_suspend(struct device *dev)
 
 	spin_lock_irqsave(&omap->lock, flags);
 
-	if (is_ehci_tll_mode(pdata->port_mode[0])) {
+	switch (pdata->port_mode[0]) {
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		clk_disable(omap->usb_host_hs_hsic60m_p1_clk);
+		clk_disable(omap->usb_host_hs_hsic480m_p1_clk);
+	case OMAP_EHCI_PORT_MODE_TLL:
 		clk_disable(omap->usbhost_p1_fck);
 		clk_disable(omap->usbtll_p1_fck);
+	default:
+		break;
 	}
-	if (is_ehci_tll_mode(pdata->port_mode[1])) {
+
+	switch (pdata->port_mode[1]) {
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		clk_disable(omap->usb_host_hs_hsic60m_p2_clk);
+		clk_disable(omap->usb_host_hs_hsic480m_p2_clk);
+	case OMAP_EHCI_PORT_MODE_TLL:
 		clk_disable(omap->usbhost_p2_fck);
 		clk_disable(omap->usbtll_p2_fck);
+	default:
+		break;
 	}
+
+	switch (pdata->port_mode[2]) {
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		clk_disable(omap->usb_host_hs_hsic60m_p3_clk);
+		clk_disable(omap->usb_host_hs_hsic480m_p3_clk);
+	case OMAP_EHCI_PORT_MODE_TLL:
+		clk_disable(omap->usbhost_p3_fck);
+		clk_disable(omap->usbtll_p3_fck);
+	default:
+		break;
+	}
+
+	clk_disable(omap->utmi_p3_fck);
 	clk_disable(omap->utmi_p2_fck);
 	clk_disable(omap->utmi_p1_fck);
 
@@ -711,11 +772,18 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_utmi_p2_fck;
 	}
 
+	omap->utmi_p3_fck = clk_get(dev, "utmi_p3_gfclk");
+	if (IS_ERR(omap->utmi_p3_fck)) {
+		ret = PTR_ERR(omap->utmi_p3_fck);
+		dev_err(dev, "utmi_p3_gfclk failed error:%d\n", ret);
+		goto err_xclk60mhsp2_ck;
+	}
+
 	omap->usbhost_p1_fck = clk_get(dev, "usb_host_hs_utmi_p1_clk");
 	if (IS_ERR(omap->usbhost_p1_fck)) {
 		ret = PTR_ERR(omap->usbhost_p1_fck);
 		dev_err(dev, "usbhost_p1_fck failed error:%d\n", ret);
-		goto err_xclk60mhsp2_ck;
+		goto err_utmi_p3_fck;
 	}
 
 	omap->usbtll_p1_fck = clk_get(dev, "usb_tll_hs_usb_ch0_clk");
@@ -739,11 +807,73 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_usbhost_p2_fck;
 	}
 
+	omap->usbhost_p3_fck = clk_get(dev, "usb_host_hs_utmi_p3_clk");
+	if (IS_ERR(omap->usbhost_p3_fck)) {
+		ret = PTR_ERR(omap->usbhost_p3_fck);
+		dev_err(dev, "usbhost_p3_fck failed error:%d\n", ret);
+		goto err_usbtll_p2_fck;
+	}
+
+	omap->usbtll_p3_fck = clk_get(dev, "usb_tll_hs_usb_ch2_clk");
+	if (IS_ERR(omap->usbtll_p3_fck)) {
+		ret = PTR_ERR(omap->usbtll_p3_fck);
+		dev_err(dev, "usbtll_p3_fck failed error:%d\n", ret);
+		goto err_usbhost_p3_fck;
+	}
+
 	omap->init_60m_fclk = clk_get(dev, "init_60m_fclk");
 	if (IS_ERR(omap->init_60m_fclk)) {
 		ret = PTR_ERR(omap->init_60m_fclk);
 		dev_err(dev, "init_60m_fclk failed error:%d\n", ret);
-		goto err_usbtll_p2_fck;
+		goto err_usbtll_p3_fck;
+	}
+
+	omap->usb_host_hs_hsic60m_p1_clk = clk_get(dev,
+					"usb_host_hs_hsic60m_p1_clk");
+	if (IS_ERR(omap->usb_host_hs_hsic60m_p1_clk)) {
+		ret = PTR_ERR(omap->usb_host_hs_hsic60m_p1_clk);
+		dev_err(dev, "Unable to get usb_host_hs_hsic60m_p1_clk\n");
+		goto err_init_60m_fclk;
+	}
+
+	omap->usb_host_hs_hsic480m_p1_clk = clk_get(dev,
+					"usb_host_hs_hsic480m_p1_clk");
+	if (IS_ERR(omap->usb_host_hs_hsic480m_p1_clk)) {
+		ret = PTR_ERR(omap->usb_host_hs_hsic480m_p1_clk);
+		dev_err(dev, "Unable to get usb_host_hs_hsic480m_p1_clk\n");
+		goto err_usb_host_hs_hsic60m_p1_clk;
+	}
+
+	omap->usb_host_hs_hsic60m_p2_clk = clk_get(dev,
+					"usb_host_hs_hsic60m_p2_clk");
+	if (IS_ERR(omap->usb_host_hs_hsic60m_p2_clk)) {
+		ret = PTR_ERR(omap->usb_host_hs_hsic60m_p2_clk);
+		dev_err(dev, "Unable to get usb_host_hs_hsic60m_p2_clk\n");
+		goto err_usb_host_hs_hsic480m_p1_clk;
+	}
+
+	omap->usb_host_hs_hsic480m_p2_clk = clk_get(dev,
+					"usb_host_hs_hsic480m_p2_clk");
+	if (IS_ERR(omap->usb_host_hs_hsic480m_p2_clk)) {
+		ret = PTR_ERR(omap->usb_host_hs_hsic480m_p2_clk);
+		dev_err(dev, "Unable to get usb_host_hs_hsic480m_p2_clk\n");
+		goto err_usb_host_hs_hsic60m_p2_clk;
+	}
+
+	omap->usb_host_hs_hsic60m_p3_clk = clk_get(dev,
+					"usb_host_hs_hsic60m_p3_clk");
+	if (IS_ERR(omap->usb_host_hs_hsic60m_p3_clk)) {
+		ret = PTR_ERR(omap->usb_host_hs_hsic60m_p3_clk);
+		dev_err(dev, "Unable to get usb_host_hs_hsic60m_p3_clk\n");
+		goto err_usb_host_hs_hsic480m_p2_clk;
+	}
+
+	omap->usb_host_hs_hsic480m_p3_clk = clk_get(dev,
+					"usb_host_hs_hsic480m_p3_clk");
+	if (IS_ERR(omap->usb_host_hs_hsic480m_p3_clk)) {
+		ret = PTR_ERR(omap->usb_host_hs_hsic480m_p3_clk);
+		dev_err(dev, "Unable to get usb_host_hs_hsic480m_p3_clk\n");
+		goto err_usb_host_hs_hsic60m_p3_clk;
 	}
 
 	if (is_ehci_phy_mode(pdata->port_mode[0])) {
@@ -779,14 +909,14 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 	if (!res) {
 		dev_err(dev, "UHH EHCI get resource failed\n");
 		ret = -ENODEV;
-		goto err_init_60m_fclk;
+		goto err_usb_host_hs_hsic480m_p3_clk;
 	}
 
 	omap->uhh_base = ioremap(res->start, resource_size(res));
 	if (!omap->uhh_base) {
 		dev_err(dev, "UHH ioremap failed\n");
 		ret = -ENOMEM;
-		goto err_init_60m_fclk;
+		goto err_usb_host_hs_hsic480m_p3_clk;
 	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "tll");
@@ -821,8 +951,32 @@ err_alloc:
 err_tll:
 	iounmap(omap->uhh_base);
 
+err_usb_host_hs_hsic480m_p3_clk:
+	clk_put(omap->usb_host_hs_hsic480m_p3_clk);
+
+err_usb_host_hs_hsic60m_p3_clk:
+	clk_put(omap->usb_host_hs_hsic60m_p3_clk);
+
+err_usb_host_hs_hsic480m_p2_clk:
+	clk_put(omap->usb_host_hs_hsic480m_p2_clk);
+
+err_usb_host_hs_hsic60m_p2_clk:
+	clk_put(omap->usb_host_hs_hsic60m_p2_clk);
+
+err_usb_host_hs_hsic480m_p1_clk:
+	clk_put(omap->usb_host_hs_hsic480m_p1_clk);
+
+err_usb_host_hs_hsic60m_p1_clk:
+	clk_put(omap->usb_host_hs_hsic60m_p1_clk);
+
 err_init_60m_fclk:
 	clk_put(omap->init_60m_fclk);
+
+err_usbtll_p3_fck:
+	clk_put(omap->usbtll_p3_fck);
+
+err_usbhost_p3_fck:
+	clk_put(omap->usbhost_p3_fck);
 
 err_usbtll_p2_fck:
 	clk_put(omap->usbtll_p2_fck);
@@ -835,6 +989,9 @@ err_usbtll_p1_fck:
 
 err_usbhost_p1_fck:
 	clk_put(omap->usbhost_p1_fck);
+
+err_utmi_p3_fck:
+	clk_put(omap->utmi_p3_fck);
 
 err_xclk60mhsp2_ck:
 	clk_put(omap->xclk60mhsp2_ck);
@@ -870,11 +1027,20 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 	omap_usbhs_deinit(&pdev->dev);
 	iounmap(omap->tll_base);
 	iounmap(omap->uhh_base);
+	clk_put(omap->usb_host_hs_hsic480m_p3_clk);
+	clk_put(omap->usb_host_hs_hsic60m_p3_clk);
+	clk_put(omap->usb_host_hs_hsic480m_p2_clk);
+	clk_put(omap->usb_host_hs_hsic60m_p2_clk);
+	clk_put(omap->usb_host_hs_hsic480m_p1_clk);
+	clk_put(omap->usb_host_hs_hsic60m_p1_clk);
 	clk_put(omap->init_60m_fclk);
+	clk_put(omap->usbtll_p3_fck);
+	clk_put(omap->usbhost_p3_fck);
 	clk_put(omap->usbtll_p2_fck);
 	clk_put(omap->usbhost_p2_fck);
 	clk_put(omap->usbtll_p1_fck);
 	clk_put(omap->usbhost_p1_fck);
+	clk_put(omap->utmi_p3_fck);
 	clk_put(omap->xclk60mhsp2_ck);
 	clk_put(omap->utmi_p2_fck);
 	clk_put(omap->xclk60mhsp1_ck);
