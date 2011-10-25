@@ -114,7 +114,7 @@ static int omap2_gp_timer_set_next_event(unsigned long cycles,
 static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
 				    struct clock_event_device *evt)
 {
-	u32 period;
+	u32 period = 0xff;
 
 	__omap_dm_timer_stop(&clkev, 1, clkev.rate);
 
@@ -137,8 +137,19 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
 		break;
 	case CLOCK_EVT_MODE_ONESHOT:
 		break;
-	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
+		if (cpu_is_omap54xx())
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+			period = 0x3ff;
+#else
+			period = 0xff;
+#endif
+		__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG,
+			0xffffffff - (period * 5), 1);
+		__omap_dm_timer_load_start(&clkev, OMAP_TIMER_CTRL_ST,
+			0xffffffff - (period * 5), 1);
+		break;
+	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_RESUME:
 		break;
 	}
