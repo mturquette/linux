@@ -1388,6 +1388,7 @@ static struct clk dsp_fck = {
 	.clkdm_name	= "tesla_clkdm",
 	.parent		= &dpll_iva_m4x2_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk dss_sys_clk = {
@@ -1494,6 +1495,7 @@ static struct clk emif1_fck = {
 	.clkdm_name	= "l3_emif_clkdm",
 	.parent		= &ddrphy_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk emif2_fck = {
@@ -1505,6 +1507,7 @@ static struct clk emif2_fck = {
 	.clkdm_name	= "l3_emif_clkdm",
 	.parent		= &ddrphy_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static const struct clksel fdif_fclk_div[] = {
@@ -1556,6 +1559,7 @@ static struct clk gpio1_ick = {
 	.clkdm_name	= "l4_wkup_clkdm",
 	.parent		= &l4_wkup_clk_mux_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk gpio2_dbclk = {
@@ -1576,6 +1580,7 @@ static struct clk gpio2_ick = {
 	.clkdm_name	= "l4_per_clkdm",
 	.parent		= &l4_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk gpio3_dbclk = {
@@ -1596,6 +1601,7 @@ static struct clk gpio3_ick = {
 	.clkdm_name	= "l4_per_clkdm",
 	.parent		= &l4_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk gpio4_dbclk = {
@@ -1616,6 +1622,7 @@ static struct clk gpio4_ick = {
 	.clkdm_name	= "l4_per_clkdm",
 	.parent		= &l4_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk gpio5_dbclk = {
@@ -1636,6 +1643,7 @@ static struct clk gpio5_ick = {
 	.clkdm_name	= "l4_per_clkdm",
 	.parent		= &l4_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk gpio6_dbclk = {
@@ -1656,6 +1664,7 @@ static struct clk gpio6_ick = {
 	.clkdm_name	= "l4_per_clkdm",
 	.parent		= &l4_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk gpmc_ick = {
@@ -1667,6 +1676,7 @@ static struct clk gpmc_ick = {
 	.clkdm_name	= "l3_2_clkdm",
 	.parent		= &l3_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static const struct clksel sgx_clk_mux_sel[] = {
@@ -1820,6 +1830,7 @@ static struct clk l3_instr_ick = {
 	.clkdm_name	= "l3_instr_clkdm",
 	.parent		= &l3_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk l3_main_3_ick = {
@@ -1831,6 +1842,7 @@ static struct clk l3_main_3_ick = {
 	.clkdm_name	= "l3_instr_clkdm",
 	.parent		= &l3_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk mcasp_sync_mux_ck = {
@@ -2148,6 +2160,7 @@ static struct clk ocp_wp_noc_ick = {
 	.clkdm_name	= "l3_instr_clkdm",
 	.parent		= &l3_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1,
 };
 
 static struct clk rng_ick = {
