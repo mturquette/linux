@@ -49,11 +49,8 @@ struct gpio_bank {
 	void __iomem *base;
 	u16 irq;
 	u16 virtual_irq_start;
-	int method;
 	u32 suspend_wakeup;
-#if defined(CONFIG_ARCH_OMAP16XX) || defined(CONFIG_ARCH_OMAP2PLUS)
 	u32 saved_wakeup;
-#endif
 	u32 non_wakeup_gpios;
 	u32 enabled_non_wakeup_gpios;
 	struct gpio_regs context;
@@ -68,6 +65,7 @@ struct gpio_bank {
 	u32 mod_usage;
 	u32 dbck_enable_mask;
 	struct device *dev;
+	bool is_mpuio;
 	bool dbck_flag;
 	bool loses_context;
 	int stride;
@@ -690,14 +688,6 @@ static struct irq_chip gpio_irq_chip = {
 
 /*---------------------------------------------------------------------*/
 
-#ifdef CONFIG_ARCH_OMAP1
-
-#define bank_is_mpuio(bank)	((bank)->method == METHOD_MPUIO)
-
-#ifdef CONFIG_ARCH_OMAP16XX
-
-#include <linux/platform_device.h>
-
 static int omap_mpuio_suspend_noirq(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -759,22 +749,7 @@ static inline void mpuio_init(struct gpio_bank *bank)
 		(void) platform_device_register(&omap_mpuio_device);
 }
 
-#else
-static inline void mpuio_init(struct gpio_bank *bank) {}
-#endif	/* 16xx */
-
-#else
-
-#define bank_is_mpuio(bank)	0
-static inline void mpuio_init(struct gpio_bank *bank) {}
-
-#endif
-
 /*---------------------------------------------------------------------*/
-
-/* REVISIT these are stupid implementations!  replace by ones that
- * don't switch on METHOD_* and which mostly avoid spinlocks
- */
 
 static int gpio_input(struct gpio_chip *chip, unsigned offset)
 {
@@ -896,7 +871,7 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
 	if (bank->width == 16)
 		l = 0xffff;
 
-	if (bank_is_mpuio(bank)) {
+	if (bank->is_mpuio) {
 		__raw_writel(l, bank->base + bank->regs->irqenable);
 		return;
 	}
@@ -942,7 +917,6 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
 	int j;
 	static int gpio;
 
-	bank->mod_usage = 0;
 	/*
 	 * REVISIT eventually switch from OMAP-specific gpio structs
 	 * over to the generic ones
@@ -955,12 +929,10 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
 	bank->chip.set_debounce = gpio_debounce;
 	bank->chip.set = gpio_set;
 	bank->chip.to_irq = gpio_2irq;
-	if (bank_is_mpuio(bank)) {
+	if (bank->is_mpuio) {
 		bank->chip.label = "mpuio";
-#ifdef CONFIG_ARCH_OMAP16XX
 		if (bank->regs->wkup_en)
 			bank->chip.dev = &omap_mpuio_device.dev;
-#endif
 		bank->chip.base = OMAP_MPUIO(0);
 	} else {
 		bank->chip.label = "gpio";
@@ -975,7 +947,7 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
 		     j < bank->virtual_irq_start + bank->width; j++) {
 		irq_set_lockdep_class(j, &gpio_lock_class);
 		irq_set_chip_data(j, bank);
-		if (bank_is_mpuio(bank)) {
+		if (bank->is_mpuio) {
 			omap_mpuio_alloc_gc(bank, j, bank->width);
 		} else {
 			irq_set_chip(j, &gpio_irq_chip);
@@ -1019,11 +991,11 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 
 	pdata = pdev->dev.platform_data;
 	bank->virtual_irq_start = pdata->virtual_irq_start;
-	bank->method = pdata->bank_type;
 	bank->dev = &pdev->dev;
 	bank->dbck_flag = pdata->dbck_flag;
 	bank->stride = pdata->bank_stride;
 	bank->width = pdata->bank_width;
+	bank->is_mpuio = pdata->is_mpuio;
 	bank->non_wakeup_gpios = pdata->non_wakeup_gpios;
 	bank->loses_context = pdata->loses_context;
 	bank->get_context_loss_count = pdata->get_context_loss_count;
@@ -1056,7 +1028,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 	pm_runtime_enable(bank->dev);
 	pm_runtime_get_sync(bank->dev);
 
-	if (bank_is_mpuio(bank))
+	if (bank->is_mpuio)
 		mpuio_init(bank);
 
 	omap_gpio_mod_init(bank);
