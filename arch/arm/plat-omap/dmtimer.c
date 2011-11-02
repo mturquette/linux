@@ -398,7 +398,10 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
 	unsigned long rate = 0;
 
 #ifdef CONFIG_ARCH_OMAP2PLUS
-	rate = clk_get_rate(timer->fclk);
+	if (!cpu_is_omap54xx())
+		rate = clk_get_rate(timer->fclk);
+	else
+		rate = 32768;
 #endif
 
 	__omap_dm_timer_stop(timer->io_base, timer->posted, rate);
