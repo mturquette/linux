@@ -257,7 +257,7 @@ static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
 	}
 
 	/* This part needs to be executed always for OMAP{34xx, 44xx} */
-	if (cpu_is_omap34xx() || cpu_is_omap44xx() ||
+	if (cpu_is_omap34xx() || cpu_is_omap44xx() || cpu_is_omap54xx() ||
 			(bank->non_wakeup_gpios & gpio_bit)) {
 		/*
 		 * Log the edge gpio and manually trigger the IRQ
@@ -1290,7 +1290,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
 			old1 |= gen;
 		}
 
-		if (cpu_is_omap44xx()) {
+		if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 			old0 |= l;
 			old1 |= l;
 		}
