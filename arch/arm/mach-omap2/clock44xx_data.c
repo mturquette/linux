@@ -1474,6 +1474,7 @@ static struct clk dss_fck = {
 	.clkdm_name	= "l3_dss_clkdm",
 	.parent		= &l3_div_ck,
 	.recalc		= &followparent_recalc,
+	.autoidle	= 1, /* XXX Temporary hack, dss_fck handling broken */
 };
 
 static struct clk efuse_ctrl_cust_fck = {
