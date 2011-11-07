@@ -36,7 +36,6 @@ static struct powerdomain core_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_CORE_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 5,
@@ -63,7 +62,6 @@ static struct powerdomain abe_54xx_pwrdm = {
 	.voltdm		  = { .name = "mm" },
 	.prcm_offs	  = OMAP54XX_PRM_ABE_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF,
 	.banks		  = 2,
@@ -84,7 +82,6 @@ static struct powerdomain coreaon_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_COREAON_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_ON,
 };
 
@@ -94,7 +91,6 @@ static struct powerdomain dss_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_DSS_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF,
 	.banks		  = 1,
@@ -113,7 +109,6 @@ static struct powerdomain cpu0_54xx_pwrdm = {
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP54XX_PRCM_MPU_PRM_C0_INST,
 	.prcm_partition	  = OMAP54XX_PRCM_MPU_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
@@ -131,7 +126,6 @@ static struct powerdomain cpu1_54xx_pwrdm = {
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP54XX_PRCM_MPU_PRM_C1_INST,
 	.prcm_partition	  = OMAP54XX_PRCM_MPU_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
@@ -149,7 +143,6 @@ static struct powerdomain emu_54xx_pwrdm = {
 	.voltdm		  = { .name = "wakeup" },
 	.prcm_offs	  = OMAP54XX_PRM_EMU_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_ON,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -166,7 +159,6 @@ static struct powerdomain mpu_54xx_pwrdm = {
 	.voltdm		  = { .name = "mpu" },
 	.prcm_offs	  = OMAP54XX_PRM_MPU_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 2,
@@ -186,7 +178,6 @@ static struct powerdomain custefuse_54xx_pwrdm = {
 	.voltdm		  = { .name = "wakeup" },
 	.prcm_offs	  = OMAP54XX_PRM_CUSTEFUSE_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_ON,
 	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
 };
@@ -197,7 +188,6 @@ static struct powerdomain dsp_54xx_pwrdm = {
 	.voltdm		  = { .name = "mm" },
 	.prcm_offs	  = OMAP54XX_PRM_DSP_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 3,
@@ -220,7 +210,6 @@ static struct powerdomain cam_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_CAM_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_ON,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -238,7 +227,6 @@ static struct powerdomain l3init_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_L3INIT_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 2,
@@ -259,7 +247,6 @@ static struct powerdomain l4per_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_L4PER_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 2,
@@ -280,7 +267,6 @@ static struct powerdomain gpu_54xx_pwrdm = {
 	.voltdm		  = { .name = "mm" },
 	.prcm_offs	  = OMAP54XX_PRM_GPU_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_ON,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -298,7 +284,6 @@ static struct powerdomain wkupaon_54xx_pwrdm = {
 	.voltdm		  = { .name = "core" },
 	.prcm_offs	  = OMAP54XX_PRM_WKUPAON_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_ON,
 	.banks		  = 1,
 	.pwrsts_mem_ret	= {
@@ -314,7 +299,6 @@ static struct powerdomain iva_54xx_pwrdm = {
 	.voltdm		  = { .name = "mm" },
 	.prcm_offs	  = OMAP54XX_PRM_IVA_INST,
 	.prcm_partition	  = OMAP54XX_PRM_PARTITION,
-	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF,
 	.banks		  = 4,
@@ -363,5 +347,7 @@ static struct powerdomain *powerdomains_omap54xx[] __initdata = {
 
 void __init omap54xx_powerdomains_init(void)
 {
-	pwrdm_init(powerdomains_omap54xx, &omap4_pwrdm_operations);
+	pwrdm_register_platform_funcs(&omap4_pwrdm_operations);
+	pwrdm_register_pwrdms(powerdomains_omap54xx);
+	pwrdm_complete_init();
 }
