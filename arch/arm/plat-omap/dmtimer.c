@@ -147,7 +147,7 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
 		omap_dm_timer_reset(timer);
 
 #ifndef CONFIG_OMAP5_VIRTIO
-	omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
+	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
 #endif
 	timer->posted = 1;
 	return ret;
