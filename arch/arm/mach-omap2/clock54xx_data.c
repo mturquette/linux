@@ -845,6 +845,28 @@ static struct clk dpll_mpu_m2_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+static struct clk virt_dpll_mpu_ck = {
+	.name		= "virt_dpll_mpu_ck",
+	.parent		= &dpll_mpu_ck,
+	.clksel		= dpll_mpu_m2_div,
+	.clksel_reg	= OMAP5430_CM_DIV_M2_DPLL_MPU,
+	.clksel_mask	= OMAP5430_DIVHS_0_4_MASK,
+	.ops		= &clkops_omap4_dpllmx_ops,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
+};
+#else
+static struct clk virt_dpll_mpu_ck = {
+	.name		= "virt_dpll_mpu_ck",
+	.parent		= &dpll_mpu_ck,
+	.ops		= &clkops_null,
+	.recalc		= &omap5_mpu_dpll_recalc,
+	.round_rate	= &omap5_mpu_dpll_round_rate,
+	.set_rate	= &omap5_mpu_dpll_set_rate,
+};
+#endif
 static struct clk dpll_per_h11_ck = {
 	.name		= "dpll_per_h11_ck",
 	.parent		= &dpll_per_ck,
@@ -2227,6 +2249,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_iva_h12_ck",		&dpll_iva_h12_ck,	CK_54XX),
 	CLK(NULL,	"dpll_mpu_ck",			&dpll_mpu_ck,	CK_54XX),
 	CLK(NULL,	"dpll_mpu_m2_ck",		&dpll_mpu_m2_ck,	CK_54XX),
+	CLK(NULL,	"virt_dpll_mpu_ck",		&virt_dpll_mpu_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_h11_ck",		&dpll_per_h11_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_h12_ck",		&dpll_per_h12_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_h14_ck",		&dpll_per_h14_ck,	CK_54XX),
