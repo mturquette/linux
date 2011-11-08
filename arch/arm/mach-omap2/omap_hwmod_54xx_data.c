@@ -5723,7 +5723,7 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 /*	&omap54xx_gpu_hwmod, */
 
 	/* hsi class */
-/*	&omap54xx_hsi_hwmod, */
+	&omap54xx_hsi_hwmod,
 
 	/* i2c class */
 	&omap54xx_i2c1_hwmod,
