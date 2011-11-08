@@ -309,3 +309,7 @@ obj-y					+= $(disp-m) $(disp-y)
 
 obj-y					+= common-board-devices.o twl-common.o
 obj-$(CONFIG_OMAP_HSI_DEVICE)		+= omap_hsi.o
+
+# Serial ATA support
+s-ata-$(CONFIG_SATA_AHCI_PLATFORM)	:= sata.o
+obj-$(CONFIG_ARCH_OMAP5) 		+= $(s-ata-m) $(s-ata-y)
