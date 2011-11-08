@@ -63,28 +63,7 @@ struct omap_uart_state {
 
 static LIST_HEAD(uart_list);
 static u8 num_uarts;
-
-static int uart_idle_hwmod(struct omap_device *od)
-{
-	omap_hwmod_idle(od->hwmods[0]);
-
-	return 0;
-}
-
-static int uart_enable_hwmod(struct omap_device *od)
-{
-	omap_hwmod_enable(od->hwmods[0]);
-
-	return 0;
-}
-
-static struct omap_device_pm_latency omap_uart_latency[] = {
-	{
-		.deactivate_func = uart_idle_hwmod,
-		.activate_func	 = uart_enable_hwmod,
-		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-	},
-};
+static u8 console_uart_id = -1;
 
 #define DEFAULT_RXDMA_POLLRATE		1	/* RX DMA polling rate (us) */
 #define DEFAULT_RXDMA_BUFSIZE		4096	/* RX DMA buffer size */
@@ -97,6 +76,41 @@ static struct omap_uart_port_info omap_serial_default_info[] __initdata = {
 		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
 		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
 		.autosuspend_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+	},
+};
+
+static struct omap_device_pm_latency omap_uart_latency[] = {
+	{
+		.activate_func   = omap_device_enable_hwmods,
+		.deactivate_func = omap_device_idle_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static int console_uart_enable_hwmod(struct omap_device *od)
+{
+	console_lock();
+	/*
+	 * For early console we prevented hwmod reset and idle
+	 * So before we enable the uart clocks idle and then
+	 */
+	omap_hwmod_idle(od->hwmods[0]);
+	omap_hwmod_enable(od->hwmods[0]);
+	console_unlock();
+
+	/*
+	 * Restore the default activate/deactivate funcs,
+	 * since now we have set the hwmod state machine right
+	 * with the idle/enable for console uart
+	 */
+	od->pm_lats = omap_uart_latency;
+
+	return 0;
+}
+
+static struct omap_device_pm_latency console_uart_latency[] = {
+	{
+		.activate_func	 = console_uart_enable_hwmod,
 	},
 };
 
@@ -286,12 +300,20 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
 static void omap_serial_fill_default_pads(struct omap_board_data *bdata) {}
 #endif
 
+char *cmdline_find_option(char *str)
+{
+	extern char *saved_command_line;
+
+	return strstr(saved_command_line, str);
+}
+
 static int __init omap_serial_early_init(void)
 {
 	do {
 		char oh_name[MAX_UART_HWMOD_NAME_LEN];
 		struct omap_hwmod *oh;
 		struct omap_uart_state *uart;
+		char uart_name[MAX_UART_HWMOD_NAME_LEN];
 
 		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN,
 			 "uart%d", num_uarts + 1);
@@ -306,18 +328,23 @@ static int __init omap_serial_early_init(void)
 		uart->oh = oh;
 		uart->num = num_uarts++;
 		list_add_tail(&uart->node, &uart_list);
+		snprintf(uart_name, MAX_UART_HWMOD_NAME_LEN,
+				"%s%d", OMAP_SERIAL_NAME, uart->num);
 
-		/*
-		 * NOTE: omap_hwmod_setup*() has not yet been called,
-		 *       so no hwmod functions will work yet.
-		 */
+		if (cmdline_find_option(uart_name)) {
+			console_uart_id = uart->num;
+			/*
+			 * omap-uart can be used for earlyprintk logs
+			 * So if omap-uart is used as console then prevent
+			 * uart reset and idle to get logs from omap-uart
+			 * until uart console driver is available to take
+			 * care for console messages.
+			 * Idling or resetting omap-uart while printing logs
+			 * early boot logs can stall the boot-up.
+			 */
+			oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
+		}
 
-		/*
-		 * During UART early init, device need to be probed
-		 * to determine SoC specific init before omap_device
-		 * is ready.  Therefore, don't allow idle here
-		 */
-		uart->oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
 	} while (1);
 
 	return 0;
@@ -393,27 +420,15 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
 	WARN(IS_ERR(od), "Could not build omap_device for %s: %s.\n",
 	     name, oh->name);
 
+	if (console_uart_id == bdata->id)
+		od->pm_lats = console_uart_latency;
+
 	omap_device_disable_idle_on_suspend(od);
 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
 
 	uart->pdev = &od->pdev;
 
 	oh->dev_attr = uart;
-
-	console_lock(); /* in case the earlycon is on the UART */
-
-	/*
-	 * Because of early UART probing, UART did not get idled
-	 * on init.  Now that omap_device is ready, ensure full idle
-	 * before doing omap_device_enable().
-	 */
-	if (!cpu_is_omap54xx()) {
-		omap_hwmod_idle(uart->oh);
-		omap_device_enable(uart->pdev);
-		omap_device_idle(uart->pdev);
-	}
-
-	console_unlock();
 
 	if (((cpu_is_omap34xx() || cpu_is_omap44xx() || cpu_is_omap54xx())
 			&& bdata->pads))
