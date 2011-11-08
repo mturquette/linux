@@ -69,6 +69,7 @@ struct omap_uart_port_info {
 	u32 (*get_context_loss_count)(struct device *);
 	void (*set_forceidle)(struct platform_device *);
 	void (*set_noidle)(struct platform_device *);
+	void (*enable_wakeup)(struct platform_device *, bool);
 };
 
 struct uart_omap_dma {
@@ -123,6 +124,7 @@ struct uart_omap_port {
 	unsigned long		port_activity;
 	u32			context_loss_cnt;
 	u32			errata;
+	u8			wakeups_enabled;
 };
 
 #endif /* __OMAP_SERIAL_H__ */

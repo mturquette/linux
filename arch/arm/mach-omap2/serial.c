@@ -56,10 +56,6 @@ struct omap_uart_state {
 	int num;
 	int can_sleep;
 
-	void __iomem *wk_st;
-	void __iomem *wk_en;
-	u32 wk_mask;
-
 	int clocked;
 
 	struct list_head node;
@@ -114,26 +110,6 @@ static inline void omap_uart_disable_clocks(struct omap_uart_state *uart)
 	omap_device_idle(uart->pdev);
 }
 
-static void omap_uart_enable_wakeup(struct omap_uart_state *uart)
-{
-	/* Set wake-enable bit */
-	if (uart->wk_en && uart->wk_mask) {
-		u32 v = __raw_readl(uart->wk_en);
-		v |= uart->wk_mask;
-		__raw_writel(v, uart->wk_en);
-	}
-}
-
-static void omap_uart_disable_wakeup(struct omap_uart_state *uart)
-{
-	/* Clear wake-enable bit */
-	if (uart->wk_en && uart->wk_mask) {
-		u32 v = __raw_readl(uart->wk_en);
-		v &= ~uart->wk_mask;
-		__raw_writel(v, uart->wk_en);
-	}
-}
-
 static void omap_uart_block_sleep(struct omap_uart_state *uart)
 {
 	omap_uart_enable_clocks(uart);
@@ -163,65 +139,17 @@ int omap_uart_can_sleep(void)
 	return can_sleep;
 }
 
-static void omap_uart_idle_init(struct omap_uart_state *uart)
+static void omap_uart_enable_wakeup(struct platform_device *pdev, bool enable)
 {
-	int ret;
+	struct omap_device *od = to_omap_device(pdev);
 
-	uart->can_sleep = 0;
-	omap_uart_smart_idle_enable(uart, 0);
+	if (!od)
+		return;
 
-	if (cpu_is_omap34xx() && !cpu_is_ti816x()) {
-		u32 mod = (uart->num > 1) ? OMAP3430_PER_MOD : CORE_MOD;
-		u32 wk_mask = 0;
-
-		/* XXX These PRM accesses do not belong here */
-		uart->wk_en = OMAP34XX_PRM_REGADDR(mod, PM_WKEN1);
-		uart->wk_st = OMAP34XX_PRM_REGADDR(mod, PM_WKST1);
-		switch (uart->num) {
-		case 0:
-			wk_mask = OMAP3430_ST_UART1_MASK;
-			break;
-		case 1:
-			wk_mask = OMAP3430_ST_UART2_MASK;
-			break;
-		case 2:
-			wk_mask = OMAP3430_ST_UART3_MASK;
-			break;
-		case 3:
-			wk_mask = OMAP3630_ST_UART4_MASK;
-			break;
-		}
-		uart->wk_mask = wk_mask;
-	} else if (cpu_is_omap24xx()) {
-		u32 wk_mask = 0;
-		u32 wk_en = PM_WKEN1, wk_st = PM_WKST1;
-
-		switch (uart->num) {
-		case 0:
-			wk_mask = OMAP24XX_ST_UART1_MASK;
-			break;
-		case 1:
-			wk_mask = OMAP24XX_ST_UART2_MASK;
-			break;
-		case 2:
-			wk_en = OMAP24XX_PM_WKEN2;
-			wk_st = OMAP24XX_PM_WKST2;
-			wk_mask = OMAP24XX_ST_UART3_MASK;
-			break;
-		}
-		uart->wk_mask = wk_mask;
-		if (cpu_is_omap2430()) {
-			uart->wk_en = OMAP2430_PRM_REGADDR(CORE_MOD, wk_en);
-			uart->wk_st = OMAP2430_PRM_REGADDR(CORE_MOD, wk_st);
-		} else if (cpu_is_omap2420()) {
-			uart->wk_en = OMAP2420_PRM_REGADDR(CORE_MOD, wk_en);
-			uart->wk_st = OMAP2420_PRM_REGADDR(CORE_MOD, wk_st);
-		}
-	} else {
-		uart->wk_en = NULL;
-		uart->wk_st = NULL;
-		uart->wk_mask = 0;
-	}
+	if (enable)
+		omap_hwmod_enable_wakeup(od->hwmods[0]);
+	else
+		omap_hwmod_disable_wakeup(od->hwmods[0]);
 }
 
 /*
@@ -244,6 +172,8 @@ static void omap_uart_set_forceidle(struct platform_device *pdev)
 }
 
 #else
+static void omap_uart_enable_wakeup(struct platform_device *pdev, bool enable)
+{}
 static void omap_uart_set_noidle(struct platform_device *pdev) {}
 static void omap_uart_set_forceidle(struct platform_device *pdev) {}
 static void omap_uart_block_sleep(struct omap_uart_state *uart)
@@ -458,6 +388,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
 	omap_up.flags = UPF_BOOT_AUTOCONF;
 	omap_up.set_forceidle = omap_uart_set_forceidle;
 	omap_up.set_noidle = omap_uart_set_noidle;
+	omap_up.enable_wakeup = omap_uart_enable_wakeup;
 
 	/* Enable the MDR1 errata for OMAP3 */
 	if (cpu_is_omap34xx() && !cpu_is_ti816x())
@@ -494,8 +425,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
 	if (!cpu_is_omap54xx()) {
 		omap_hwmod_idle(uart->oh);
 		omap_device_enable(uart->pdev);
-		omap_uart_idle_init(uart);
-		omap_hwmod_enable_wakeup(uart->oh);
 		omap_device_idle(uart->pdev);
 	}
 
@@ -504,7 +433,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
 	console_unlock();
 
 	if (((cpu_is_omap34xx() || cpu_is_omap44xx() || cpu_is_omap54xx())
-			&& bdata->pads) || (pdata->wk_en && pdata->wk_mask))
+			&& bdata->pads))
 		device_init_wakeup(&od->pdev.dev, true);
 }
 
