@@ -43,12 +43,12 @@
 #include "mux.h"
 
 /*
- * NOTE: By default the serial timeout is disabled as it causes lost characters
- * over the serial ports. This means that the UART clocks will stay on until
- * disabled via sysfs. This also causes that any deeper omap sleep states are
- * blocked. 
+ * NOTE: By default the serial auto_suspend timeout is disabled as it causes
+ * lost characters over the serial ports. This means that the UART clocks will
+ * stay on until power/autosuspend_delay is set for the uart from sysfs.
+ * This also causes that any deeper omap sleep states are blocked.
  */
-#define DEFAULT_TIMEOUT 0
+#define DEFAULT_AUTOSUSPEND_DELAY	-1
 
 #define MAX_UART_HWMOD_NAME_LEN		16
 
@@ -83,6 +83,18 @@ static struct omap_device_pm_latency omap_uart_latency[] = {
 		.deactivate_func = uart_idle_hwmod,
 		.activate_func	 = uart_enable_hwmod,
 		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+#define DEFAULT_RXDMA_TIMEOUT		1	/* RX DMA polling rate (us) */
+#define DEFAULT_RXDMA_BUFSIZE		4096	/* RX DMA buffer size */
+
+static struct omap_uart_port_info omap_serial_default_info[] __initdata = {
+	{
+		.dma_enabled	= false,
+		.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
+		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
+		.autosuspend_timeout = DEFAULT_AUTOSUSPEND_DELAY,
 	},
 };
 
@@ -316,6 +328,7 @@ core_initcall(omap_serial_early_init);
 /**
  * omap_serial_init_port() - initialize single serial port
  * @bdata: port specific board data pointer
+ * @info: platform specific data pointer
  *
  * This function initialies serial driver for given port only.
  * Platforms can call this function instead of omap_serial_init()
@@ -324,7 +337,8 @@ core_initcall(omap_serial_early_init);
  * Don't mix calls to omap_serial_init_port() and omap_serial_init(),
  * use only one of the two.
  */
-void __init omap_serial_init_port(struct omap_board_data *bdata)
+void __init omap_serial_init_port(struct omap_board_data *bdata,
+			struct omap_uart_port_info *info)
 {
 	struct omap_uart_state *uart;
 	struct omap_hwmod *oh;
@@ -345,15 +359,21 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
 		if (bdata->id == uart->num)
 			break;
 
+	if (!info)
+		info = omap_serial_default_info;
+ 
 	oh = uart->oh;
 	name = DRIVER_NAME;
 
-	omap_up.dma_enabled = uart->dma_enabled;
+	omap_up.dma_enabled = info->dma_enabled;
 	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
 	omap_up.flags = UPF_BOOT_AUTOCONF;
 	omap_up.set_forceidle = omap_uart_set_forceidle;
 	omap_up.set_noidle = omap_uart_set_noidle;
 	omap_up.enable_wakeup = omap_uart_enable_wakeup;
+	omap_up.dma_rx_buf_size = info->dma_rx_buf_size;
+	omap_up.dma_rx_timeout = info->dma_rx_timeout;
+	omap_up.autosuspend_timeout = info->autosuspend_timeout;
 
 	/* Enable the MDR1 errata for OMAP3 */
 	if (cpu_is_omap34xx() && !cpu_is_ti816x())
@@ -401,13 +421,14 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
 }
 
 /**
- * omap_serial_init() - initialize all supported serial ports
+ * omap_serial_board_init() - initialize all supported serial ports
+ * @info: platform specific data pointer
  *
  * Initializes all available UARTs as serial ports. Platforms
  * can call this function when they want to have default behaviour
  * for serial ports (e.g initialize them all as serial ports).
  */
-void __init omap_serial_init(void)
+void __init omap_serial_board_init(struct omap_uart_port_info *info)
 {
 	struct omap_uart_state *uart;
 	struct omap_board_data bdata;
@@ -421,7 +442,21 @@ void __init omap_serial_init(void)
 		if (cpu_is_omap54xx() || cpu_is_omap44xx() || cpu_is_omap34xx())
 			omap_serial_fill_default_pads(&bdata);
 
-		omap_serial_init_port(&bdata);
-
+		if (!info)
+			omap_serial_init_port(&bdata, NULL);
+		else
+			omap_serial_init_port(&bdata, &info[uart->num]);
 	}
+}
+
+/**
+ * omap_serial_init() - initialize all supported serial ports
+ *
+ * Initializes all available UARTs.
+ * Platforms can call this function when they want to have default behaviour
+ * for serial ports (e.g initialize them all as serial ports).
+ */
+void __init omap_serial_init(void)
+{
+	omap_serial_board_init(NULL);
 }
