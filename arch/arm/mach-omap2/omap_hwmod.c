@@ -1533,6 +1533,7 @@ static int _enable(struct omap_hwmod *oh)
 
 	_enable_clocks(oh);
 	_enable_module(oh);
+	_update_context_lost(oh);
 
 	r = _wait_target_ready(oh);
 	if (!r) {
@@ -1590,6 +1591,7 @@ static int _idle(struct omap_hwmod *oh)
 		_idle_sysc(oh);
 	_del_initiator_dep(oh, mpu_oh);
 #if !defined(CONFIG_OMAP5_VIRTIO)
+	_clear_context_lost(oh);
 	_disable_module(oh);
 	ret = _wait_target_disable(oh);
 	if (ret)
