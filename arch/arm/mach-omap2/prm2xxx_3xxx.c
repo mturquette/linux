@@ -275,11 +275,3 @@ void omap3_trigger_wuclk_ctrl(void)
 				     PM_WKEN);
 	}
 }
-
-/* OMAP3 Daisychain disable sequence */
-void omap3_disable_io_chain(void)
-{
-	if (omap_rev() >= OMAP3430_REV_ES3_1)
-		omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-				       PM_WKEN);
-}
