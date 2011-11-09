@@ -272,11 +272,6 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
 	struct omap3_idle_statedata *cx;
 	int ret;
 
-	if (!omap3_can_sleep()) {
-		new_state = dev->safe_state;
-		goto select_state;
-	}
-
 	/*
 	 * Prevent idle completely if CAM is active.
 	 * CAM does not have wakeup capability in OMAP3.

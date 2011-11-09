@@ -144,7 +144,6 @@ enum {
 #define OMAP_I2C_SCLH_HSSCLH	8
 
 /* I2C System Test Register (OMAP_I2C_SYSTEST): */
-#ifdef DEBUG
 #define OMAP_I2C_SYSTEST_ST_EN		(1 << 15)	/* System test enable */
 #define OMAP_I2C_SYSTEST_FREE		(1 << 14)	/* Free running mode */
 #define OMAP_I2C_SYSTEST_TMODE_MASK	(3 << 12)	/* Test mode select */
@@ -153,7 +152,6 @@ enum {
 #define OMAP_I2C_SYSTEST_SCL_O		(1 << 2)	/* SCL line drive out */
 #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
 #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
-#endif
 
 /* OCP_SYSSTATUS bit definitions */
 #define SYSS_RESETDONE_MASK		(1 << 0)
@@ -276,7 +274,7 @@ static void omap_i2c_unidle(struct omap_i2c_dev *dev)
 
 	pm_runtime_get_sync(&pdev->dev);
 
-	if (cpu_is_omap34xx()) {
+	if (cpu_is_omap34xx() || cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 		omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
 		omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
@@ -493,7 +491,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 			OMAP_I2C_IE_AL)  | ((dev->fifo_size) ?
 				(OMAP_I2C_IE_RDR | OMAP_I2C_IE_XDR) : 0);
 	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
-	if (cpu_is_omap34xx()) {
+	if (cpu_is_omap34xx() || cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		dev->pscstate = psc;
 		dev->scllstate = scll;
 		dev->sclhstate = sclh;
@@ -641,10 +639,23 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
 	int i;
 	int r;
+	u16 val;
 
 	omap_i2c_unidle(dev);
 
 	r = omap_i2c_wait_for_bb(dev);
+	/* If timeout, try to again check after soft reset of I2C block */
+	if (WARN_ON(r == -ETIMEDOUT)) {
+		/* Provide a permanent clock to recover the peripheral */
+		val = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+		val |= (OMAP_I2C_SYSTEST_ST_EN |
+				OMAP_I2C_SYSTEST_FREE |
+				(2 << OMAP_I2C_SYSTEST_TMODE_SHIFT));
+		omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, val);
+		msleep(1);
+		omap_i2c_init(dev);
+		r = omap_i2c_wait_for_bb(dev);
+	}
 	if (r < 0)
 		goto out;
 
@@ -1031,12 +1042,12 @@ omap_i2c_probe(struct platform_device *pdev)
 
 	if (cpu_is_omap7xx())
 		dev->reg_shift = 1;
-	else if (cpu_is_omap44xx())
+	else if (cpu_is_omap44xx() || cpu_is_omap54xx())
 		dev->reg_shift = 0;
 	else
 		dev->reg_shift = 2;
 
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap44xx() ||  cpu_is_omap54xx())
 		dev->regs = (u8 *) omap4_reg_map;
 	else
 		dev->regs = (u8 *) reg_map;
@@ -1061,13 +1072,12 @@ omap_i2c_probe(struct platform_device *pdev)
 		 * size. This is to ensure that we can handle the status on int
 		 * call back latencies.
 		 */
-		if (dev->rev >= OMAP_I2C_REV_ON_4430) {
-			dev->fifo_size = 0;
+		dev->fifo_size = (dev->fifo_size / 2);
+		if (dev->rev >= OMAP_I2C_REV_ON_4430)
 			dev->b_hw = 0; /* Disable hardware fixes */
-		} else {
-			dev->fifo_size = (dev->fifo_size / 2);
+		 else
 			dev->b_hw = 1; /* Enable hardware fixes */
-		}
+		
 		/* calculate wakeup latency constraint */
 		dev->latency = (1000000 * dev->fifo_size) / (1000 * speed / 8);
 	}
