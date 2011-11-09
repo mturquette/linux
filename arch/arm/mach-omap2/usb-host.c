@@ -520,6 +520,30 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		ehci_data.reset_gpio_port[i] = pdata->reset_gpio_port[i];
 		ehci_data.regulator[i] = pdata->regulator[i];
 	}
+
+	if (cpu_is_omap54xx()) {
+		if (is_ehci_tll_mode(pdata->port_mode[0])) {
+			pr_err("TLL mode is not present in port1 of omap5\n");
+			ehci_data.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
+		}
+		if (is_ehci_phy_mode(pdata->port_mode[1])) {
+			pr_err("PHY mode is not present in port2 of omap5\n");
+			ehci_data.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED;
+		}
+		if (is_ehci_tll_mode(pdata->port_mode[2]) ||
+			is_ehci_phy_mode(pdata->port_mode[2])) {
+			pr_err("TLL/PHY mode is not present in port3 of omap5\n");
+			ehci_data.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED;
+		}
+	} else {
+		if (is_ehci_tll_mode(pdata->port_mode[2]) ||
+			is_ehci_phy_mode(pdata->port_mode[2]) ||
+			is_ehci_hsic_mode(pdata->port_mode[2])) {
+			pr_err("port3 is not present\n");
+			ehci_data.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED;
+		}
+	}
+
 	ehci_data.phy_reset = pdata->phy_reset;
 	ohci_data.es2_compatibility = pdata->es2_compatibility;
 	usbhs_data.ehci_data = &ehci_data;
