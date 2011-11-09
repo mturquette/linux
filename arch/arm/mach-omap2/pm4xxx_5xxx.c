@@ -57,9 +57,6 @@ static int omap_pm_suspend(void)
 	/* Set targeted power domain states by suspend */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-		if (cpu_is_omap44xx())
-			pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_OFF);
-		else
 			pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_RET);
 	}
 
@@ -140,10 +137,6 @@ static const struct platform_suspend_ops omap_pm_ops = {
  */
 static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
 {
-	/* FIXME: Initliase only MPUSS clock domains */
-	if (strncmp(clkdm->name, "mpu", 3))
-		return 0;
-
 	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
 		clkdm_allow_idle(clkdm);
 	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
@@ -166,13 +159,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	 * further down in the code path
 	 */
 	if (!strncmp(pwrdm->name, "cpu", 3))
-		return 0;
-
-	/*
-	 * FIXME: Remove this check when core retention is supported
-	 * Only MPUSS power domain is added in the list.
-	 */
-	if (strcmp(pwrdm->name, "mpu_pwrdm"))
 		return 0;
 
 	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
