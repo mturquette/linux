@@ -243,6 +243,39 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
         return IRQ_HANDLED;
 }
 
+static inline int omap5_init_static_deps(void)
+{
+	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm;
+	struct clockdomain *l3_2_clkdm, *l4_per_clkdm;
+	int ret;
+	/*
+	 * The dynamic dependency between MPUSS -> MEMIF and
+	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
+	 * expected. The hardware recommendation is to enable static
+	 * dependencies for these to avoid system lock ups or random crashes.
+	 */
+	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
+	l4_per_clkdm = clkdm_lookup("l4per_clkdm");
+    emif_clkdm = clkdm_lookup("emif_clkdm");
+    l3_1_clkdm = clkdm_lookup("l3main1_clkdm");
+    l3_2_clkdm = clkdm_lookup("l3main2_clkdm");
+    l4_per_clkdm = clkdm_lookup("l4per_clkdm");
+    if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) ||
+            (!l3_2_clkdm) || (!l4_per_clkdm))
+              return -EINVAL;
+
+	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
+	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
+	ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per_clkdm);
+	if (ret) {
+		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER"
+				"wakeup dependency\n");
+	}
+
+	return ret;
+}
+
 /**
  * omap_pm_init - Init routine for OMAP4 PM
  *
@@ -292,6 +325,16 @@ static int __init omap_pm_init(void)
 			goto err2;
 		}
 	}
+
+#ifdef CONFIG_MACH_OMAP_5430ZEBU	
+	if (cpu_is_omap54xx()) {
+		ret = omap5_init_static_deps();
+		if (ret) {
+			pr_err("Failed to initialise static depedencies\n");
+			goto err2;
+		}
+	}
+#endif
 
 	ret = omap_mpuss_init();
 	if (ret) {
