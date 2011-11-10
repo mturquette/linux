@@ -555,6 +555,7 @@ static int mmc_select_powerclass(struct mmc_card *card,
 
 	host = card->host;
 	BUG_ON(!host);
+	return 0;
 
 	if (ext_csd == NULL)
 		return 0;
@@ -578,6 +579,7 @@ static int mmc_select_powerclass(struct mmc_card *card,
 		else if (host->ios.clock <= 200000000)
 			index = EXT_CSD_PWR_CL_200_195;
 		break;
+	case MMC_VDD_29_30:
 	case MMC_VDD_32_33:
 	case MMC_VDD_33_34:
 	case MMC_VDD_34_35:
