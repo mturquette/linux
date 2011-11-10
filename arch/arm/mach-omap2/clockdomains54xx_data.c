@@ -493,7 +493,11 @@ static struct clockdomain wkupaon_54xx_clkdm = {
 	.cm_inst	  = OMAP54XX_PRM_WKUPAON_CM_INST,
 	.clkdm_offs	  = OMAP54XX_PRM_WKUPAON_CM_WKUPAON_CDOFFS,
 	.dep_bit	  = OMAP54XX_WKUPAON_STATDEP_SHIFT,
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+	.flags		  = CLKDM_CAN_FORCE_WAKEUP
+#else
 	.flags		  = CLKDM_CAN_FORCE_WAKEUP | CLKDM_CAN_HWSUP,
+#endif
 };
 
 static struct clockdomain mpu0_54xx_clkdm = {
