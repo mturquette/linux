@@ -263,7 +263,7 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
 		bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
 		break;
 	case 3:
-		if (cpu_is_omap44xx()) {
+		if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 			bdata->pads = default_omap4_uart4_pads;
 			bdata->pads_cnt =
 				ARRAY_SIZE(default_omap4_uart4_pads);

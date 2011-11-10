@@ -27,6 +27,7 @@
 #include <plat/mcspi.h>
 #include <plat/mcbsp.h>
 #include <plat/mmc.h>
+#include <plat/i2c.h>
 #include <plat/dmtimer.h>
 
 #include "omap_hwmod_common_data.h"
@@ -2483,6 +2484,8 @@ static struct omap_hwmod_class_sysconfig omap54xx_i2c_sysc = {
 static struct omap_hwmod_class omap54xx_i2c_hwmod_class = {
 	.name	= "i2c",
 	.sysc	= &omap54xx_i2c_sysc,
+	.rev	= OMAP_I2C_IP_VERSION_2,
+	.reset	= &omap_i2c_reset,
 };
 
 /* i2c1 */
@@ -2525,7 +2528,7 @@ static struct omap_hwmod omap54xx_i2c1_hwmod = {
 	.name		= "i2c1",
 	.class		= &omap54xx_i2c_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
-	.flags		= HWMOD_INIT_NO_RESET,
+	.flags		= HWMOD_16BIT_REG,
 	.mpu_irqs	= omap54xx_i2c1_irqs,
 	.sdma_reqs	= omap54xx_i2c1_sdma_reqs,
 	.main_clk	= "func_96m_fclk",
@@ -2581,7 +2584,7 @@ static struct omap_hwmod omap54xx_i2c2_hwmod = {
 	.name		= "i2c2",
 	.class		= &omap54xx_i2c_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
-	.flags		= HWMOD_INIT_NO_RESET,
+	.flags		= HWMOD_16BIT_REG,
 	.mpu_irqs	= omap54xx_i2c2_irqs,
 	.sdma_reqs	= omap54xx_i2c2_sdma_reqs,
 	.main_clk	= "func_96m_fclk",
@@ -2637,7 +2640,7 @@ static struct omap_hwmod omap54xx_i2c3_hwmod = {
 	.name		= "i2c3",
 	.class		= &omap54xx_i2c_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
-	.flags		= HWMOD_INIT_NO_RESET,
+	.flags		= HWMOD_16BIT_REG,
 	.mpu_irqs	= omap54xx_i2c3_irqs,
 	.sdma_reqs	= omap54xx_i2c3_sdma_reqs,
 	.main_clk	= "func_96m_fclk",
@@ -2693,7 +2696,7 @@ static struct omap_hwmod omap54xx_i2c4_hwmod = {
 	.name		= "i2c4",
 	.class		= &omap54xx_i2c_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
-	.flags		= HWMOD_INIT_NO_RESET,
+	.flags		= HWMOD_16BIT_REG,
 	.mpu_irqs	= omap54xx_i2c4_irqs,
 	.sdma_reqs	= omap54xx_i2c4_sdma_reqs,
 	.main_clk	= "func_96m_fclk",
@@ -2743,6 +2746,7 @@ static struct omap_hwmod omap54xx_i2c5_hwmod = {
 	.name		= "i2c5",
 	.class		= &omap54xx_i2c_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
+	.flags		= HWMOD_16BIT_REG,
 	.mpu_irqs	= omap54xx_i2c5_irqs,
 	.main_clk	= "func_96m_fclk",
 	.prcm = {
@@ -5097,7 +5101,7 @@ static struct omap_hwmod_class_sysconfig omap54xx_uart_sysc = {
 	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_ENAWAKEUP |
 			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
 			   SYSS_HAS_RESET_STATUS),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART | SIDLE_SMART_WKUP),
 	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
@@ -5727,7 +5731,7 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 /*	&omap54xx_gpu_hwmod, */
 
 	/* hsi class */
-/*	&omap54xx_hsi_hwmod, */
+	&omap54xx_hsi_hwmod,
 
 	/* i2c class */
 	&omap54xx_i2c1_hwmod,
