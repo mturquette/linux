@@ -931,7 +931,7 @@ static struct omap_hwmod omap54xx_ctrl_module_core_hwmod = {
 	.slaves         = omap54xx_ctrl_module_core_slaves,
 	.slaves_cnt     = ARRAY_SIZE(omap54xx_ctrl_module_core_slaves),
 	.dev_attr	= &scm_dev_attr,
-	.clkdm_name     = "l4_wkup_clkdm",
+	.clkdm_name     = "l4cfg_clkdm",
 	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 };
 
