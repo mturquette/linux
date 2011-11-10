@@ -1693,11 +1693,28 @@ static struct clk wkupaon_clk_mux_ck = {
 	.recalc		= &followparent_recalc,
 };
 
+static const struct clksel_rate div3_8to32_rates[] = {
+	{ .div = 8, .val = 0, .flags = RATE_IN_54XX },
+	{ .div = 16, .val = 1, .flags = RATE_IN_54XX },
+	{ .div = 32, .val = 2, .flags = RATE_IN_54XX },
+	{ .div = 0 },
+};
+
+static const struct clksel div_ts_div[] = {
+	{ .parent = &wkupaon_clk_mux_ck, .rates = div3_8to32_rates },
+	{ .parent = NULL },
+};
+
 static struct clk ts_clk_div_ck = {
 	.name		= "ts_clk_div_ck",
 	.parent		= &wkupaon_clk_mux_ck,
-	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.clksel		= div_ts_div,
+	.ops		= &clkops_omap2_dflt,
+	.enable_reg	= OMAP54XX_CM_COREAON_BANDGAP_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_TS_FCLK_SHIFT,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 static const struct clksel utmi_p1_gfclk_sel[] = {
@@ -2476,7 +2493,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"gpt8_sync_mux_ck",		&timer8_sync_mux_ck,	CK_54XX),
 	CLK(NULL,	"gpt9_clk_mux_ck",		&timer9_clk_mux_ck,	CK_54XX),
 	CLK(NULL,	"wkupaon_clk_mux_ck",		&wkupaon_clk_mux_ck,	CK_54XX),
-	CLK(NULL,	"ts_clk_div_ck",		&ts_clk_div_ck,	CK_54XX),
+	CLK("omap4plus_scm.0",	"ts_fck",		&ts_clk_div_ck,	CK_54XX),
 	CLK(NULL,	"utmi_p1_gfclk",		&utmi_p1_gfclk,	CK_54XX),
 	CLK(NULL,	"utmi_p2_gfclk",		&utmi_p2_gfclk,	CK_54XX),
 	CLK(NULL,	"dss_32khz_clk",		&dss_32khz_clk,	CK_54XX),
