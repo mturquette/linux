@@ -17,6 +17,7 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 #include <linux/i2c/atmel_mxt224.h>
+#include <linux/input/mpu6050.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -193,6 +194,31 @@ static struct atmel_mxt224_platform_data atmel_mxt224_ts_platform_data[] = {
 	},
 };
 
+static struct mpu6050_platform_data mpu6050_platform_data = {
+	.aux_i2c_supply = 0,
+	.sample_rate_div = 0,
+	.config = 0,
+	.fifo_mode = 0,
+	.mpu6050_accel = {
+			.x_axis = 2,
+			.y_axis = 2,
+			.z_axis = 2,
+			.fsr = 0,               /* FSR to +-2g */
+			.hpf = 4,               /* HPF ON and cut off 0.63HZ */
+			.ctrl_mode = 2,         /* ZERO MOTION DETECTION */
+			.mode_thr_val = 0,      /* Threshold val */
+			.mode_thr_dur = 0,      /* Threshold duration */
+			.irqflags = IRQF_TRIGGER_HIGH,
+	},
+	.mpu6050_gyro = {
+			.x_axis = 2,
+			.y_axis = 2,
+			.z_axis = 2,
+			.fsr = 0,
+			.config = 0,
+	},
+};
+
 static void __init omap_5430evm_init_early(void)
 {
 	omap2_init_common_infrastructure();
@@ -229,6 +255,11 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("bmp085", 0x77),
+	},
+	{
+		I2C_BOARD_INFO("mpu6050", 0x68),
+		.platform_data = &mpu6050_platform_data,
+		.irq = OMAP_GPIO_IRQ(150),
 	},
 };
 
