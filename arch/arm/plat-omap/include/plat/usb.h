@@ -8,6 +8,10 @@
 
 #define OMAP3_HS_USB_PORTS	3
 
+#define is_ehci_phy_mode(x)	(x == OMAP_EHCI_PORT_MODE_PHY)
+#define is_ehci_tll_mode(x)	(x == OMAP_EHCI_PORT_MODE_TLL)
+#define is_ehci_hsic_mode(x)	(x == OMAP_EHCI_PORT_MODE_HSIC)
+
 enum usbhs_omap_port_mode {
 	OMAP_USBHS_PORT_MODE_UNUSED,
 	OMAP_EHCI_PORT_MODE_PHY,
@@ -99,9 +103,6 @@ enum musb_interface    {MUSB_INTERFACE_ULPI, MUSB_INTERFACE_UTMI};
 extern void usb_musb_init(struct omap_musb_board_data *board_data);
 
 extern void usbhs_init(const struct usbhs_omap_board_data *pdata);
-
-extern int omap_usbhs_enable(struct device *dev);
-extern void omap_usbhs_disable(struct device *dev);
 
 extern int omap4430_phy_power(struct device *dev, int ID, int on);
 extern int omap4430_phy_set_clk(struct device *dev, int on);
@@ -291,6 +292,12 @@ static inline u32 omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
 {
 	return 0;
 }
+#endif
+
+#if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_DWC3_MODULE)
+void usb_dwc3_init(void);
+#else
+static inline void usb_dwc3_init(void) {}
 #endif
 
 #endif	/* __ASM_ARCH_OMAP_USB_H */
