@@ -226,13 +226,20 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 	},
 };
 
+static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("bmp085", 0x77),
+	},
+};
+
 static int __init omap_5430evm_i2c_init(void)
 {
 	omap_register_i2c_bus(1, 400, omap5evm_i2c_1_boardinfo,
 				ARRAY_SIZE(omap5evm_i2c_1_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
-	omap_register_i2c_bus(4, 400, NULL, 0);
+	omap_register_i2c_bus(4, 400, omap5evm_i2c_4_boardinfo,
+				ARRAY_SIZE(omap5evm_i2c_4_boardinfo));
 	omap_register_i2c_bus(5, 400, NULL, 0);
 	return 0;
 }
