@@ -45,7 +45,7 @@
 int omap_type(void);
 
 struct omap_chip_id {
-	u16 oc;
+	u32 oc;
 	u8 type;
 };
 
@@ -446,7 +446,7 @@ IS_OMAP_TYPE(3517, 0x3517)
 #define CHIP_IS_OMAP4430ES2_2		(1 << 13)
 #define CHIP_IS_TI816X			(1 << 14)
 #define CHIP_IS_OMAP4460ES1_0		(1 << 15)
-#define CHIP_IS_OMAP5430ES1		(1 << 15)
+#define CHIP_IS_OMAP5430ES1		(1 << 16)
 
 #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
 
