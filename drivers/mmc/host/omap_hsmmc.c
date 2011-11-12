@@ -83,6 +83,8 @@
 #define BRR_ENABLE		(1 << 5)
 #define DTO_ENABLE		(1 << 20)
 #define INIT_STREAM		(1 << 1)
+#define ACEN_ACMD12		(1 << 2)
+#define ACEN_ACMD23		(2 << 2)
 #define DP_SELECT		(1 << 21)
 #define DDIR			(1 << 4)
 #define DMA_EN			0x1
@@ -107,6 +109,7 @@
 #define SOFTRESET		(1 << 1)
 #define RESETDONE		(1 << 0)
 
+#define AUTO_CMD12		(1 << 0)	/* Auto CMD12 support */
 /*
  * FIXME: Most likely all the data using these _DEVID defines should come
  * from the platform_data, or implemented in controller and slot specific
@@ -188,6 +191,7 @@ struct omap_hsmmc_host {
 	int			reqs_blocked;
 	int			use_reg;
 	int			req_in_progress;
+	unsigned int		flags;
 	struct omap_hsmmc_next	next_data;
 
 	struct	omap_mmc_platform_data	*pdata;
@@ -450,15 +454,14 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
 		* framework is fixed, we need a workaround like this
 		* (which is safe for MMC, but not in general).
 		*/
-		if (regulator_is_enabled(host->vcc) > 0) {
-			regulator_enable(host->vcc);
-			regulator_disable(host->vcc);
-		}
-		if (host->vcc_aux) {
-			if (regulator_is_enabled(reg) > 0) {
-				regulator_enable(reg);
-				regulator_disable(reg);
-			}
+		if (regulator_is_enabled(host->vcc) > 0 ||
+		    (host->vcc_aux && regulator_is_enabled(host->vcc_aux))) {
+			int vdd = ffs(mmc_slot(host).ocr_mask) - 1;
+
+			mmc_slot(host).set_power(host->dev, host->slot_id,
+						 1, vdd);
+			mmc_slot(host).set_power(host->dev, host->slot_id,
+						 0, 0);
 		}
 	}
 
@@ -485,9 +488,23 @@ static inline int omap_hsmmc_have_reg(void)
 
 #else
 
+static int omap_hsmmc_4_set_sleep(struct device *dev, int slot, int sleep,
+					int vdd, int cardsleep)
+{
+	return 0;
+}
+
+static int omap_hsmmc_4_set_power(struct device *dev, int slot, int power_on,
+					int vdd)
+{
+	return 0;
+}
+
 static inline int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
 {
-	return -EINVAL;
+	mmc_slot(host).set_power = omap_hsmmc_4_set_power;
+	mmc_slot(host).set_sleep = omap_hsmmc_4_set_sleep;
+	return 0;
 }
 
 static inline void omap_hsmmc_reg_put(struct omap_hsmmc_host *host)
@@ -875,8 +892,17 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 		if (cmd->flags & MMC_RSP_136)
 			resptype = 1;
 		else if (cmd->flags & MMC_RSP_BUSY) {
-			resptype = 3;
-			host->response_busy = 1;
+			#ifdef CONFIG_MACH_OMAP_5430ZEBU
+				resptype = 3;
+				host->response_busy = 1;
+			#else
+				if (cmd->opcode == 6 || cmd->opcode == 38)
+					host->response_busy = 0;
+				else {
+					resptype = 3;
+					host->response_busy = 1;
+					}
+			#endif
 		} else
 			resptype = 2;
 	}
@@ -890,9 +916,14 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 		cmdtype = 0x3;
 
 	cmdreg = (cmd->opcode << 24) | (resptype << 16) | (cmdtype << 22);
+	if ((host->flags & AUTO_CMD12) && mmc_op_multi(cmd->opcode))
+		cmdreg |= ACEN_ACMD12;
 
 	if (data) {
-		cmdreg |= DP_SELECT | MSBS | BCE;
+		if (host->use_dma)
+			cmdreg |= DP_SELECT | MSBS | BCE;
+		else
+			cmdreg |= DP_SELECT ;
 		if (data->flags & MMC_DATA_READ)
 			cmdreg |= DDIR;
 		else
@@ -961,11 +992,16 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 	else
 		data->bytes_xfered = 0;
 
-	if (!data->stop) {
+	if (data->stop && ((!(host->flags & AUTO_CMD12)) || data->error))
+		omap_hsmmc_start_command(host, data->stop, NULL);
+	else {
+		if (data->stop)
+			data->stop->resp[0] = OMAP_HSMMC_READ(host->base,
+							RSP76);
 		omap_hsmmc_request_done(host, data->mrq);
-		return;
 	}
-	omap_hsmmc_start_command(host, data->stop, NULL);
+
+	return;
 }
 
 /*
@@ -1011,6 +1047,7 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
 			host->data->sg_len,
 			omap_hsmmc_get_dma_dir(host, host->data));
 		omap_free_dma(dma_ch);
+		host->data->host_cookie = 0;
 	}
 	host->data = NULL;
 }
@@ -1510,7 +1547,7 @@ static void set_data_timeout(struct omap_hsmmc_host *host,
 	if (clkd == 0)
 		clkd = 1;
 
-	cycle_ns = 1000000000 / (clk_get_rate(host->fclk) / clkd);
+	cycle_ns = 1000000000 /  (26000000 / clkd);
 	timeout = timeout_ns / cycle_ns;
 	timeout += timeout_clks;
 	if (timeout) {
@@ -1576,8 +1613,10 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
 	struct mmc_data *data = mrq->data;
 
 	if (host->use_dma) {
-		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-			     omap_hsmmc_get_dma_dir(host, data));
+		if (data->host_cookie)
+			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
+				     data->sg_len,
+				     omap_hsmmc_get_dma_dir(host, data));
 		data->host_cookie = 0;
 	}
 }
@@ -1914,6 +1953,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	host->mapbase	= res->start;
 	host->base	= ioremap(host->mapbase, SZ_4K);
 	host->power_mode = MMC_POWER_OFF;
+	host->flags	= AUTO_CMD12;
 	host->next_data.cookie = 1;
 
 	platform_set_drvdata(pdev, host);
@@ -1933,16 +1973,22 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 
 	spin_lock_init(&host->irq_lock);
 
+#ifndef CONFIG_OMAP5_VIRTIO
 	host->fclk = clk_get(&pdev->dev, "fck");
 	if (IS_ERR(host->fclk)) {
 		ret = PTR_ERR(host->fclk);
 		host->fclk = NULL;
 		goto err1;
 	}
+#endif
 
 	omap_hsmmc_context_save(host);
 
 	mmc->caps |= MMC_CAP_DISABLE;
+	if (host->pdata->controller_flags & OMAP_HSMMC_BROKEN_MULTIBLOCK_READ) {
+		dev_info(&pdev->dev, "multiblock reads disabled due to 35xx erratum 2.1.1.128; MMC read performance may suffer\n");
+		mmc->caps2 |= MMC_CAP2_NO_MULTI_READ;
+	}
 
 	pm_runtime_enable(host->dev);
 	pm_runtime_get_sync(host->dev);
@@ -2015,7 +2061,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	}
 
 	/* Request IRQ for MMC operations */
-	ret = request_irq(host->irq, omap_hsmmc_irq, IRQF_DISABLED,
+	ret = request_irq(host->irq, omap_hsmmc_irq, 0,
 			mmc_hostname(mmc), host);
 	if (ret) {
 		dev_dbg(mmc_dev(host->mmc), "Unable to grab HSMMC IRQ\n");
@@ -2030,21 +2076,23 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 		}
 	}
 
+#ifdef CONFIG_REGULATOR
 	if (omap_hsmmc_have_reg() && !mmc_slot(host).set_power) {
 		ret = omap_hsmmc_reg_get(host);
 		if (ret)
 			goto err_reg;
 		host->use_reg = 1;
 	}
-
+#else
+	omap_hsmmc_reg_get(host);
+#endif
 	mmc->ocr_avail = mmc_slot(host).ocr_mask;
 
 	/* Request IRQ for card detect */
 	if ((mmc_slot(host).card_detect_irq)) {
 		ret = request_irq(mmc_slot(host).card_detect_irq,
 				  omap_hsmmc_cd_handler,
-				  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING
-					  | IRQF_DISABLED,
+				  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 				  mmc_hostname(mmc), host);
 		if (ret) {
 			dev_dbg(mmc_dev(host->mmc),
@@ -2085,7 +2133,9 @@ err_slot_name:
 err_irq_cd:
 	if (host->use_reg)
 		omap_hsmmc_reg_put(host);
+#ifdef CONFIG_REGULATOR
 err_reg:
+#endif
 	if (host->pdata->cleanup)
 		host->pdata->cleanup(&pdev->dev);
 err_irq_cd_init:
@@ -2098,7 +2148,9 @@ err_irq:
 		clk_disable(host->dbclk);
 		clk_put(host->dbclk);
 	}
+#ifndef CONFIG_OMAP5_VIRTIO
 err1:
+#endif
 	iounmap(host->base);
 	platform_set_drvdata(pdev, NULL);
 	mmc_free_host(mmc);

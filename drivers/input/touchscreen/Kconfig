@@ -714,6 +714,18 @@ config TOUCHSCREEN_STMPE
 	  To compile this driver as a module, choose M here: the
 	  module will be called stmpe-ts.
 
+config TOUCHSCREEN_ATMELMXT224
+	tristate "Atmel mXT224 touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have the Atmel mXT224 I2C touchscreen
+	  connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called atmel_mxt224.
+
 config TOUCHSCREEN_TPS6507X
 	tristate "TPS6507x based touchscreens"
 	depends on I2C

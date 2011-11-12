@@ -2102,6 +2102,50 @@ static int ahci_port_start(struct ata_port *ap)
 	 */
 	pp->intr_mask = DEF_PORT_IRQ;
 
+	/*
+	 * OMAP5 silicon errata : 9000445811
+	 * Title:  Erroneous PRD Interrupt Assertion
+	 * Description:
+	 * If the PRD size is larger than the FIS size, the SATA AHCI core
+	 * asserts a PRD interrupt erroneously in the middle of a PRD data
+	 * transfer. If one PRD spans more than one data FIS, the PRD
+	 * interrupt asserts after the first data FIS due to prd_i_done_q
+	 * being set at the beginning of a data tranmission instead of after
+	 * the PRD transfer has completed.
+
+	 * Consequence of the defect: PRD intrq (IS.DPS=1) is asserted
+	 * erroneously after the first TX Data FIS, when it should not be
+	 * asserted until after all the data in the PRD is transferred.
+	 * Because IS.DPS=1 is only informative to software, this erroneous
+	 * assertion should not cause any problems.
+	 *
+	 * Workaround:
+	 * Software ignores IS.DPS=1
+	 */
+
+	/*
+	 * OMAP5 silicon errata : 9000461620
+	 * Title : S.DPS Set Incorrectly when CMD.ST Bit Cleared During RX
+	 *	   Data Operation
+	 * Descrrption:
+	 * When CMD.ST is cleared during RX Data operation (to issue a
+	 * SRST/Device Reset cmd), it is possible that the prd_i_done_q
+	 * register remains set due to prd_i_done_set being asserted when
+	 * cmd_st=0. This causes the erroneous assertion of IS.DPS interrupt
+	 * during the data transfer that follows the reset. For example, if
+	 * this transfer has two Data FISes and two PRDs of the same size, and
+	 * the second PRD has I-bit set, then IS.DPS would be set after the
+	 * first Data FIS erroneously, not after the second Data FIS as
+	 * expected.
+	 * Consequence of the defect: IS.DPS interrupt is asserted unexpectedly.
+	 * This should not affect software operation, since software should not
+	 * look at IS. DPS to definitively detect end of transfer.
+	 *
+	 * Workaround:
+	 * Software ignores IS.DPS=1
+	 */
+	pp->intr_mask &= ~PORT_IRQ_SG_DONE;
+
 	ap->private_data = pp;
 
 	/* engage engines, captain */
