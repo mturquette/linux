@@ -137,6 +137,12 @@ static const struct platform_suspend_ops omap_pm_ops = {
  */
 static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
 {
+#ifndef CONFIG_OMAP_PM_STANDALONE
+
+	if ((cpu_is_omap54xx()) && strncmp(clkdm->name, "mpu", 3))
+		return 0;
+#endif
+
 	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
 		clkdm_allow_idle(clkdm);
 	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
@@ -160,6 +166,11 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	 */
 	if (!strncmp(pwrdm->name, "cpu", 3))
 		return 0;
+
+#ifndef CONFIG_OMAP_PM_STANDALONE
+	if ((cpu_is_omap54xx()) && strncmp(pwrdm->name, "mpu", 3))
+		return 0;
+#endif
 
 	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
 	if (!pwrst)
