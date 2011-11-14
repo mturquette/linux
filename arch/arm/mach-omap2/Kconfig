@@ -6,7 +6,7 @@ config ARCH_OMAP2PLUS_TYPICAL
 	bool "Typical OMAP configuration"
 	default y
 	select AEABI
-	select REGULATOR
+	select REGULATOR if ARCH_OMAP3 || ARCH_OMAP4
 	select PM_RUNTIME
 	select SERIAL_OMAP
 	select SERIAL_OMAP_CONSOLE

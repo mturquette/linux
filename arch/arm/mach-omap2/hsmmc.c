@@ -308,7 +308,7 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	mmc->slots[0].caps = c->caps;
 	mmc->slots[0].internal_clock = !c->ext_clock;
 	mmc->dma_mask = 0xffffffff;
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap44xx() || cpu_is_omap54xx())
 		mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
 	else
 		mmc->reg_offset = 0;
@@ -356,11 +356,19 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
 		mmc->slots[0].features |= HSMMC_HAS_UPDATED_RESET;
 
+	if (cpu_is_omap54xx())
+		mmc->slots[0].features |= HSMMC_HAS_UPDATED_RESET;
+
 	switch (c->mmc) {
 	case 1:
 		if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
 			/* on-chip level shifting via PBIAS0/PBIAS1 */
-			if (cpu_is_omap44xx()) {
+			if (cpu_is_omap54xx()) {
+				mmc->slots[0].before_set_reg =
+					NULL;
+				mmc->slots[0].after_set_reg =
+					NULL;
+			} else if (cpu_is_omap44xx()) {
 				mmc->slots[0].before_set_reg =
 						omap4_hsmmc1_before_set_reg;
 				mmc->slots[0].after_set_reg =
@@ -423,7 +431,8 @@ static struct omap_device_pm_latency omap_hsmmc_latency[] = {
 
 #define MAX_OMAP_MMC_HWMOD_NAME_LEN		16
 
-void __init omap_init_hsmmc(struct omap2_hsmmc_info *hsmmcinfo, int ctrl_nr)
+static void __init omap_init_hsmmc(struct omap2_hsmmc_info *hsmmcinfo,
+							int ctrl_nr)
 {
 	struct omap_hwmod *oh;
 	struct omap_device *od;
@@ -488,7 +497,7 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 {
 	u32 reg;
 
-	if (!cpu_is_omap44xx()) {
+	if (!(cpu_is_omap44xx() || cpu_is_omap54xx())) {
 		if (cpu_is_omap2430()) {
 			control_pbias_offset = OMAP243X_CONTROL_PBIAS_LITE;
 			control_devconf1_offset = OMAP243X_CONTROL_DEVCONF1;
@@ -496,7 +505,7 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 			control_pbias_offset = OMAP343X_CONTROL_PBIAS_LITE;
 			control_devconf1_offset = OMAP343X_CONTROL_DEVCONF1;
 		}
-	} else {
+	} else if (cpu_is_omap44xx()) {
 		control_pbias_offset =
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_PBIASLITE;
 		control_mmc1 = OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_MMC1;
@@ -509,8 +518,9 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 			OMAP4_SDMMC1_DR1_SPEEDCTRL_MASK |
 			OMAP4_SDMMC1_DR2_SPEEDCTRL_MASK);
 		omap4_ctrl_pad_writel(reg, control_mmc1);
+	} else if (cpu_is_omap54xx()) {
+		reg = 0;
 	}
-
 	for (; controllers->mmc; controllers++)
 		omap_init_hsmmc(controllers, controllers->mmc);
 

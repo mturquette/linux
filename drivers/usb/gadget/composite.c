@@ -164,7 +164,7 @@ int config_ep_by_speed(struct usb_gadget *g,
 
 ep_found:
 	/* commit results */
-	_ep->maxpacket = le16_to_cpu(chosen_desc->wMaxPacketSize);
+	_ep->maxpacket = usb_endpoint_maxp(chosen_desc);
 	_ep->desc = chosen_desc;
 	_ep->comp_desc = NULL;
 	_ep->maxburst = 0;
@@ -1083,7 +1083,9 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 					cdev->desc.bcdUSB = cpu_to_le16(0x0300);
 					cdev->desc.bMaxPacketSize0 = 9;
 				} else {
+#ifdef NOT_USING_VIRTUAL_HUB
 					cdev->desc.bcdUSB = cpu_to_le16(0x0210);
+#endif
 				}
 			}
 

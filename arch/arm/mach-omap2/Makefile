@@ -289,12 +289,16 @@ obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o \
 
 obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
 
-obj-$(CONFIG_MACH_OMAP_5430EVM)            += board-omap5evm.o
+obj-$(CONFIG_MACH_OMAP_5430EVM)            += board-omap5evm.o \
+					      hsmmc.o
 
 # Platform specific device init code
 usbfs-$(CONFIG_ARCH_OMAP_OTG)		:= usb-fs.o
 obj-y					+= $(usbfs-m) $(usbfs-y)
 obj-y					+= usb-musb.o
+ifneq ($(CONFIG_USB_DWC3),)
+obj-y					+= usb-dwc3.o
+endif
 obj-$(CONFIG_MACH_OMAP2_TUSB6010)	+= usb-tusb6010.o
 obj-y					+= usb-host.o
 
@@ -316,3 +320,7 @@ obj-y					+= $(disp-m) $(disp-y)
 
 obj-y					+= common-board-devices.o twl-common.o
 obj-$(CONFIG_OMAP_HSI_DEVICE)		+= omap_hsi.o
+
+# Serial ATA support
+s-ata-$(CONFIG_SATA_AHCI_PLATFORM)	:= sata.o
+obj-$(CONFIG_ARCH_OMAP5) 		+= $(s-ata-m) $(s-ata-y)

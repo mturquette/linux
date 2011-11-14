@@ -4296,11 +4296,49 @@ static struct omap_hwmod_ocp_if *omap54xx_sata_masters[] = {
 };
 
 static struct omap_hwmod_addr_space omap54xx_sata_addrs[] = {
+
+	/* ahci address space should be always the first element
+	 * for the ahci platform driver.
+	 */
 	{
+		.name		= "ahci",
 		.pa_start	= 0x4a140000,
-		.pa_end		= 0x4a141fff,
+		.pa_end		= 0x4a1410ff,
+	},
+	{
+		.name		= "sysc",
+		.pa_start	= 0x4A141100,
+		.pa_end		= 0x4A141104,
 		.flags		= ADDR_TYPE_RT
 	},
+
+#if (!defined(CONFIG_MACH_OMAP_5430ZEBU) && !defined(CONFIG_OMAP5_VIRTIO))
+	/*
+	 * - TODO -
+	 * Following PLL addresses will be removed in future,
+	 * once the SATA Phy is made as seperate platform driver.
+	 */
+	{
+		.name		= "ocp2scp3",
+		.pa_start	= 0x4A090000,
+		.pa_end		= 0x4A096400,
+	},
+	{
+		.name		= "rx",
+		.pa_start	= 0x4A096000,
+		.pa_end		= 0x4A096080,
+	},
+	{
+		.name		= "tx",
+		.pa_start	= 0x4A096400,
+		.pa_end		= 0x4A096464,
+	},
+	{
+		.name		= "pll",
+		.pa_start	= 0x4A096800,
+		.pa_end		= 0x4A096840,
+	},
+#endif
 	{ }
 };
 
@@ -4341,6 +4379,7 @@ static struct omap_hwmod omap54xx_sata_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_sata_slaves),
 	.masters	= omap54xx_sata_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_sata_masters),
+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP54XX),
 };
 
@@ -5606,9 +5645,9 @@ static struct omap_hwmod_class omap54xx_usb_otg_ss_hwmod_class = {
 
 /* usb_otg_ss */
 static struct omap_hwmod_irq_info omap54xx_usb_otg_ss_irqs[] = {
-	{ .name = "core", .irq = 92 + OMAP54XX_IRQ_GIC_START },
-	{ .name = "wrp", .irq = 93 + OMAP54XX_IRQ_GIC_START },
-	{ .irq = -1 }
+	{ .name = "dwc_usb3", .irq = 92 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "wrapper", .irq = 93 + OMAP44XX_IRQ_GIC_START },
+	{ .irq = -1 },
 };
 
 /* usb_otg_ss master ports */
@@ -5618,9 +5657,15 @@ static struct omap_hwmod_ocp_if *omap54xx_usb_otg_ss_masters[] = {
 
 static struct omap_hwmod_addr_space omap54xx_usb_otg_ss_addrs[] = {
 	{
-		.pa_start	= 0x4a020000,
-		.pa_end		= 0x4a03ffff,
-		.flags		= ADDR_TYPE_RT
+		.name           = "dwc_usb3",
+		.pa_start       = 0x4a030000,
+		.pa_end         = 0x4a03ffff,
+		.flags          = ADDR_TYPE_RT
+	}, {
+		.name           = "wrapper",
+		.pa_start       = 0x4a020000,
+		.pa_end         = 0x4a02ffff,
+		.flags          = ADDR_TYPE_RT
 	},
 	{ }
 };

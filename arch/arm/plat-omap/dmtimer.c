@@ -362,8 +362,22 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
 	}
 
 	__omap_dm_timer_stop(timer, timer->posted, rate);
-	timer->ctx_loss_count =
-		timer->get_context_loss_count(&timer->pdev->dev);
+
+	if (timer->loses_context) {
+		if (timer->get_context_loss_count)
+			timer->ctx_loss_count =
+			timer->get_context_loss_count(&timer->pdev->dev);
+	}
+
+	/*
+	 * Since the register values are computed and written within
+	 * __omap_dm_timer_stop, we need to use read to retrieve the
+	 * context.
+	 */
+	timer->context.tclr =
+			omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+	timer->context.tisr = __raw_readl(timer->irq_stat);
+	omap_dm_timer_disable(timer);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
