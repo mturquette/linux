@@ -129,6 +129,14 @@ void __init omap44xx_voltagedomains_init(void)
 	} else
 		return;
 
+	omap4_voltdm_mpu.vp_param = &omap44xx_mpu_vp_data;
+	omap4_voltdm_iva.vp_param = &omap44xx_iva_vp_data;
+	omap4_voltdm_core.vp_param = &omap44xx_core_vp_data;
+
+	omap4_voltdm_mpu.vc_param = &omap44xx_mpu_vc_data;
+	omap4_voltdm_iva.vc_param = &omap44xx_iva_vc_data;
+	omap4_voltdm_core.vc_param = &omap44xx_core_vc_data;
+
 	for (i = 0; voltdm = voltagedomains_omap4[i], voltdm; i++)
 		voltdm->sys_clk.name = sys_clk_name;
 
