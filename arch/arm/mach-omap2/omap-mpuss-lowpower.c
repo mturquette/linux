@@ -451,6 +451,7 @@ int __init omap_mpuss_init(void)
 	mpuss_clear_prev_logic_pwrst();
 
 	mpu_voltdm = voltdm_lookup("mpu");
+	voltdm_pwrdm_enable(mpu_voltdm);
 
 	/* Save device type on scratchpad for low level code to use */
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
