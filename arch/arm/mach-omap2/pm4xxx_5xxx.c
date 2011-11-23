@@ -32,6 +32,15 @@
 #include "pm.h"
 #include "cm2_54xx.h"
 
+static const char *autoidle_hwmods[] = {
+	"mpu",
+	"gpio2",
+	"gpio3",
+	"gpio4",
+	"gpio5",
+	"gpio6",
+};
+
 struct power_state {
 	struct powerdomain *pwrdm;
 	u32 next_state;
@@ -376,6 +385,13 @@ static int __init omap_pm_init(void)
 		}
 	}
 #endif
+
+	for (i = 0; i < ARRAY_SIZE(autoidle_hwmods); i++) {
+		struct omap_hwmod *oh;
+
+		oh = omap_hwmod_lookup(autoidle_hwmods[i]);
+		omap_hwmod_disable_clkdm_usecounting(oh);
+	}
 
 	ret = omap_mpuss_init();
 	if (ret) {
