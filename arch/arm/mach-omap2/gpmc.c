@@ -714,8 +714,7 @@ static int __init gpmc_init(void)
 	} else if (cpu_is_omap54xx()) {
 		ck = "gpmc_ck";
 		l = OMAP54XX_GPMC_BASE;
-		/* FIXME: Remove with clock-framework */
-		return 0;
+		gpmc_irq = OMAP44XX_IRQ_GPMC;
 	}
 
 	if (WARN_ON(!ck))
@@ -738,6 +737,19 @@ static int __init gpmc_init(void)
 
 	l = gpmc_read_reg(GPMC_REVISION);
 	printk(KERN_INFO "GPMC revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
+
+	if (cpu_is_omap54xx()) {
+	/* 
+	 * On zebu GPMNC does not seem to idle due to pending interrupts.
+	 * So clear them and idle it.
+	 */
+#ifdef CONFIG_MACH_OMAP_5430ZEBU	
+		gpmc_write_reg(GPMC_IRQENABLE, 0);
+		gpmc_write_reg(GPMC_IRQSTATUS, gpmc_read_reg(GPMC_IRQSTATUS));
+#endif
+	return 0;
+	}
+
 	/* Set smart idle mode and automatic L3 clock gating */
 	l = gpmc_read_reg(GPMC_SYSCONFIG);
 	l &= 0x03 << 3;
