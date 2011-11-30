@@ -17,8 +17,8 @@ omap-4-5-common				= omap4-common.o omap-wakeupgen.o \
 
 obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
 obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)
-obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common) $(secure-common) $(omap-4-5-common)
-obj-$(CONFIG_ARCH_OMAP5) += prm44xx.o $(hwmod-common) $(secure-common) $(omap-4-5-common)
+obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o scrm44xx.o $(hwmod-common) $(secure-common) $(omap-4-5-common)
+obj-$(CONFIG_ARCH_OMAP5) += prm44xx.o scrm44xx.o $(hwmod-common) $(secure-common) $(omap-4-5-common)
 
 obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
 obj-$(CONFIG_OMAP_SCM_DEV)          += scm_device.o
