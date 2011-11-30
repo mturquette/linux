@@ -124,6 +124,8 @@ extern struct omap_vp_param omap44xx_core_vp_data;
 extern struct omap_vc_param omap44xx_mpu_vc_data;
 extern struct omap_vc_param omap44xx_iva_vc_data;
 extern struct omap_vc_param omap44xx_core_vc_data;
+extern struct omap_vp_param omap446x_core_vp_data;
+extern struct omap_vc_param omap446x_core_vc_data;
 
 extern struct omap_vdd_dep_info omap443x_vddmpu_dep_info[];
 extern struct omap_vdd_dep_info omap443x_vddiva_dep_info[];
