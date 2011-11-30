@@ -150,7 +150,7 @@ int omap_vc_pre_scale(struct voltagedomain *voltdm,
 	vc_cmdval |= (*target_vsel << vc->common->cmd_on_shift);
 	voltdm->write(vc_cmdval, vc->cmdval_reg);
 
-	voltdm->vc_param->on = target_volt;
+	voltdm->vc_param->on = target_volt->volt_nominal;
 
 	omap_vp_update_errorgain(voltdm, target_volt);
 
