@@ -39,6 +39,8 @@ static const char *autoidle_hwmods[] = {
 	"gpio4",
 	"gpio5",
 	"gpio6",
+	"kbd",
+	"timer1",
 };
 
 struct power_state {
@@ -332,7 +334,7 @@ static void __init prcm_setup_regs(void)
  */
 static int __init omap_pm_init(void)
 {
-	int ret;
+	int ret, i;
 
 	if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
 		return -ENODEV;
@@ -390,7 +392,10 @@ static int __init omap_pm_init(void)
 		struct omap_hwmod *oh;
 
 		oh = omap_hwmod_lookup(autoidle_hwmods[i]);
-		omap_hwmod_disable_clkdm_usecounting(oh);
+		if (oh)
+			omap_hwmod_disable_clkdm_usecounting(oh);
+		else
+			pr_warning("hwmod %s not found\n", autoidle_hwmods[i]);
 	}
 
 	ret = omap_mpuss_init();
