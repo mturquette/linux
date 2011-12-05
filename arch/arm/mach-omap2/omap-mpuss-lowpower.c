@@ -83,6 +83,7 @@ extern void omap4_cpu_resume(void);
 static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
 static struct powerdomain *mpuss_pd;
 static void __iomem *sar_base;
+static struct voltagedomain *mpu_voltdm;
 
 static int default_finish_suspend(unsigned long cpu_state)
 {
@@ -313,6 +314,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	omap_pm_ops.scu_prepare(cpu, power_state);
 	l2x0_pwrst_prepare(cpu, save_state);
 
+	voltdm_pwrdm_disable(mpu_voltdm);
 
 	/*
 	 * Call low level function  with targeted low power state.
@@ -321,6 +323,8 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		cpu_suspend(save_state, omap_pm_ops.finish_suspend);
 	else
 		omap_pm_ops.finish_suspend(save_state);
+
+	voltdm_pwrdm_enable(mpu_voltdm);
 
 	/*
 	 * Restore the CPUx power state to ON otherwise CPUx
@@ -445,6 +449,8 @@ int __init omap_mpuss_init(void)
 	}
 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
 	mpuss_clear_prev_logic_pwrst();
+
+	mpu_voltdm = voltdm_lookup("mpu");
 
 	/* Save device type on scratchpad for low level code to use */
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
