@@ -140,6 +140,12 @@ extern struct omap_vdd_dep_info omap446x_vddiva_dep_info[];
 extern struct omap_volt_data omap54xx_vdd_mpu_volt_data[];
 extern struct omap_volt_data omap54xx_vdd_mm_volt_data[];
 extern struct omap_volt_data omap54xx_vdd_core_volt_data[];
+extern struct omap_vp_param omap54xx_mpu_vp_data;
+extern struct omap_vp_param omap54xx_mm_vp_data;
+extern struct omap_vp_param omap54xx_core_vp_data;
+extern struct omap_vc_param omap54xx_mpu_vc_data;
+extern struct omap_vc_param omap54xx_mm_vc_data;
+extern struct omap_vc_param omap54xx_core_vc_data;
 
 extern struct omap_vdd_dep_info omap54xx_vddmpu_dep_info[];
 extern struct omap_vdd_dep_info omap54xx_vddmm_dep_info[];
