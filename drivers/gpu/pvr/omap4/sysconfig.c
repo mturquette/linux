@@ -1204,6 +1204,8 @@ IMG_VOID SysSGXIdleTransition(IMG_BOOL bSGXIdle)
 
 	if (bSGXIdle) {
 		sgx_idle_log_event(SGX_IDLE);
+		/*pr_err("%s: bSGXIdle = true, sgx_idle_mode = %d\n",
+				__func__, sgx_idle_mode);*/
 		if (sgx_idle_mode != 0) {
 			uint timeout = sgx_idle_timeout;
 
@@ -1223,6 +1225,7 @@ IMG_VOID SysSGXIdleTransition(IMG_BOOL bSGXIdle)
 				      HRTIMER_MODE_REL);
 		}
 	} else {
+		//pr_err("%s: bSGXIdle = false\n", __func__);
 		if (sgx_idle_mode != 0) {
 			bool fast = true;
 
