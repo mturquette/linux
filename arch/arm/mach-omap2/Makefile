@@ -95,11 +95,13 @@ endif
 # PRCM
 omap-prcm-4-5-common			=  prcm.o cminst44xx.o cm44xx.o \
 					   prcm_mpu44xx.o prminst44xx.o \
-					   vc44xx_data.o vp44xx_data.o
+					   vc44xx_data.o vp44xx_data.o \
+					   abb44xx_data.o
 obj-y					+= prm_common.o
 obj-$(CONFIG_ARCH_OMAP2)		+= prcm.o cm2xxx_3xxx.o prm2xxx_3xxx.o
 obj-$(CONFIG_ARCH_OMAP3)		+= prcm.o cm2xxx_3xxx.o prm2xxx_3xxx.o
-obj-$(CONFIG_ARCH_OMAP3)		+= vc3xxx_data.o vp3xxx_data.o
+obj-$(CONFIG_ARCH_OMAP3)		+= vc3xxx_data.o vp3xxx_data.o \
+					   abb36xx_data.o
 obj-$(CONFIG_SOC_AM33XX)		+= prcm.o prm33xx.o cm33xx.o
 obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-prcm-4-5-common) prm44xx.o
 obj-$(CONFIG_SOC_OMAP5)			+= $(omap-prcm-4-5-common)
