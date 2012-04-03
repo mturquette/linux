@@ -54,6 +54,10 @@
 extern int pm_dbg_regset_init(int reg_set);
 extern int pm_dbg_regset_save(int reg_set);
 
+#ifdef CONFIG_SUSPEND
+static bool is_suspending;
+#endif
+
 /* pm34xx errata defined in pm.h */
 u16 pm34xx_errata;
 
@@ -305,7 +309,7 @@ void omap_sram_idle(void)
 	    core_next_state == PWRDM_POWER_OFF)
 		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
 
-	if (is_suspending())
+	if (is_suspending)
 		pm_dbg_regset_save(1);
 
 	/*
@@ -327,7 +331,7 @@ void omap_sram_idle(void)
 	    core_next_state == PWRDM_POWER_OFF)
 		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
 
-	if (is_suspending())
+	if (is_suspending)
 		pm_dbg_regset_save(2);
 
 	/* CORE */
@@ -391,7 +395,9 @@ static int omap3_pm_suspend(void)
 
 	omap3_intc_suspend();
 
+	is_suspending = true;
 	omap_sram_idle();
+	is_suspending = false;
 
 restore:
 	/* Restore next_pwrsts */
