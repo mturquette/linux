@@ -119,46 +119,8 @@ static int omap_target(struct cpufreq_policy *policy,
 
 	freq = freqs.new * 1000;
 
-	if (mpu_reg) {
-		opp = opp_find_freq_ceil(mpu_dev, &freq);
-		if (IS_ERR(opp)) {
-			dev_err(mpu_dev, "%s: unable to find MPU OPP for %d\n",
-				__func__, freqs.new);
-			return -EINVAL;
-		}
-		volt = opp_get_voltage(opp);
-		tol = volt * OPP_TOLERANCE / 100;
-		volt_old = regulator_get_voltage(mpu_reg);
-	}
-
-	dev_dbg(mpu_dev, "cpufreq-omap: %u MHz, %ld mV --> %u MHz, %ld mV\n", 
-		freqs.old / 1000, volt_old ? volt_old / 1000 : -1,
-		freqs.new / 1000, volt ? volt / 1000 : -1);
-
-	/* scaling up?  scale voltage before frequency */
-	if (mpu_reg && (freqs.new > freqs.old)) {
-		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
-		if (r < 0) {
-			dev_warn(mpu_dev, "%s: unable to scale voltage up.\n",
-				 __func__);
-			freqs.new = freqs.old;
-			goto done;
-		}
-	}
-
+	pr_err("%s: clk_set_rate(mpu_clk, %u\n", __func__, freqs.new * 1000);
 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
-
-	/* scaling down?  scale voltage after frequency */
-	if (mpu_reg && (freqs.new < freqs.old)) {
-		r = regulator_set_voltage(mpu_reg, volt - tol, volt + tol);
-		if (r < 0) {
-			dev_warn(mpu_dev, "%s: unable to scale voltage down.\n",
-				 __func__);
-			ret = clk_set_rate(mpu_clk, freqs.old * 1000);
-			freqs.new = freqs.old;
-			goto done;
-		}
-	}
 
 	freqs.new = omap_getspeed(policy->cpu);
 #ifdef CONFIG_SMP
@@ -304,6 +266,7 @@ static int __init omap_cpufreq_init(void)
 		return -EINVAL;
 	}
 
+#if 0
 	mpu_reg = regulator_get(mpu_dev, "vcc");
 	if (IS_ERR(mpu_reg)) {
 		pr_warning("%s: unable to get MPU regulator\n", __func__);
@@ -320,6 +283,7 @@ static int __init omap_cpufreq_init(void)
 			mpu_reg = NULL;
 		}
 	}
+#endif
 
 	return cpufreq_register_driver(&omap_driver);
 }
