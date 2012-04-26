@@ -648,7 +648,7 @@ static int _enable_clocks(struct omap_hwmod *oh)
 	pr_debug("omap_hwmod: %s: enabling clocks\n", oh->name);
 
 	if (oh->_clk)
-		clk_enable(oh->_clk);
+		clk_prepare_enable(oh->_clk);
 
 	if (oh->slaves_cnt > 0) {
 		for (i = 0; i < oh->slaves_cnt; i++) {
@@ -656,7 +656,7 @@ static int _enable_clocks(struct omap_hwmod *oh)
 			struct clk *c = os->_clk;
 
 			if (c && (os->flags & OCPIF_SWSUP_IDLE))
-				clk_enable(c);
+				clk_prepare_enable(c);
 		}
 	}
 
@@ -678,7 +678,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
 	pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
 
 	if (oh->_clk)
-		clk_disable(oh->_clk);
+		clk_disable_unprepare(oh->_clk);
 
 	if (oh->slaves_cnt > 0) {
 		for (i = 0; i < oh->slaves_cnt; i++) {
@@ -686,7 +686,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
 			struct clk *c = os->_clk;
 
 			if (c && (os->flags & OCPIF_SWSUP_IDLE))
-				clk_disable(c);
+				clk_disable_unprepare(c);
 		}
 	}
 
@@ -706,7 +706,7 @@ static void _enable_optional_clocks(struct omap_hwmod *oh)
 		if (oc->_clk) {
 			pr_debug("omap_hwmod: enable %s:%s\n", oc->role,
 				 oc->_clk->name);
-			clk_enable(oc->_clk);
+			clk_prepare_enable(oc->_clk);
 		}
 }
 
@@ -721,7 +721,7 @@ static void _disable_optional_clocks(struct omap_hwmod *oh)
 		if (oc->_clk) {
 			pr_debug("omap_hwmod: disable %s:%s\n", oc->role,
 				 oc->_clk->name);
-			clk_disable(oc->_clk);
+			clk_disable_unprepare(oc->_clk);
 		}
 }
 
@@ -1772,7 +1772,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
 				/* XXX omap_iclk_deny_idle(c); */
 			} else {
 				/* XXX omap_iclk_allow_idle(c); */
-				clk_enable(c);
+				clk_prepare_enable(c);
 			}
 		}
 	}

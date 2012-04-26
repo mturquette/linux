@@ -344,7 +344,7 @@ void __init omap2_usbfs_init(struct omap_usb_config *pdata)
 	if (IS_ERR(ick))
 		return;
 
-	clk_enable(ick);
+	clk_prepare_enable(ick);
 	pdata->usb0_init = omap2_usb0_init;
 	pdata->usb1_init = omap2_usb1_init;
 	pdata->usb2_init = omap2_usb2_init;
@@ -352,7 +352,7 @@ void __init omap2_usbfs_init(struct omap_usb_config *pdata)
 	ohci_device_init(pdata);
 	otg_device_init(pdata);
 	omap_otg_init(pdata);
-	clk_disable(ick);
+	clk_disable_unprepare(ick);
 	clk_put(ick);
 }
 

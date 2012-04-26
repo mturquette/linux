@@ -100,7 +100,7 @@ int __init omap_init_clocksource_32k(void)
 
 		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
 		if (!IS_ERR(sync_32k_ick))
-			clk_enable(sync_32k_ick);
+			clk_prepare_enable(sync_32k_ick);
 
 		timer_32k_base = base;
 

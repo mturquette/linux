@@ -81,7 +81,7 @@ static int omap2_enter_full_retention(void)
 	 * oscillator itself it will be disabled if/when we enter retention
 	 * mode.
 	 */
-	clk_disable(osc_ck);
+	clk_disable_unprepare(osc_ck);
 
 	/* Clear old wake-up events */
 	/* REVISIT: These write to reserved bits? */
@@ -115,7 +115,7 @@ static int omap2_enter_full_retention(void)
 no_sleep:
 	omap2_gpio_resume_after_idle();
 
-	clk_enable(osc_ck);
+	clk_prepare_enable(osc_ck);
 
 	/* clear CORE wake-up events */
 	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, PM_WKST1);
