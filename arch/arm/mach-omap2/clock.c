@@ -19,7 +19,11 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/delay.h>
+#ifdef CONFIG_COMMON_CLK
+#include <linux/clk-provider.h>
+#else
 #include <linux/clk.h>
+#endif
 #include <linux/io.h>
 #include <linux/bitops.h>
 #include <trace/events/power.h>
@@ -45,6 +49,32 @@ u16 cpu_mask;
  */
 static bool clkdm_control = true;
 
+#ifdef CONFIG_COMMON_CLK
+LIST_HEAD(omap_clocks);
+DEFINE_MUTEX(omap_clocks_mutex);
+
+/*
+ * Used for clocks that have the same value as the parent clock,
+ * divided by some factor
+ */
+unsigned long omap_fixed_divisor_recalc(struct clk_hw *hw,
+		unsigned long parent_rate)
+{
+        struct clk_hw_omap *oclk;
+
+        if (!hw) {
+                pr_warning("%s: hw is NULL\n", __func__);
+                return -EINVAL;
+        }
+
+        oclk = to_clk_hw_omap(hw);
+
+        WARN_ON(!oclk->fixed_div);
+
+        return parent_rate / oclk->fixed_div;
+}
+#endif
+
 /*
  * OMAP2+ specific clock functions
  */
@@ -61,22 +91,38 @@ static bool clkdm_control = true;
  * belong in the clock code and will be moved in the medium term to
  * module-dependent code.  No return value.
  */
+#ifdef CONFIG_COMMON_CLK
+static void _omap2_module_wait_ready(struct clk_hw_omap *clk)
+#else
 static void _omap2_module_wait_ready(struct clk *clk)
+#endif
 {
 	void __iomem *companion_reg, *idlest_reg;
 	u8 other_bit, idlest_bit, idlest_val;
 
 	/* Not all modules have multiple clocks that their IDLEST depends on */
+#ifdef CONFIG_COMMON_CLK
+	if (clk->find_companion) {
+		clk->find_companion(clk, &companion_reg, &other_bit);
+#else
 	if (clk->ops->find_companion) {
 		clk->ops->find_companion(clk, &companion_reg, &other_bit);
+#endif
 		if (!(__raw_readl(companion_reg) & (1 << other_bit)))
 			return;
 	}
 
+#ifdef CONFIG_COMMON_CLK
+	clk->find_idlest(clk, &idlest_reg, &idlest_bit, &idlest_val);
+#else
 	clk->ops->find_idlest(clk, &idlest_reg, &idlest_bit, &idlest_val);
-
+#endif
 	omap2_cm_wait_idlest(idlest_reg, (1 << idlest_bit), idlest_val,
+#ifdef CONFIG_COMMON_CLK
+			     __clk_get_name(clk->hw.clk));
+#else
 			     __clk_get_name(clk));
+#endif
 }
 
 /* Public functions */
@@ -89,15 +135,25 @@ static void _omap2_module_wait_ready(struct clk *clk)
  * clockdomain pointer, and save it into the struct clk.  Intended to be
  * called during clk_register().  No return value.
  */
+#ifdef CONFIG_COMMON_CLK
+void omap2_init_clk_clkdm(struct clk_hw *hw)
+{
+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+#else
 void omap2_init_clk_clkdm(struct clk *clk)
 {
+#endif
 	struct clockdomain *clkdm;
 	const char *clk_name;
 
 	if (!clk->clkdm_name)
 		return;
 
+#ifdef CONFIG_COMMON_CLK
+	clk_name = __clk_get_name(hw->clk);
+#else
 	clk_name = __clk_get_name(clk);
+#endif
 
 	clkdm = clkdm_lookup(clk->clkdm_name);
 	if (clkdm) {
@@ -144,8 +200,12 @@ void __init omap2_clk_disable_clkdm_control(void)
  * associate this type of code with per-module data structures to
  * avoid this issue, and remove the casts.  No return value.
  */
-void omap2_clk_dflt_find_companion(struct clk *clk, void __iomem **other_reg,
-				   u8 *other_bit)
+#ifdef CONFIG_COMMON_CLK
+void omap2_clk_dflt_find_companion(struct clk_hw_omap *clk,
+#else
+void omap2_clk_dflt_find_companion(struct clk *clk,
+#endif
+	 		void __iomem **other_reg, u8 *other_bit)
 {
 	u32 r;
 
@@ -173,8 +233,12 @@ void omap2_clk_dflt_find_companion(struct clk *clk, void __iomem **other_reg,
  * register address ID (e.g., that CM_FCLKEN2 corresponds to
  * CM_IDLEST2).  This is not true for all modules.  No return value.
  */
-void omap2_clk_dflt_find_idlest(struct clk *clk, void __iomem **idlest_reg,
-				u8 *idlest_bit, u8 *idlest_val)
+#ifdef CONFIG_COMMON_CLK
+void omap2_clk_dflt_find_idlest(struct clk_hw_omap *clk,
+#else
+void omap2_clk_dflt_find_idlest(struct clk *clk,
+#endif
+		void __iomem **idlest_reg, u8 *idlest_bit, u8 *idlest_val)
 {
 	u32 r;
 
@@ -196,6 +260,91 @@ void omap2_clk_dflt_find_idlest(struct clk *clk, void __iomem **idlest_reg,
 
 }
 
+#ifdef CONFIG_COMMON_CLK
+int omap2_dflt_clk_enable(struct clk_hw *hw)
+{
+	struct clk_hw_omap *clk;
+ 	u32 v;
+	int ret = 0;
+
+	clk = to_clk_hw_omap(hw);
+
+	if (clkdm_control && clk->clkdm) {
+		ret = clkdm_clk_enable(clk->clkdm, hw->clk);
+		if (ret) {
+			WARN(1, "%s: could not enable %s's clockdomain %s: %d\n",
+					__func__, __clk_get_name(hw->clk),
+					clk->clkdm->name, ret);
+			return ret;
+		}
+	}
+
+	if (unlikely(clk->enable_reg == NULL)) {
+		pr_err("%s: %s missing enable_reg\n", __func__,
+				__clk_get_name(hw->clk));
+		ret = -EINVAL;
+		goto err;
+	}
+
+	/* FIXME should not have INVERT_ENABLE bit here */
+	v = __raw_readl(clk->enable_reg);
+	if (clk->flags & INVERT_ENABLE)
+		v &= ~(1 << clk->enable_bit);
+	else
+		v |= (1 << clk->enable_bit);
+	__raw_writel(v, clk->enable_reg);
+	v = __raw_readl(clk->enable_reg); /* OCP barrier */
+
+	if (clk->find_idlest)
+		_omap2_module_wait_ready(clk);
+
+	return 0;
+
+err:
+	if (clkdm_control && clk->clkdm)
+		clkdm_clk_disable(clk->clkdm, hw->clk);
+ 	return ret;
+}
+
+void omap2_dflt_clk_disable(struct clk_hw *hw)
+{
+	struct clk_hw_omap *clk;
+	u32 v;
+
+	clk = to_clk_hw_omap(hw);
+	if (!clk->enable_reg) {
+		/*
+		 * 'independent' here refers to a clock which is not
+		 * controlled by its parent.
+		 */
+		pr_err("%s: independent clock %s has no enable_reg\n",
+				__func__, __clk_get_name(hw->clk));
+ 		return;
+ 	}
+
+	v = __raw_readl(clk->enable_reg);
+	if (clk->flags & INVERT_ENABLE)
+		v |= (1 << clk->enable_bit);
+	else
+		v &= ~(1 << clk->enable_bit);
+	__raw_writel(v, clk->enable_reg);
+	/* No OCP barrier needed here since it is a disable operation */
+
+	if (clkdm_control && clk->clkdm)
+		clkdm_clk_disable(clk->clkdm, hw->clk);
+}
+
+/* TODO: Need to handle these for the COMMON clk case */
+int __init omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name)
+{
+	return 0;
+}
+
+void __init omap2_clk_print_new_rates(const char *hfclkin_ck_name,
+				      const char *core_ck_name,
+				      const char *mpu_ck_name)
+{}
+#else
 int omap2_dflt_clk_enable(struct clk *clk)
 {
 	u32 v;
@@ -540,4 +689,4 @@ struct clk_functions omap2_clk_functions = {
 	.clk_set_parent		= omap2_clk_set_parent,
 	.clk_disable_unused	= omap2_clk_disable_unused,
 };
-
+#endif /* CONFIG_COMMON_CLK */
