@@ -380,8 +380,13 @@ int omap2_clksel_set_parent(struct clk *clk, struct clk *new_parent);
 #endif
 
 /* clkt_iclk.c public functions */
+#ifdef CONFIG_COMMON_CLK
+extern void omap2_clkt_iclk_allow_idle(struct clk_hw_omap *clk);
+extern void omap2_clkt_iclk_deny_idle(struct clk_hw_omap *clk);
+#else
 extern void omap2_clkt_iclk_allow_idle(struct clk *clk);
 extern void omap2_clkt_iclk_deny_idle(struct clk *clk);
+#endif
 
 #ifdef CONFIG_COMMON_CLK
 u8 omap2_init_dpll_parent(struct clk_hw *hw);
@@ -452,6 +457,7 @@ extern const struct clksel_rate gpt_sys_rates[];
 extern const struct clksel_rate gfx_l3_rates[];
 extern const struct clksel_rate dsp_ick_rates[];
 
+#ifndef CONFIG_COMMON_CLK
 extern const struct clkops clkops_omap2_iclk_dflt_wait;
 extern const struct clkops clkops_omap2_iclk_dflt;
 extern const struct clkops clkops_omap2_iclk_idle_only;
@@ -460,5 +466,6 @@ extern const struct clkops clkops_omap2xxx_dpll_ops;
 extern const struct clkops clkops_omap3_noncore_dpll_ops;
 extern const struct clkops clkops_omap3_core_dpll_ops;
 extern const struct clkops clkops_omap4_dpllmx_ops;
+#endif
 
 #endif

@@ -39,6 +39,8 @@
  * (Any other value different from the Read value) to the
  * corresponding CM_CLKSEL register will refresh the dividers.
  */
+/* TODO: Need to handle this for the common clk case */
+#ifndef CONFIG_COMMON_CLK
 static int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk *clk)
 {
 	u32 dummy_v, orig_v, clksel_shift;
@@ -70,3 +72,4 @@ const struct clkops clkops_omap36xx_pwrdn_with_hsdiv_wait_restore = {
 	.find_companion	= omap2_clk_dflt_find_companion,
 	.find_idlest	= omap2_clk_dflt_find_idlest,
 };
+#endif
