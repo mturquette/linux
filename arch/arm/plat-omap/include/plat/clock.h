@@ -13,16 +13,11 @@
 #ifndef __ARCH_ARM_OMAP_CLOCK_H
 #define __ARCH_ARM_OMAP_CLOCK_H
 
-#ifndef CONFIG_COMMON_CLK
 #include <linux/list.h>
 
 struct module;
 struct clk;
 struct clockdomain;
-
-#define __clk_get_name(clk) clk->name
-#define __clk_get_parent(clk) clk->parent
-#define __clk_get_rate(clk) clk->rate
 
 /**
  * struct clkops - some clock function pointers
@@ -52,131 +47,6 @@ struct clkops {
 	void			(*allow_idle)(struct clk *);
 	void			(*deny_idle)(struct clk *);
 };
-
-#ifdef CONFIG_ARCH_OMAP2PLUS
-
-/* struct clksel_rate.flags possibilities */
-#define RATE_IN_242X		(1 << 0)
-#define RATE_IN_243X		(1 << 1)
-#define RATE_IN_3430ES1		(1 << 2)	/* 3430ES1 rates only */
-#define RATE_IN_3430ES2PLUS	(1 << 3)	/* 3430 ES >= 2 rates only */
-#define RATE_IN_36XX		(1 << 4)
-#define RATE_IN_4430		(1 << 5)
-#define RATE_IN_TI816X		(1 << 6)
-#define RATE_IN_4460		(1 << 7)
-#define RATE_IN_AM33XX		(1 << 8)
-#define RATE_IN_TI814X		(1 << 9)
-
-#define RATE_IN_24XX		(RATE_IN_242X | RATE_IN_243X)
-#define RATE_IN_34XX		(RATE_IN_3430ES1 | RATE_IN_3430ES2PLUS)
-#define RATE_IN_3XXX		(RATE_IN_34XX | RATE_IN_36XX)
-#define RATE_IN_44XX		(RATE_IN_4430 | RATE_IN_4460)
-
-/* RATE_IN_3430ES2PLUS_36XX includes 34xx/35xx with ES >=2, and all 36xx/37xx */
-#define RATE_IN_3430ES2PLUS_36XX	(RATE_IN_3430ES2PLUS | RATE_IN_36XX)
-
-
-/**
- * struct clksel_rate - register bitfield values corresponding to clk divisors
- * @val: register bitfield value (shifted to bit 0)
- * @div: clock divisor corresponding to @val
- * @flags: (see "struct clksel_rate.flags possibilities" above)
- *
- * @val should match the value of a read from struct clk.clksel_reg
- * AND'ed with struct clk.clksel_mask, shifted right to bit 0.
- *
- * @div is the divisor that should be applied to the parent clock's rate
- * to produce the current clock's rate.
- */
-struct clksel_rate {
-	u32			val;
-	u8			div;
-	u16			flags;
-};
-
-/**
- * struct clksel - available parent clocks, and a pointer to their divisors
- * @parent: struct clk * to a possible parent clock
- * @rates: available divisors for this parent clock
- *
- * A struct clksel is always associated with one or more struct clks
- * and one or more struct clksel_rates.
- */
-struct clksel {
-	struct clk		 *parent;
-	const struct clksel_rate *rates;
-};
-
-/**
- * struct dpll_data - DPLL registers and integration data
- * @mult_div1_reg: register containing the DPLL M and N bitfields
- * @mult_mask: mask of the DPLL M bitfield in @mult_div1_reg
- * @div1_mask: mask of the DPLL N bitfield in @mult_div1_reg
- * @clk_bypass: struct clk pointer to the clock's bypass clock input
- * @clk_ref: struct clk pointer to the clock's reference clock input
- * @control_reg: register containing the DPLL mode bitfield
- * @enable_mask: mask of the DPLL mode bitfield in @control_reg
- * @last_rounded_rate: cache of the last rate result of omap2_dpll_round_rate()
- * @last_rounded_m: cache of the last M result of omap2_dpll_round_rate()
- * @max_multiplier: maximum valid non-bypass multiplier value (actual)
- * @last_rounded_n: cache of the last N result of omap2_dpll_round_rate()
- * @min_divider: minimum valid non-bypass divider value (actual)
- * @max_divider: maximum valid non-bypass divider value (actual)
- * @modes: possible values of @enable_mask
- * @autoidle_reg: register containing the DPLL autoidle mode bitfield
- * @idlest_reg: register containing the DPLL idle status bitfield
- * @autoidle_mask: mask of the DPLL autoidle mode bitfield in @autoidle_reg
- * @freqsel_mask: mask of the DPLL jitter correction bitfield in @control_reg
- * @idlest_mask: mask of the DPLL idle status bitfield in @idlest_reg
- * @auto_recal_bit: bitshift of the driftguard enable bit in @control_reg
- * @recal_en_bit: bitshift of the PRM_IRQENABLE_* bit for recalibration IRQs
- * @recal_st_bit: bitshift of the PRM_IRQSTATUS_* bit for recalibration IRQs
- * @flags: DPLL type/features (see below)
- *
- * Possible values for @flags:
- * DPLL_J_TYPE: "J-type DPLL" (only some 36xx, 4xxx DPLLs)
- *
- * @freqsel_mask is only used on the OMAP34xx family and AM35xx.
- *
- * XXX Some DPLLs have multiple bypass inputs, so it's not technically
- * correct to only have one @clk_bypass pointer.
- *
- * XXX The runtime-variable fields (@last_rounded_rate, @last_rounded_m,
- * @last_rounded_n) should be separated from the runtime-fixed fields
- * and placed into a different structure, so that the runtime-fixed data
- * can be placed into read-only space.
- */
-struct dpll_data {
-	void __iomem		*mult_div1_reg;
-	u32			mult_mask;
-	u32			div1_mask;
-	struct clk		*clk_bypass;
-	struct clk		*clk_ref;
-	void __iomem		*control_reg;
-	u32			enable_mask;
-	unsigned long		last_rounded_rate;
-	u16			last_rounded_m;
-	u16			max_multiplier;
-	u8			last_rounded_n;
-	u8			min_divider;
-	u16			max_divider;
-	u8			modes;
-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-	void __iomem		*autoidle_reg;
-	void __iomem		*idlest_reg;
-	u32			autoidle_mask;
-	u32			freqsel_mask;
-	u32			idlest_mask;
-	u32			dco_mask;
-	u32			sddiv_mask;
-	u8			auto_recal_bit;
-	u8			recal_en_bit;
-	u8			recal_st_bit;
-#  endif
-	u8			flags;
-};
-
-#endif
 
 /*
  * struct clk.flags possibilities
@@ -261,17 +131,8 @@ struct clk {
 	s8			usecount;
 	u8			fixed_div;
 	u8			flags;
-#ifdef CONFIG_ARCH_OMAP2PLUS
-	void __iomem		*clksel_reg;
-	u32			clksel_mask;
-	const struct clksel	*clksel;
-	struct dpll_data	*dpll_data;
-	const char		*clkdm_name;
-	struct clockdomain	*clkdm;
-#else
 	u8			rate_offset;
 	u8			src_offset;
-#endif
 #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
 	struct dentry		*dent;	/* For visible tree hierarchy */
 #endif
@@ -308,5 +169,4 @@ extern const struct clkops clkops_null;
 
 extern struct clk dummy_ck;
 
-#endif /* CONFIG_COMMON_CLK */
 #endif

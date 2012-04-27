@@ -146,7 +146,6 @@
 #include <plat/cpu.h>
 #include "clockdomain.h"
 #include "powerdomain.h"
-#include <plat/clock.h>
 #include <plat/omap_hwmod.h>
 #include <plat/prcm.h>
 

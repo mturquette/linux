@@ -20,7 +20,6 @@
 #include <plat/hardware.h>
 #include <plat/board.h>
 #include <plat/mux.h>
-#include <plat/clock.h>
 
 #include "iomap.h"
 #include "common.h"

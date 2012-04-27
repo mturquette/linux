@@ -18,7 +18,6 @@
 #endif
 #include <linux/io.h>
 
-#include <plat/clock.h>
 #include <plat/prcm.h>
 
 #include "clock.h"

@@ -39,7 +39,6 @@
 #include <asm/mach-types.h>
 #include <asm/system_misc.h>
 
-#include <plat/clock.h>
 #include <plat/sram.h>
 #include <plat/dma.h>
 #include <plat/board.h>

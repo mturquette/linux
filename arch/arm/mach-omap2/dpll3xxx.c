@@ -29,7 +29,6 @@
 #include <linux/clkdev.h>
 
 #include <plat/cpu.h>
-#include <plat/clock.h>
 
 #include "clock.h"
 #include "cm2xxx_3xxx.h"

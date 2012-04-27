@@ -49,8 +49,6 @@
 #include <linux/io.h>
 #include <linux/bug.h>
 
-#include <plat/clock.h>
-
 #include "clock.h"
 
 /* Private functions */

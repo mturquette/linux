@@ -17,11 +17,6 @@
 #define __ARCH_ARM_MACH_OMAP2_CLOCK_H
 
 #include <linux/kernel.h>
-
-#include <plat/clock.h>
-
-#ifdef CONFIG_COMMON_CLK
-
 #include <linux/clk-provider.h>
 #include <linux/clk.h>
 #include <linux/list.h>
@@ -467,6 +462,4 @@ extern const struct clkops clkops_omap2xxx_dpll_ops;
 extern const struct clkops clkops_omap3_noncore_dpll_ops;
 extern const struct clkops clkops_omap3_core_dpll_ops;
 extern const struct clkops clkops_omap4_dpllmx_ops;
-#endif
-
 #endif

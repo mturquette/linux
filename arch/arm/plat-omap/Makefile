@@ -3,12 +3,13 @@
 #
 
 # Common support
-obj-y := common.o sram.o clock.o devices.o dma.o mux.o \
+obj-y := common.o sram.o devices.o dma.o mux.o \
 	 usb.o fb.o counter_32k.o
 obj-m :=
 obj-n :=
 obj-  :=
 
+obj-$(CONFIG_ARCH_OMAP1) += clock.o
 # OCPI interconnect support for 1710, 1610 and 5912
 obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o
 

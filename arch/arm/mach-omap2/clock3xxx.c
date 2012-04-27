@@ -22,7 +22,6 @@
 #include <linux/io.h>
 
 #include <plat/hardware.h>
-#include <plat/clock.h>
 
 #include "clock.h"
 #include "clock3xxx.h"

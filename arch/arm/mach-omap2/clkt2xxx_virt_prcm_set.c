@@ -34,7 +34,6 @@
 #include <linux/slab.h>
 
 #include <plat/cpu.h>
-#include <plat/clock.h>
 #include <plat/sram.h>
 #include <plat/sdrc.h>
 
