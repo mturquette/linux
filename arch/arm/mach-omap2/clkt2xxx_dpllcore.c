@@ -47,7 +47,11 @@
  * struct clk *dpll_ck, which is a composite clock of dpll_ck and
  * core_ck.
  */
+#ifdef CONFIG_COMMON_CLK
+unsigned long omap2xxx_clk_get_core_rate(struct clk_hw_omap *clk)
+#else
 unsigned long omap2xxx_clk_get_core_rate(struct clk *clk)
+#endif
 {
 	long long core_clk;
 	u32 v;
@@ -98,13 +102,26 @@ static long omap2_dpllcore_round_rate(unsigned long target_rate)
 
 }
 
+#ifdef CONFIG_COMMON_CLK
+unsigned long omap2_dpllcore_recalc(struct clk_hw *hw, unsigned long parent_rate)
+{
+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+#else
 unsigned long omap2_dpllcore_recalc(struct clk *clk)
 {
+#endif
 	return omap2xxx_clk_get_core_rate(clk);
 }
 
+#ifdef CONFIG_COMMON_CLK
+int omap2_reprogram_dpllcore(struct clk_hw *hw, unsigned long rate,
+					unsigned long parent_rate)
+{
+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+#else
 int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate)
 {
+#endif
 	u32 cur_rate, low, mult, div, valid_rate, done_rate;
 	u32 bypass = 0;
 	struct prcm_config tmpset;
