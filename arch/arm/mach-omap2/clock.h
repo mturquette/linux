@@ -456,6 +456,7 @@ extern const struct clksel_rate gpt_32k_rates[];
 extern const struct clksel_rate gpt_sys_rates[];
 extern const struct clksel_rate gfx_l3_rates[];
 extern const struct clksel_rate dsp_ick_rates[];
+extern struct clk dummy_ck;
 
 #ifndef CONFIG_COMMON_CLK
 extern const struct clkops clkops_omap2_iclk_dflt_wait;

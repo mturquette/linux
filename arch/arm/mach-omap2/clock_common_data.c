@@ -43,3 +43,16 @@ const struct clksel_rate dsp_ick_rates[] = {
 	{ .div = 3, .val = 3, .flags = RATE_IN_243X },
 	{ .div = 0 },
 };
+
+#ifdef CONFIG_COMMON_CLK
+
+#include <linux/clk-private.h>
+
+static struct clk_ops dummy_ck_ops = {};
+
+struct clk dummy_ck = {
+	.name = "dummy_clk",
+	.ops = &dummy_ck_ops,
+};
+
+#endif
