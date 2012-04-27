@@ -37,6 +37,9 @@
 #include "cm2xxx_3xxx.h"
 #include "prm2xxx_3xxx.h"
 #include "pm.h"
+#ifdef CONFIG_COMMON_CLK
+#include "clock.h"
+#endif
 
 u32 enable_off_mode;
 

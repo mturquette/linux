@@ -8,6 +8,8 @@
 #ifndef __ARCH_ARM_MACH_OMAP2_CLOCK3XXX_H
 #define __ARCH_ARM_MACH_OMAP2_CLOCK3XXX_H
 
+#include "clock.h"
+
 int omap3xxx_clk_init(void);
 int omap3_dpll4_set_rate(struct clk *clk, unsigned long rate);
 int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate);

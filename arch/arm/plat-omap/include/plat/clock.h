@@ -13,6 +13,7 @@
 #ifndef __ARCH_ARM_OMAP_CLOCK_H
 #define __ARCH_ARM_OMAP_CLOCK_H
 
+#ifndef CONFIG_COMMON_CLK
 #include <linux/list.h>
 
 struct module;
@@ -303,4 +304,5 @@ extern const struct clkops clkops_null;
 
 extern struct clk dummy_ck;
 
+#endif /* CONFIG_COMMON_CLK */
 #endif

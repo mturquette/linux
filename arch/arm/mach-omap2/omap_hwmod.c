@@ -152,6 +152,9 @@
 #include "prm44xx.h"
 #include "prminst44xx.h"
 #include "mux.h"
+#ifdef CONFIG_COMMON_CLK
+#include "clock.h"
+#endif
 
 /* Maximum microseconds to wait for OMAP module to softreset */
 #define MAX_MODULE_SOFTRESET_WAIT	10000
