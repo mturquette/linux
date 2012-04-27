@@ -29,11 +29,7 @@
  * REVISIT: DPLL can optionally enter low-power bypass by writing 0x1
  * instead.  Add some mechanism to optionally enter this mode.
  */
-#ifdef CONFIG_COMMON_CLK
 void _allow_idle(struct clk_hw_omap *clk)
-#else
-static void _allow_idle(struct clk *clk)
-#endif
 {
 	if (!clk || !clk->dpll_data)
 		return;
@@ -47,24 +43,10 @@ static void _allow_idle(struct clk *clk)
  *
  * Disable DPLL automatic idle control.  No return value.
  */
-#ifdef CONFIG_COMMON_CLK
 void _deny_idle(struct clk_hw_omap *clk)
-#else
-static void _deny_idle(struct clk *clk)
-#endif
 {
 	if (!clk || !clk->dpll_data)
 		return;
 
 	omap2xxx_cm_set_dpll_disable_autoidle();
 }
-
-
-/* Public data */
-#ifndef CONFIG_COMMON_CLK
-const struct clkops clkops_omap2xxx_dpll_ops = {
-	.allow_idle	= _allow_idle,
-	.deny_idle	= _deny_idle,
-};
-#endif
-
