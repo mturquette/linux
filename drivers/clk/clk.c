@@ -742,6 +742,73 @@ out:
 	return ret;
 }
 
+/*
+ * clk_lock_subtree - lock every mutex in a subtree using head recursion
+ * @clk: root of the subtree of clocks
+ */
+static int clk_lock_subtree(struct clk *clk)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	pr_err("%s: %s\n", __func__, clk->name);
+	mutex_lock(&clk->lock);
+
+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
+		clk_lock_subtree(child);
+
+	return 0;
+}
+
+#if 0
+#define	clk_lock_subtree_sibling(_clk, _locked)				\
+	hlist_for_each_entry(child, tmp, &_clk->children, child_node)	\
+		if (child != _locked)					\
+			clk_lock_subtree(child);
+#endif
+
+/*
+ * clk_lock_children_subtree - lock clk's children with optional exception
+ * @clk: the clock whose children are being locked, depth-first
+ * @locked: child already locked and must not be locked again (can be NULL)
+ *
+ * If the arguments passed in are (clk, NULL) then this function simply locks
+ * the children of clk.  Note that clk is NOT locked.
+ *
+ * If the arguments passed in are (clk->parent, clk) then this function locks
+ * the siblings of clk.  This is useful when propagating rate-change requests
+ * up the clock tree because clk's subtree has alread been locked.  Attempting
+ * to hold the locks again could cause a deadlock.
+ */
+static int clk_lock_children_subtree(struct clk *clk, struct clk *locked)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
+		if (child != locked)
+			clk_lock_subtree(child);
+
+	return 0;
+}
+
+/*
+ * clk_unlock_subtree - unlock every mutex in a subtree using tail recursion
+ * @clk: root of the subtree of clocks
+ */
+static int clk_unlock_subtree(struct clk *clk)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
+		clk_unlock_subtree(child);
+
+	mutex_unlock(&clk->lock);
+
+	return 0;
+}
+
 static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
 {
 	struct clk *child;
@@ -762,6 +829,7 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
  * calculate the new rates returning the topmost clock that has to be
  * changed.
  */
+/* parent mutex must be held by caller */
 static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
 {
 	struct clk *top = clk;
@@ -772,20 +840,25 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
 	if (IS_ERR_OR_NULL(clk))
 		return NULL;
 
-	/* save parent rate, if it exists */
-	if (clk->parent)
+	/* lock parent clock and save its rate, if necessary */
+	if (clk->parent) {
+		mutex_lock(&clk->parent->lock);
 		best_parent_rate = clk->parent->rate;
+	}
 
 	/* never propagate up to the parent */
 	if (!(clk->flags & CLK_SET_RATE_PARENT)) {
 		if (!clk->ops->round_rate) {
 			clk->new_rate = clk->rate;
+			/* FIXME this is buggy.  Need to handle orphan cases */
 			return NULL;
 		}
+		/* FIXME maybe can calc subtree only here? */
 		new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
 		goto out;
 	}
 
+	/* FIXME this is buggy.  Need to handle orphan cases */
 	/* need clk->parent from here on out */
 	if (!clk->parent) {
 		pr_debug("%s: %s has NULL parent\n", __func__, clk->name);
@@ -793,21 +866,37 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
 	}
 
 	if (!clk->ops->round_rate) {
+		clk_lock_children_subtree(clk->parent, clk);
 		top = clk_calc_new_rates(clk->parent, rate);
 		new_rate = clk->parent->new_rate;
 
 		goto out;
 	}
 
+	/*
+	 * FIXME maybe should assign this to clk->new_rate instead?
+	 *
+	 * Umm, no.  new_rate is used in clk_calc_subtree (pass into .recalc_rate).
+	 *
+	 * So instead we need ANOTHER piece of storage.  Maybe
+	 * clk->new_rounded_rate can take on this new meaning (e.g. the new
+	 * rounded rate from clk_cacl_new_rates) or perhaps just ke the old
+	 * clk->new_rate member name.  And THEN we need a new u32
+	 * clk->speculate_rate which stores the recalc'd rate similar to how
+	 * the current clk->new_rate does...
+	 */
 	new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
 
 	if (best_parent_rate != clk->parent->rate) {
+		clk_lock_children_subtree(clk->parent, clk);
 		top = clk_calc_new_rates(clk->parent, best_parent_rate);
 
 		goto out;
 	}
 
 out:
+	//clk_lock_adjacent_children(clk, locked);
+	/* FIXME would be nice to only calc the subtree once, at the root */
 	clk_calc_subtree(clk, new_rate);
 
 	return top;
@@ -868,7 +957,92 @@ static void clk_change_rate(struct clk *clk)
 
 	hlist_for_each_entry(child, tmp, &clk->children, child_node)
 		clk_change_rate(child);
+
+	/* release per-clock mutex */
+	//mutex_unlock(&clk->mutex);
 }
+
+#if 0
+/*
+ * clk_lock_unlocked_children - lock clk's children; allows an exception
+ * @clk: the clock whose children are being locked, depth-first
+ * @locked: child already locked and must not be locked again (can be NULL)
+ *
+ * FIXME rename this macro to clk_lock_siblings
+ *
+ * The locking semantics of clk_lock_unlocked_children are useful when locking
+ * a subtree where both the top-most clock and one of the top-most clock's
+ * children are already locked.  This is a common pattern in the clock
+ * framework when clk A is locked and so is clk A's parent, clk B.  For
+ * propagating rate-change requests up the framework it becomes necessary to
+ * lock all of the clk B's children, keeping in mind that clk B and clk A are
+ * already locked.
+ */
+int clk_lock_unlocked_children(struct *clk clk, struct clk *locked)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	/* sanity */
+	if (!clk || !mutex_is_locked(clk))
+		return -EINVAL;
+
+	if (locked && !mutex_is_locked(clk))
+		return -EINVAL;
+
+	/*
+	 * FIXME make this a macro, not a function
+	 * rename to clk_lock_siblings
+	 * keep clk_lock_subtree as a proper function
+	 */
+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
+		if (child != locked)
+			clk_lock_subtree(child);
+
+	return 0;
+}
+
+int clk_lock_parent_subtree(struct *clk)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	mutex_lock(&clk->parent->mutex);
+
+	/* lock all subtrees of clk's parent, except for clk's subtree */
+	hlist_for_each_entry(child, tmp, &clk->parent->children, child_node)
+		if (child != clk)
+			clk_lock_subtree(child);
+
+	return 0;
+}
+
+int clk_lock_adjacent_children(struct clk *clk, struct clk *locked_child)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	/* lock all subtrees of clk's parent, except for clk's subtree */
+	hlist_for_each_entry(child, tmp, &clk->parent->children, child_node)
+		if (child != locked_child)
+			clk_lock_subtree(child);
+
+	return 0;
+}
+
+int clk_unlock_nonessential_subtree(struct *clk, struct clk *locked)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
+		clk_lock_subtree(child);
+
+	mutex_unlock(&clk->mutex);
+
+	return 0;
+}
+#endif
 
 /**
  * clk_set_rate - specify a new rate for clk
@@ -896,25 +1070,62 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 	struct clk *top, *fail_clk;
 	int ret = 0;
 
-	/* prevent racing with updates to the clock topology */
+	int i=0;
+	pr_err("%s: %s\n", __func__, clk->name);
+	/* hold the global lock until the per-clock locks are held */
 	mutex_lock(&prepare_lock);
 
-	/* bail early if nothing to do */
-	if (rate == clk->rate)
-		goto out;
+	pr_err("%s: here%d\n", __func__, i++);
+	/* prevent racing with updates to the clock topology */
+	/* hold the per-clock locks */
+	mutex_lock(&clk->lock);
+	/*clk_lock_unlocked_children(clk, NULL);*/
+	//clk_lock_subtree(clk);
 
+	pr_err("%s: here%d\n", __func__, i++);
+	/* bail early if nothing to do */
+	if (rate == clk->rate) {
+		mutex_unlock(&clk->lock);
+		goto out;
+	}
+
+	pr_err("%s: here%d\n", __func__, i++);
 	if ((clk->flags & CLK_SET_RATE_GATE) && clk->prepare_count) {
 		ret = -EBUSY;
+		mutex_unlock(&clk->lock);
 		goto out;
 	}
 
+	pr_err("%s: here%d\n", __func__, i++);
+	/* passed sanity, so lock clk's children */
+	clk_lock_children_subtree(clk, NULL);
+
+	/* lock parent and adjacent siblings? */
+	//clk_lock_partial_subtree(clk->parent, clk);
+
+	pr_err("%s: here%d\n", __func__, i++);
 	/* calculate new rates and get the topmost changed clock */
+	/* XXX clk_calc_new_rates locks the parents */
 	top = clk_calc_new_rates(clk, rate);
 	if (!top) {
-		ret = -EINVAL;
-		goto out;
+		//ret = -EINVAL;
+		//goto out_unlock_clk;
+		clk_unlock_subtree(clk);
+		return -EINVAL;
 	}
 
+	/* hold per-clock mutexes from top clk down to leaf clocks */
+	//clk_lock_subtree(top);
+
+	/* unlock any clock subtrees that are upstream of top */
+	/*if (clk->top != top)
+		clk_unlock_nonessential_subtree(clk->top, top);*/
+
+	pr_err("%s: here%d\n", __func__, i++);
+	/* release global prepare_lock to allow for re-entrancy */
+	mutex_unlock(&prepare_lock);
+
+	pr_err("%s: here%d\n", __func__, i++);
 	/* notify that we are about to change rates */
 	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
 	if (fail_clk) {
@@ -922,18 +1133,31 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 				fail_clk->name);
 		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
 		ret = -EBUSY;
-		goto out;
+		goto out_unlock_top;
 	}
 
+	pr_err("%s: here%d\n", __func__, i++);
 	/* change the rates */
 	clk_change_rate(top);
 
-	mutex_unlock(&prepare_lock);
-
+	pr_err("%s: here%d\n", __func__, i++);
+#if 0
 	return 0;
-out:
-	mutex_unlock(&prepare_lock);
 
+out_unlock_clk:
+	clk_unlock_subtree(clk);
+
+/*out_unlock:
+	mutex_unlock(&clk->top->lock);*/
+#endif
+
+out_unlock_top:
+	if (top->parent)
+		mutex_unlock(&top->parent->lock);
+
+	clk_unlock_subtree(top);
+
+out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(clk_set_rate);
@@ -1189,6 +1413,8 @@ int __clk_init(struct device *dev, struct clk *clk)
 
 	mutex_lock(&prepare_lock);
 
+	mutex_init(&clk->lock);
+	pr_err("%s: %s\n", __func__, clk->name);
 	/* check to see if a clock with this name is already registered */
 	if (__clk_lookup(clk->name)) {
 		pr_debug("%s: clk %s already initialized\n",
