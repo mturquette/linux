@@ -61,7 +61,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= opp4xxx_data.o
 endif
 
 # DVFS crap from mturquette
-obj-y					+= dvfs_4xxx.o
+#obj-y					+= dvfs_4xxx.o
 
 # Power Management
 ifeq ($(CONFIG_PM),y)
