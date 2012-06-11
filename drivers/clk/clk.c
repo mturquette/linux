@@ -870,6 +870,42 @@ static void clk_change_rate(struct clk *clk)
 		clk_change_rate(child);
 }
 
+static void clk_lock_subtree(struct clk *clk)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	mutex_lock(&clk->lock);
+
+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
+		clk_lock_subtree(child);
+}
+
+static void clk_unlock_subtree(struct clk *clk)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
+		clk_lock_subtree(child);
+
+	mutex_unlock(&clk->lock);
+}
+
+static void clk_unlock_subtree_unchanged(struct clk *clk, struct clk *changed)
+{
+	struct clk *child;
+	struct hlist_node *tmp;
+
+	if (clk == changed)
+		return;
+
+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
+		clk_unlock_subtree_unchanged(child);
+
+	mutex_unlock(&clk->lock);
+}
+
 /**
  * clk_set_rate - specify a new rate for clk
  * @clk: the clk whose rate is being changed
@@ -1329,6 +1365,8 @@ struct clk *__clk_register(struct device *dev, struct clk_hw *hw)
 {
 	int ret;
 	struct clk *clk;
+
+	mutex_init(&clk->lock);
 
 	clk = hw->clk;
 	clk->name = hw->init->name;
