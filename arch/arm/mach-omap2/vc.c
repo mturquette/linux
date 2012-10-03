@@ -171,7 +171,7 @@ int omap_vc_bypass_scale(struct voltagedomain *voltdm,
 
 	vc_valid = vc->common->valid;
 	vc_bypass_val_reg = vc->common->bypass_val_reg;
-	vc_bypass_value = (target_vsel << vc->common->data_shift) |
+	vc_bypass_value = (target_vsel << __ffs(vc->common->data_mask)) |
 		(vc->volt_reg_addr << vc->common->regaddr_shift) |
 		(vc->i2c_slave_addr << vc->common->slaveaddr_shift);
 

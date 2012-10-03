@@ -43,8 +43,8 @@ struct voltagedomain;
 struct omap_vc_common {
 	u32 cmd_on_mask;
 	u32 valid;
+	u32 data_mask;
 	u8 bypass_val_reg;
-	u8 data_shift;
 	u8 slaveaddr_shift;
 	u8 regaddr_shift;
 	u8 cmd_on_shift;
