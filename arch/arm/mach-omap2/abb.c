@@ -91,8 +91,11 @@ int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
  *
  * @voltdm - voltage domain that is about to scale
  * @target_volt - voltage that voltdm is scaling towards
+ *
+ * Changes the ABB ldo mode prior to scaling the voltage domain.
+ * Returns 0 on success, otherwise an error code.
  */
-long omap_abb_pre_scale(struct voltagedomain *voltdm,
+int omap_abb_pre_scale(struct voltagedomain *voltdm,
 		unsigned long target_volt)
 {
 	struct omap_abb_instance *abb = voltdm->abb;
@@ -108,34 +111,28 @@ long omap_abb_pre_scale(struct voltagedomain *voltdm,
 		return 0;
 
 	/*
-	 * FIXME OH crap!  corner case!  voltdm->nominal_volt is 0 at
-	 * boot time!
+	 * XXX boot-time corner case: voltdm->nominal volt might be zero
 	 *
-	 * Can we populated voltdm->nominal_volt somehow during early pm
-	 * init?  How about from 
+	 * This implies that we're running at the default PMIC voltage,
+	 * since voltdm->nominal_volt should have been populated in
+	 * omap_voltage_late_init if the voltage had been scaled
+	 * previously.  The best way to fix this is for DT data to pass
+	 * in PMIC boot voltage.
+	 *
+	 * For now, handle this by returning success (0) to not block
+	 * the rest of the transition.
 	 */
+	if (!voltdm->nominal_volt)
+		return 0;
+
 	cur_volt_data = omap_voltage_get_voltdata(voltdm, voltdm->nominal_volt);
 	target_volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
 
-	/*
-	 * FIXME if voltdm_scale is called before the voltdm data is
-	 * populated then we don't want to abort the whole operation.
-	 * This happens with performance governor, for instance
-	 */
-	if (IS_ERR(cur_volt_data)) {
-		pr_err("%s: omap_voltage_get_voltdata returned %ld for current voltage %lu\n",
-				__func__, PTR_ERR(cur_volt_data),
-				voltdm->nominal_volt);
-		return 0;
-	}
+	if (IS_ERR(cur_volt_data))
+		return PTR_ERR(cur_volt_data);
 
-	/* FIXME if above printk never fires then duplicate below code for cur_volt_data */
-	if (IS_ERR(target_volt_data)) {
-		pr_err("%s: omap_voltage_get_voltdata returned %ld for target voltage %lu\n",
-				__func__, PTR_ERR(cur_volt_data),
-				target_volt);
+	if (IS_ERR(target_volt_data))
 		return PTR_ERR(target_volt_data);
-	}
 
 	/* bail if the sequence is wrong */
 	if (target_volt_data->volt_nominal > cur_volt_data->volt_nominal)
@@ -150,12 +147,15 @@ long omap_abb_pre_scale(struct voltagedomain *voltdm,
 	return omap_abb_set_opp(voltdm, opp_sel);
 }
 
-/*
+/**
  * omap_abb_post_scale - ABB transition post-voltage scale, if needed
  * @voltdm - voltage domain that just finished scaling
  * @target_volt - voltage that voltdm is scaling towards
+ *
+ * Changes the ABB ldo mode prior to scaling the voltage domain.
+ * Returns 0 on success, otherwise an error code.
  */
-long omap_abb_post_scale(struct voltagedomain *voltdm,
+int omap_abb_post_scale(struct voltagedomain *voltdm,
 		unsigned long target_volt)
 {
 	struct omap_abb_instance *abb = voltdm->abb;

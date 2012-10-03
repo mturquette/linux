@@ -86,9 +86,9 @@ void omap_abb_init(struct voltagedomain *voltdm);
 void omap_abb_enable(struct voltagedomain *voltdm);
 void omap_abb_disble(struct voltagedomain *voltdm);
 int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel);
-long omap_abb_pre_scale(struct voltagedomain *voltdm,
+int omap_abb_pre_scale(struct voltagedomain *voltdm,
 		unsigned long target_volt);
-long omap_abb_post_scale(struct voltagedomain *voltdm,
+int omap_abb_post_scale(struct voltagedomain *voltdm,
 		unsigned long target_volt);
 
 #endif

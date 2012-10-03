@@ -315,13 +315,21 @@ int __init omap_voltage_late_init(void)
 
 		if (voltdm->vp) {
 			voltdm->scale = omap_vp_forceupdate_scale;
+			voltdm->get_voltage = omap_vp_get_init_voltage;
 			omap_vp_init(voltdm);
 		}
 
 		if (voltdm->abb)
 			omap_abb_init(voltdm);
 
-		/* FIXME initialize voltdm->nominal_volt here? */
+		/*
+		 * XXX If voltdm->nominal_volt is zero after calling
+		 * voltdm->get_voltage then we are likely running this
+		 * voltage domain at the default boot voltage of the
+		 * PMIC.  In such a case it would be best to load this
+		 * value from DT.
+		 */
+		voltdm->nominal_volt = voltdm->get_voltage(voltdm);
 	}
 
 	return 0;
@@ -430,14 +438,6 @@ static int _voltdm_register(struct voltagedomain *voltdm)
 	list_add(&voltdm->node, &voltdm_list);
 
 	pr_debug("voltagedomain: registered %s\n", voltdm->name);
-
-	return 0;
-}
-
-static int _voltdm_init_nominal_volt(struct voltagedomain *voltdm)
-{
-	if (!voltdm)
-		return -EINVAL;
 
 	return 0;
 }

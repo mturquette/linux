@@ -9,7 +9,7 @@
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 
-static u32 _vp_get_init_voltage(struct voltagedomain *voltdm)
+u32 omap_vp_get_init_voltage(struct voltagedomain *voltdm)
 {
 	struct omap_vp_instance *vp = voltdm->vp;
 	u32 vpconfig;
@@ -40,11 +40,7 @@ static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
 
 	/* FIXME this function is the winner */
 
-	pr_err("%s: 0: %s initial voltage is %lu\n",
-	__func__, voltdm->name, _vp_get_init_voltage(voltdm));
 	vsel = voltdm->pmic->uv_to_vsel(volt);
-	pr_err("%s: volt is %lu, vsel is %d\n",
-	__func__, volt, vsel);
 
 	vpconfig = voltdm->read(vp->vpconfig);
 	vpconfig &= ~(vp->common->vpconfig_initvoltage_mask |
