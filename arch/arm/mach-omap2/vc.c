@@ -101,6 +101,27 @@ static int omap_vc_config_channel(struct voltagedomain *voltdm)
 }
 
 /* Voltage scale and accessory APIs */
+unsigned long omap_vc_get_bypass_data(struct voltagedomain *voltdm)
+{
+	struct omap_vc_channel *vc = voltdm->vc;
+	u32 vc_bypass_value;
+	u8 vsel;
+	unsigned long volt;
+
+	/* sanity */
+	if (!voltdm->pmic || !voltdm->pmic->vsel_to_uv ||
+			!voltdm->read || !voltdm->write)
+		return 0;
+
+	vc_bypass_value = voltdm->read(vc->common->bypass_val_reg);
+	vc_bypass_value &= vc->common->data_mask;
+	vsel = vc_bypass_value >> __ffs(vc->common->data_mask);
+
+	volt = voltdm->pmic->vsel_to_uv(vsel);
+
+	return volt;
+}
+
 int omap_vc_pre_scale(struct voltagedomain *voltdm,
 		      unsigned long target_volt,
 		      u8 *target_vsel, u8 *current_vsel)
