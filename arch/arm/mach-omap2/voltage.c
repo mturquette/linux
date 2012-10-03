@@ -310,6 +310,7 @@ int __init omap_voltage_late_init(void)
 
 		if (voltdm->vc) {
 			voltdm->scale = omap_vc_bypass_scale;
+			voltdm->get_voltage = omap_vc_get_bypass_data;
 			omap_vc_init_channel(voltdm);
 		}
 
