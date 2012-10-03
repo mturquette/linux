@@ -244,9 +244,11 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
 	switch (voltscale_method) {
 	case VOLTSCALE_VPFORCEUPDATE:
 		voltdm->scale = omap_vp_forceupdate_scale;
+		voltdm->get_voltage = omap_vp_get_init_voltage;
 		return;
 	case VOLTSCALE_VCBYPASS:
 		voltdm->scale = omap_vc_bypass_scale;
+		voltdm->get_voltage = omap_vc_get_bypass_data;
 		return;
 	default:
 		pr_warning("%s: Trying to change the method of voltage scaling"
@@ -288,13 +290,24 @@ int __init omap_voltage_late_init(void)
 
 		if (voltdm->vc) {
 			voltdm->scale = omap_vc_bypass_scale;
+			voltdm->get_voltage = omap_vc_get_bypass_data;
 			omap_vc_init_channel(voltdm);
 		}
 
 		if (voltdm->vp) {
 			voltdm->scale = omap_vp_forceupdate_scale;
+			voltdm->get_voltage = omap_vp_get_init_voltage;
 			omap_vp_init(voltdm);
 		}
+
+		/*
+		 * XXX If voltdm->nominal_volt is zero after calling
+		 * voltdm->get_voltage then we are likely running this
+		 * voltage domain at the default boot voltage of the
+		 * PMIC.  In such a case it would be best to load this
+		 * value from DT.
+		 */
+		voltdm->nominal_volt = voltdm->get_voltage(voltdm);
 	}
 
 	return 0;
