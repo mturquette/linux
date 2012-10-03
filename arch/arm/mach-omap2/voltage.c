@@ -265,6 +265,7 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
 	switch (voltscale_method) {
 	case VOLTSCALE_VPFORCEUPDATE:
 		voltdm->scale = omap_vp_forceupdate_scale;
+		//voltdm->get_voltage = omap_vp_get_voltage;
 		return;
 	case VOLTSCALE_VCBYPASS:
 		voltdm->scale = omap_vc_bypass_scale;
@@ -319,6 +320,8 @@ int __init omap_voltage_late_init(void)
 
 		if (voltdm->abb)
 			omap_abb_init(voltdm);
+
+		/* FIXME initialize voltdm->nominal_volt here? */
 	}
 
 	return 0;
@@ -427,6 +430,14 @@ static int _voltdm_register(struct voltagedomain *voltdm)
 	list_add(&voltdm->node, &voltdm_list);
 
 	pr_debug("voltagedomain: registered %s\n", voltdm->name);
+
+	return 0;
+}
+
+static int _voltdm_init_nominal_volt(struct voltagedomain *voltdm)
+{
+	if (!voltdm)
+		return -EINVAL;
 
 	return 0;
 }

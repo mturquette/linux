@@ -9,13 +9,42 @@
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 
+static u32 _vp_get_init_voltage(struct voltagedomain *voltdm)
+{
+	struct omap_vp_instance *vp = voltdm->vp;
+	u32 vpconfig;
+	u8 vsel;
+	u32 volt;
+
+	/* FIXME this function is the winner */
+
+	vpconfig = voltdm->read(vp->vpconfig);
+	pr_err("%s: vpconfig is 0x%x\n", __func__, vpconfig);
+	vpconfig &= vp->common->vpconfig_initvoltage_mask;
+	pr_err("%s: vpconfig is 0x%x\n", __func__, vpconfig);
+
+	vsel = vpconfig >> __ffs(vp->common->vpconfig_initvoltage_mask);
+	pr_err("%s: vsel is 0x%x\n", __func__, vsel);
+
+	volt = voltdm->pmic->vsel_to_uv(vsel);
+	pr_err("%s: volt is 0x%x\n", __func__, volt);
+
+	return volt;
+}
+
 static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
 {
 	struct omap_vp_instance *vp = voltdm->vp;
 	u32 vpconfig;
 	char vsel;
 
+	/* FIXME this function is the winner */
+
+	pr_err("%s: 0: %s initial voltage is %lu\n",
+	__func__, voltdm->name, _vp_get_init_voltage(voltdm));
 	vsel = voltdm->pmic->uv_to_vsel(volt);
+	pr_err("%s: volt is %lu, vsel is %d\n",
+	__func__, volt, vsel);
 
 	vpconfig = voltdm->read(vp->vpconfig);
 	vpconfig &= ~(vp->common->vpconfig_initvoltage_mask |

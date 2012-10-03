@@ -88,6 +88,7 @@ struct voltagedomain {
 
 	int (*scale) (struct voltagedomain *voltdm,
 		      unsigned long target_volt);
+	unsigned long (*get_voltage) (struct voltagedomain *voltdm);
 
 	u32 nominal_volt;
 	struct omap_volt_data *volt_data;

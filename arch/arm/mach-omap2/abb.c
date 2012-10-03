@@ -15,15 +15,15 @@
 #include "abb.h"
 #include "voltage.h"
 
-/*
+/**
  * omap_abb_set_opp - program ABB ldo based on new voltage
  *
- * @voltdm - pointer to voltage domain that just finished scaling voltage
+ * @voltdm - voltage domain that just finished scaling voltage
+ * @opp_sel - target ABB ldo operating mode
  *
- * Look up the ABB ldo state for the new voltage that voltdm just finished
- * transitioning to and compare it to current ldo state.  If a change is needed
- * then clear appropriate PRM_IRQSTATUS bit, transition ldo and then clear
- * PRM_IRQSTATUS bit again.  Returns 0 on success, -EERROR otherwise.
+ * Program the ABB ldo to the new state (if necessary), clearing the
+ * PRM_IRQSTATUS bit before and after the transition.  Returns 0 on
+ * success, -ETIMEDOUT otherwise.
  */
 int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
 {
@@ -86,8 +86,9 @@ int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
 	return 0;
 }
 
-/*
+/**
  * omap_abb_pre_scale - ABB transition pre-voltage scale, if needed
+ *
  * @voltdm - voltage domain that is about to scale
  * @target_volt - voltage that voltdm is scaling towards
  */
@@ -106,20 +107,35 @@ long omap_abb_pre_scale(struct voltagedomain *voltdm,
 	if (!abb)
 		return 0;
 
+	/*
+	 * FIXME OH crap!  corner case!  voltdm->nominal_volt is 0 at
+	 * boot time!
+	 *
+	 * Can we populated voltdm->nominal_volt somehow during early pm
+	 * init?  How about from 
+	 */
 	cur_volt_data = omap_voltage_get_voltdata(voltdm, voltdm->nominal_volt);
 	target_volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
 
-	/* FIXME is this still needed? */
-	/* FIXME handle boot-time corner case */
+	/*
+	 * FIXME if voltdm_scale is called before the voltdm data is
+	 * populated then we don't want to abort the whole operation.
+	 * This happens with performance governor, for instance
+	 */
 	if (IS_ERR(cur_volt_data)) {
-		pr_err("%s: omap_voltage_get_voltdata returned %ld\n",
-				__func__, PTR_ERR(cur_volt_data));
+		pr_err("%s: omap_voltage_get_voltdata returned %ld for current voltage %lu\n",
+				__func__, PTR_ERR(cur_volt_data),
+				voltdm->nominal_volt);
 		return 0;
 	}
 
 	/* FIXME if above printk never fires then duplicate below code for cur_volt_data */
-	if (IS_ERR(target_volt_data))
+	if (IS_ERR(target_volt_data)) {
+		pr_err("%s: omap_voltage_get_voltdata returned %ld for target voltage %lu\n",
+				__func__, PTR_ERR(cur_volt_data),
+				target_volt);
 		return PTR_ERR(target_volt_data);
+	}
 
 	/* bail if the sequence is wrong */
 	if (target_volt_data->volt_nominal > cur_volt_data->volt_nominal)
