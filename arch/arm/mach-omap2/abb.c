@@ -52,6 +52,20 @@ int omap_abb_set_opp(struct voltagedomain *voltdm, u8 opp_sel)
 		return -ETIMEDOUT;
 	}
 
+	/* program the setup register */
+	switch (opp_sel) {
+		case OMAP_ABB_NOMINAL_OPP:
+			voltdm->rmw(abb->common->active_fbb_sel_mask,
+					0x0,
+					abb->setup_offs);
+			break;
+		case OMAP_ABB_FAST_OPP:
+			voltdm->rmw(abb->common->active_fbb_sel_mask,
+					abb->common->active_fbb_sel_mask,
+					abb->setup_offs);
+			break;
+	}
+
 	/* program next state of ABB ldo */
 	voltdm->rmw(abb->common->opp_sel_mask,
 			opp_sel << __ffs(abb->common->opp_sel_mask),
@@ -289,11 +303,6 @@ void __init omap_abb_init(struct voltagedomain *voltdm)
 
 	voltdm->rmw(abb->common->sr2_wtcnt_value_mask,
 			(sr2_wt_cnt_val << __ffs(abb->common->sr2_wtcnt_value_mask)),
-			abb->setup_offs);
-
-	/* allow Forward Body-Bias */
-	voltdm->rmw(abb->common->active_fbb_sel_mask,
-			abb->common->active_fbb_sel_mask,
 			abb->setup_offs);
 
 	/* did bootloader set OPP_SEL? */
