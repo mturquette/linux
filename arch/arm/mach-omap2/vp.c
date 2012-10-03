@@ -9,25 +9,24 @@
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 
-u32 omap_vp_get_init_voltage(struct voltagedomain *voltdm)
+unsigned long omap_vp_get_init_voltage(struct voltagedomain *voltdm)
 {
 	struct omap_vp_instance *vp = voltdm->vp;
 	u32 vpconfig;
 	u8 vsel;
-	u32 volt;
+	unsigned long volt;
 
-	/* FIXME this function is the winner */
+	/* sanity */
+	if (!voltdm->pmic || !voltdm->pmic->vsel_to_uv
+			|| !voltdm->read || !voltdm->write)
+		return 0;
 
 	vpconfig = voltdm->read(vp->vpconfig);
-	pr_err("%s: vpconfig is 0x%x\n", __func__, vpconfig);
 	vpconfig &= vp->common->vpconfig_initvoltage_mask;
-	pr_err("%s: vpconfig is 0x%x\n", __func__, vpconfig);
 
 	vsel = vpconfig >> __ffs(vp->common->vpconfig_initvoltage_mask);
-	pr_err("%s: vsel is 0x%x\n", __func__, vsel);
 
 	volt = voltdm->pmic->vsel_to_uv(vsel);
-	pr_err("%s: volt is 0x%x\n", __func__, volt);
 
 	return volt;
 }
@@ -37,8 +36,6 @@ static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
 	struct omap_vp_instance *vp = voltdm->vp;
 	u32 vpconfig;
 	char vsel;
-
-	/* FIXME this function is the winner */
 
 	vsel = voltdm->pmic->uv_to_vsel(volt);
 
