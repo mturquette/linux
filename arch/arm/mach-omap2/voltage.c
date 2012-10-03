@@ -265,10 +265,11 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
 	switch (voltscale_method) {
 	case VOLTSCALE_VPFORCEUPDATE:
 		voltdm->scale = omap_vp_forceupdate_scale;
-		//voltdm->get_voltage = omap_vp_get_voltage;
+		voltdm->get_voltage = omap_vp_get_init_voltage;
 		return;
 	case VOLTSCALE_VCBYPASS:
 		voltdm->scale = omap_vc_bypass_scale;
+		voltdm->get_voltage = omap_vc_get_bypass_data;
 		return;
 	default:
 		pr_warning("%s: Trying to change the method of voltage scaling"
