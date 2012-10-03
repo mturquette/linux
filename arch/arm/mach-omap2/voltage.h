@@ -86,6 +86,7 @@ struct voltagedomain {
 		u32 rate;
 	} sys_clk;
 
+	unsigned long (*get_voltage) (struct voltagedomain *voltdm);
 	int (*scale) (struct voltagedomain *voltdm,
 		      unsigned long target_volt);
 
