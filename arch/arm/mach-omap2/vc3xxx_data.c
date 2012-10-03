@@ -31,7 +31,7 @@
  */
 static struct omap_vc_common omap3_vc_common = {
 	.bypass_val_reg	 = OMAP3_PRM_VC_BYPASS_VAL_OFFSET,
-	.data_shift	 = OMAP3430_DATA_SHIFT,
+	.data_mask	 = OMAP3430_DATA_MASK,
 	.slaveaddr_shift = OMAP3430_SLAVEADDR_SHIFT,
 	.regaddr_shift	 = OMAP3430_REGADDR_SHIFT,
 	.valid		 = OMAP3430_VALID_MASK,
