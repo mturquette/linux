@@ -6,12 +6,16 @@ config CLKDEV_LOOKUP
 config HAVE_CLK_PREPARE
 	bool
 
+config HAVE_CLK_GET_ACCURACY
+	bool
+
 config HAVE_MACH_CLKDEV
 	bool
 
 config COMMON_CLK
 	bool
 	select HAVE_CLK_PREPARE
+	select HAVE_CLK_GET_ACCURACY
 	select CLKDEV_LOOKUP
 	---help---
 	  The common clock framework is a single definition of struct
