@@ -71,7 +71,17 @@ DEFINE_CLK_GATE(pad_clks_ck, "pad_clks_src_ck", &pad_clks_src_ck, 0x0,
 
 DEFINE_CLK_FIXED_RATE(pad_slimbus_core_clks_ck, CLK_IS_ROOT, 12000000, 0x0);
 
-DEFINE_CLK_FIXED_RATE(secure_32k_clk_src_ck, CLK_IS_ROOT, 32768, 0x0);
+//DEFINE_CLK_FIXED_RATE(secure_32k_clk_src_ck, CLK_IS_ROOT, 32768, 0x0);
+
+struct clk_fixed_rate_desc secure_32k_clk_src_ck_desc = {
+	.fixed_rate = 32768,
+	.desc = {
+		.name = "secure_32k_clk_src_ck",
+		.flags = CLK_IS_ROOT,
+		.register_func = &clk_register_fixed_rate_desc,
+		.ops = &clk_fixed_rate_ops,
+	},
+};
 
 DEFINE_CLK_FIXED_RATE(slimbus_src_clk, CLK_IS_ROOT, 12000000, 0x0);
 
@@ -1446,7 +1456,7 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"pad_clks_src_ck",		&pad_clks_src_ck),
 	CLK(NULL,	"pad_clks_ck",			&pad_clks_ck),
 	CLK(NULL,	"pad_slimbus_core_clks_ck",	&pad_slimbus_core_clks_ck),
-	CLK(NULL,	"secure_32k_clk_src_ck",	&secure_32k_clk_src_ck),
+	//CLK(NULL,	"secure_32k_clk_src_ck",	&secure_32k_clk_src_ck),
 	CLK(NULL,	"slimbus_src_clk",		&slimbus_src_clk),
 	CLK(NULL,	"slimbus_clk",			&slimbus_clk),
 	CLK(NULL,	"sys_32k_ck",			&sys_32k_ck),
@@ -1689,6 +1699,8 @@ static struct omap_clk omap44xx_clks[] = {
 int __init omap4xxx_clk_init(void)
 {
 	int rc;
+
+	clk_register_desc(NULL, &secure_32k_clk_src_ck_desc.desc);
 
 	if (cpu_is_omap443x()) {
 		cpu_mask = RATE_IN_4430;

@@ -26,7 +26,11 @@
  * parent - fixed parent.  No clk_set_parent support
  */
 
+/* resolve struct clk_fixed_rate from inner struct clk_hw member */
 #define to_clk_fixed_rate(_hw) container_of(_hw, struct clk_fixed_rate, hw)
+
+/* resolve struct clk_fixed_rate_desc from inner struct clk_desc member */
+#define to_hw_desc(_desc) container_of(_desc, struct clk_fixed_rate_desc, desc)
 
 static unsigned long clk_fixed_rate_recalc_rate(struct clk_hw *hw,
 		unsigned long parent_rate)
@@ -107,6 +111,43 @@ struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
 						     flags, fixed_rate, 0);
 }
 EXPORT_SYMBOL_GPL(clk_register_fixed_rate);
+
+struct clk_hw *clk_register_fixed_rate_desc(struct device *dev,
+		struct clk_desc *desc)
+{
+	struct clk_fixed_rate *fixed;
+	struct clk_fixed_rate_desc *hw_desc;
+
+	hw_desc = to_hw_desc(desc);
+
+	/* allocate fixed-rate clock */
+	fixed = kzalloc(sizeof(struct clk_fixed_rate), GFP_KERNEL);
+	if (!fixed) {
+		pr_err("%s: could not allocate fixed clk\n", __func__);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	/* populate struct clk_fixed_rate assignments */
+	fixed->fixed_rate = hw_desc->fixed_rate;
+	fixed->fixed_accuracy = hw_desc->fixed_accuracy;
+
+#if 0
+	/* populate the clk_desc payload */
+	desc->hw = fixed->hw;
+#endif
+
+#if 0
+	/* register the clock */
+	clk = clk_register(dev, &fixed->hw);
+	if (IS_ERR(clk))
+		kfree(fixed);
+
+	return clk;
+#endif
+
+	return &fixed->hw;
+}
+EXPORT_SYMBOL_GPL(clk_register_fixed_rate_desc);
 
 #ifdef CONFIG_OF
 /**

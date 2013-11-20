@@ -187,6 +187,20 @@ struct clk_hw {
 	const struct clk_init_data *init;
 };
 
+struct clk_desc {
+	/* may be statically initialized */
+	const char		*name;
+	const struct clk_ops	*ops;
+	const char		**parent_names;
+	u8			num_parents;
+	unsigned long		flags;
+	struct clk_hw *(*register_func)(struct device *dev, struct clk_desc *desc);
+#if 0
+	/* do not statically initialize */
+	struct clk_hw		*hw;
+#endif
+};
+
 /*
  * DOC: Basic clock implementations common to many platforms
  *
@@ -207,6 +221,16 @@ struct clk_fixed_rate {
 	unsigned long	fixed_accuracy;
 	u8		flags;
 };
+
+struct clk_fixed_rate_desc {
+	struct clk_desc	desc;
+	unsigned long	fixed_rate;
+	unsigned long	fixed_accuracy;
+	u8		flags;
+};
+
+struct clk_hw *clk_register_fixed_rate_desc(struct device *dev,
+		struct clk_desc *desc);
 
 extern const struct clk_ops clk_fixed_rate_ops;
 struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
@@ -433,6 +457,7 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
  * error code; drivers must test for an error code after calling clk_register.
  */
 struct clk *clk_register(struct device *dev, struct clk_hw *hw);
+struct clk *clk_register_desc(struct device *dev, struct clk_desc *desc);
 struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
 
 void clk_unregister(struct clk *clk);
