@@ -356,7 +356,8 @@ static struct platform_driver cpuoffline_sysdev_driver = {
 
 int cpuoffline_register_driver(struct cpuoffline_driver *driver)
 {
-	int ret = 0;
+	int cpu, ret = 0;
+	struct device *d;
 
 	pr_info("CPUoffline: registering %s driver", driver->name);
 
@@ -380,6 +381,15 @@ int cpuoffline_register_driver(struct cpuoffline_driver *driver)
 //	ret = sysdev_driver_register(&cpu_sysdev_class,
 //			&cpuoffline_sysdev_driver);
 	ret = platform_driver_register(&cpuoffline_sysdev_driver);
+
+	if (ret)
+		goto out;
+
+	/* add all cpus */
+	for_each_possible_cpu(cpu) {
+		d = get_cpu_device(cpu);
+		cpuoffline_sysdev_driver.driver.probe(d);
+	}
 
 out:
 	return ret;
