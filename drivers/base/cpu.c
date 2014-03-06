@@ -299,8 +299,10 @@ int register_cpu(struct cpu *cpu, int num)
 	cpu->dev.bus->uevent = arch_cpu_uevent;
 #endif
 	cpu->dev.groups = common_cpu_attr_groups;
-	if (cpu->hotpluggable)
+	if (cpu->hotpluggable) {
 		cpu->dev.groups = hotplugable_cpu_attr_groups;
+		set_cpu_hotpluggable(num, true);
+	}
 	error = device_register(&cpu->dev);
 	if (!error)
 		per_cpu(cpu_sys_devices, num) = &cpu->dev;
