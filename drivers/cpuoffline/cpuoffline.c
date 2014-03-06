@@ -200,7 +200,7 @@ static struct kobj_type partition_ktype = {
 	.release	= cpuoffline_partition_release,
 };
 
-/* cpu class sysdev device registration */
+/* cpu class device registration */
 
 static int cpuoffline_add_dev_interface(struct cpuoffline_partition *partition,
 		struct device *dev)
@@ -344,7 +344,7 @@ static int cpuoffline_remove_dev(struct device *dev)
 	return 0;
 }
 
-static struct platform_driver cpuoffline_sysdev_driver = {
+static struct platform_driver cpuoffline_device_driver = {
 	.driver = {
 		.name = "cpuoffline",
 		.probe	= cpuoffline_add_dev,
@@ -378,9 +378,7 @@ int cpuoffline_register_driver(struct cpuoffline_driver *driver)
 		goto out;
 
 	/* register every CPUoffline device */
-//	ret = sysdev_driver_register(&cpu_sysdev_class,
-//			&cpuoffline_sysdev_driver);
-	ret = platform_driver_register(&cpuoffline_sysdev_driver);
+	ret = platform_driver_register(&cpuoffline_device_driver);
 
 	if (ret)
 		goto out;
@@ -388,7 +386,7 @@ int cpuoffline_register_driver(struct cpuoffline_driver *driver)
 	/* add all cpus */
 	for_each_possible_cpu(cpu) {
 		d = get_cpu_device(cpu);
-		cpuoffline_sysdev_driver.driver.probe(d);
+		cpuoffline_device_driver.driver.probe(d);
 	}
 
 out:
@@ -508,7 +506,6 @@ static int __init cpuoffline_core_init(void)
 
 	cpuoffline_global_kobject = kobject_create_and_add("cpuoffline",
 			&cpu_subsys.dev_root->kobj);
-//			&cpu_sysdev_class.kset.kobj);
 
 	WARN_ON(!cpuoffline_global_kobject);
 	/*register_syscore_ops(&cpuoffline_syscore_ops);*/
