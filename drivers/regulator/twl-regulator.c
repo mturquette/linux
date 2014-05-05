@@ -107,6 +107,8 @@ struct twlreg_info {
 #define TWL6030_CFG_STATE_APP(v)	(((v) & TWL6030_CFG_STATE_APP_MASK) >>\
 						TWL6030_CFG_STATE_APP_SHIFT)
 
+#define TWL6030_CFG_VOLTAGE_WR_S_BIT  (1 << 7)
+
 /* Flags for SMPS Voltage reading */
 #define SMPS_OFFSET_EN		BIT(0)
 #define SMPS_EXTENDED_EN	BIT(1)
@@ -559,6 +561,7 @@ twl4030ldo_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV,
 
 		/* use the first in-range value */
 		if (min_uV <= uV && uV <= max_uV) {
+			printk(KERN_INFO "twl4030ldo_set_voltage - min_uV=%d, max_uV=%d, uv=%d, vsel= %d\n",min_uV,max_uV,uV ,vsel);
 			*selector = vsel;
 			return twlreg_write(info, TWL_MODULE_PM_RECEIVER,
 							VREG_VOLTAGE, vsel);
@@ -619,10 +622,14 @@ twl6030ldo_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV,
 	 */
 	vsel = (min_uV/1000 - 1000)/100 + 1;
 	*selector = vsel;
+#ifdef CONFIG_JET_V2
+	if(info->base == 0x68) // LDO5
+		vsel |= TWL6030_CFG_VOLTAGE_WR_S_BIT;  // WR_S Keep the voltage configuration settings, same VSEL [5:0] value justbefore the warm reset event.
+#endif
 	return twlreg_write(info, TWL_MODULE_PM_RECEIVER, VREG_VOLTAGE, vsel);
 
 }
-
+#define VSEL_MASK 0x7F// The bit 7 is used to indicate WR_S(warm reset sensitivity), need to discard
 static int twl6030ldo_get_voltage(struct regulator_dev *rdev)
 {
 	struct twlreg_info	*info = rdev_get_drvdata(rdev);
@@ -631,7 +638,7 @@ static int twl6030ldo_get_voltage(struct regulator_dev *rdev)
 
 	if (vsel < 0)
 		return vsel;
-
+	vsel=vsel&VSEL_MASK;
 	/*
 	 * Use the below formula to calculate vsel
 	 * mV = 1000mv + 100mv * (vsel - 1)
@@ -1088,7 +1095,11 @@ static struct twlreg_info twl_regs[] = {
 	   verified since the specification is not public */
 	TWL6030_ADJUSTABLE_LDO(VAUX1_6030, 0x54, 1000, 3300),
 	TWL6030_ADJUSTABLE_LDO(VAUX2_6030, 0x58, 1000, 3300),
+#ifdef OFM_MOTION_INTERRUPT
+	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 2800, 2800),
+#else
 	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 1000, 3300),
+#endif
 	TWL6030_ADJUSTABLE_LDO(VMMC, 0x68, 1000, 3300),
 	TWL6030_ADJUSTABLE_LDO(VPP, 0x6c, 1000, 3300),
 	TWL6030_ADJUSTABLE_LDO(VUSIM, 0x74, 1000, 3300),

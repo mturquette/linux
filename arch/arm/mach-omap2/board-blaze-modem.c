@@ -207,22 +207,22 @@ err_pwrstate2:
 	gpio_free(BLAZE_MDM_PWRSTATE);
 err_pwrstate1:
 	/* Configure omap4 pad for HSI if modem detected */
-	if (modem_detected || force_mux) {
+/*	if (modem_detected || force_mux) {
 #if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
-		/* USBB1 I/O pads conflict with HSI1 port */
+		// USBB1 I/O pads conflict with HSI1 port 
 		usbhs_bdata.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
-		/* USBB2 I/O pads conflict with McBSP2 port */
+		// USBB2 I/O pads conflict with McBSP2 port 
 		usbhs_bdata.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED;
 #endif
-		/* Setup modem pad conf for blaze platform */
+		// Setup modem pad conf for blaze platform 
 		blaze_modem_pad_conf();
-		/* Allow HSI omap_device to be registered later */
+		// Allow HSI omap_device to be registered later 
 		omap_hsi_allow_registration();
 
 	} else {
 		gpio_direction_output(BLAZE_MDM_PWR_EN_GPIO, 0);
 		gpio_free(BLAZE_MDM_PWR_EN_GPIO);
-	}
+	}*/
 err_pwr:
 	return;
 }

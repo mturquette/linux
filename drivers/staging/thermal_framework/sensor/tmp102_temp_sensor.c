@@ -145,7 +145,9 @@ static int tmp102_get_temp(struct thermal_dev *tdev)
 {
 	struct platform_device *pdev = to_platform_device(tdev->dev);
 	struct tmp102_temp_sensor *tmp102 = platform_get_drvdata(pdev);
-
+#ifdef CONFIG_THERMAL_DEBUG
+	printk(KERN_DEBUG "%s\n", __func__);
+#endif
 	tmp102->therm_fw->current_temp =
 			tmp102_read_current_temp(tdev->dev);
 
@@ -223,7 +225,9 @@ static int __devinit tmp102_temp_sensor_probe(
 {
 	struct tmp102_temp_sensor *tmp102;
 	int ret = 0;
-
+#ifdef CONFIG_THERMAL_DEBUG
+	printk(KERN_DEBUG "%s\n", __func__);
+#endif
 	if (!i2c_check_functionality(client->adapter,
 				     I2C_FUNC_SMBUS_WORD_DATA)) {
 		dev_err(&client->dev, "adapter doesn't support SMBus word "
@@ -385,9 +389,10 @@ static struct i2c_driver tmp102_driver = {
 
 static int __init tmp102_init(void)
 {
+#ifndef CONFIG_MACH_OMAP4_JET
 	if (!cpu_is_omap447x())
 		return 0;
-
+#endif
 	return i2c_add_driver(&tmp102_driver);
 }
 module_init(tmp102_init);

@@ -1,3 +1,4 @@
+ccflags-$(CONFIG_CPU_FREQ_DEBUG) := -DDEBUG
 # CPUfreq core
 obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o
 # CPUfreq stats

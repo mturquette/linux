@@ -34,6 +34,8 @@ void twl6030_poweroff(void)
 	u8 val = 0;
 	int err = 0;
 
+	printk(KERN_INFO "[%s:%u] Powering off...\n",__FUNCTION__,__LINE__);
+
 	err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
 				  TWL6030_PHOENIX_DEV_ON);
 	if (err) {
@@ -41,7 +43,13 @@ void twl6030_poweroff(void)
 		return;
 	}
 
+#ifdef CONFIG_TWL6032_PMIC
+	val |= APP_DEVOFF;
+#else // 6030
 	val |= APP_DEVOFF | CON_DEVOFF | MOD_DEVOFF;
+#endif
+
+	printk(KERN_INFO "[%s:%u] Shutting down\n",__FUNCTION__,__LINE__);
 
 	err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, val,
 				   TWL6030_PHOENIX_DEV_ON);

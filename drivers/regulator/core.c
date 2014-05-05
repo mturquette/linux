@@ -992,7 +992,7 @@ static int set_consumer_device_supply(struct regulator_dev *rdev,
 		if (strcmp(node->supply, supply) != 0)
 			continue;
 
-		dev_dbg(consumer_dev, "%s/%s is '%s' supply; fail %s/%s\n",
+		dev_err(consumer_dev, "%s/%s is '%s' supply; fail %s/%s\n",
 			dev_name(&node->regulator->dev),
 			node->regulator->desc->name,
 			supply,
@@ -2655,8 +2655,7 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
 			init_data->consumer_supplies[i].dev_name,
 			init_data->consumer_supplies[i].supply);
 		if (ret < 0) {
-			dev_err(dev, "Failed to set supply %s\n",
-				init_data->consumer_supplies[i].supply);
+			dev_err(dev, "Error=%d Failed to set supply %s %s\n",ret,init_data->consumer_supplies[i].supply,init_data->consumer_supplies[i].dev_name);
 			goto unset_supplies;
 		}
 	}

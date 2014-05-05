@@ -43,8 +43,9 @@ obj-$(CONFIG_LEDS_MC13783)		+= leds-mc13783.o
 obj-$(CONFIG_LEDS_NS2)			+= leds-ns2.o
 obj-$(CONFIG_LEDS_NETXBIG)		+= leds-netxbig.o
 obj-$(CONFIG_LEDS_OMAP4430_SDP_DISPLAY)	+= leds-omap4430sdp-display.o
+obj-$(CONFIG_LEDS_OMAP4430_JET_DISPLAY)	+= leds-omap4430jet-display.o
 obj-$(CONFIG_LEDS_OMAP4430_SDP_KEYPAD)	+= leds-omap4430sdp-keypad.o
-
+obj-$(CONFIG_LEDS_OMAP4430_JET_PWBUTTON)	+=leds-omap4430jet-pwbutton.o
 # LED SPI Drivers
 obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
 

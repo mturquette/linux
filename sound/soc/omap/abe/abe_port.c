@@ -1128,6 +1128,7 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 		case OMAP_ABE_TONES_DL_PORT:
 			if (abe_port[id].format.f == 44100) {
 				smem1 = TONES_44P1_WPTR_labelID;
+				abe->MultiFrame[20][0] = ABE_TASK_ID(C_ABE_FW_TASK_IO_TONES_DL);
 				abe->MultiFrame[20][1] = ABE_TASK_ID(C_ABE_FW_TASK_SRC44P1_TONES_1211);
 			} else {
 				abe->MultiFrame[20][1] = 0;
@@ -1708,6 +1709,11 @@ u32 omap_abe_dma_port_iter_factor(struct omap_abe_data_format *f)
 u32 abe_dma_port_copy_subroutine_id(u32 port_id)
 {
 	u32 sub_id;
+#ifdef CONFIG_SND_DEBUG
+
+	printk(KERN_DEBUG "%s direction=%d, format=%d\n", __func__, \
+	abe_port[port_id].protocol.direction, abe_port[port_id].format.samp_format);
+#endif
 	if (abe_port[port_id].protocol.direction == ABE_ATC_DIRECTION_IN) {
 		switch (abe_port[port_id].format.samp_format) {
 		case MONO_MSB:

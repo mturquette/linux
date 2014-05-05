@@ -46,12 +46,18 @@ static int pcb_sections_size;
 
 void omap4_duty_pcb_section_reg(struct pcb_section *pcb_sect, int sect_size)
 {
+#ifdef CONFIG_THERMAL_DEBUG
+	printk(KERN_DEBUG "%s\n", __func__);
+#endif
 	pcb_sections = pcb_sect;
 	pcb_sections_size = sect_size;
 }
 
 static void omap4_duty_schedule(struct duty_governor *t_gov)
 {
+#ifdef CONFIG_THERMAL_DEBUG
+	printk(KERN_DEBUG "%s\n", __func__);
+#endif
 	if (!IS_ERR_OR_NULL(t_gov) &&
 	    !IS_ERR_OR_NULL(t_gov->tpcb) &&
 	    !IS_ERR_OR_NULL(t_gov->tduty))
@@ -117,14 +123,19 @@ static int omap4_duty_apply_constraint(struct duty_governor *tgov,
 static void omap4_duty_update(struct duty_governor *tgov)
 {
 	int sect_num;
-
+	if(IS_ERR_OR_NULL(t_governor->tpcb_sections)){
+		t_governor->tpcb_sections = pcb_sections;
+		t_governor->npcb_sections = pcb_sections_size;
+	}
 	for (sect_num = 0; sect_num < tgov->npcb_sections; sect_num++)
 		if (tgov->tpcb_sections[sect_num].pcb_temp_level >
 				tgov->curr_pcb_temp)
 			break;
 	if (sect_num >= tgov->npcb_sections)
 		sect_num = tgov->npcb_sections - 1;
-
+#ifdef CONFIG_THERMAL_DEBUG
+	printk(KERN_DEBUG "%s:pcb_temp_level=%d\n", __func__, tgov->tpcb_sections[sect_num].pcb_temp_level);
+#endif
 	if (omap4_duty_apply_constraint(tgov, sect_num))
 		tgov->previous_pcb_temp = tgov->curr_pcb_temp;
 }
@@ -135,6 +146,7 @@ static void omap4_duty_governor_delayed_work_fn(struct work_struct *work)
 		if (!IS_ERR_OR_NULL(t_governor->tpcb->update_temp)) {
 			t_governor->curr_pcb_temp =
 					t_governor->tpcb->update_temp();
+
 			if (is_treshold(t_governor))
 				omap4_duty_update(t_governor);
 		} else {
@@ -147,6 +159,9 @@ static void omap4_duty_governor_delayed_work_fn(struct work_struct *work)
 
 int omap4_duty_cycle_register(struct duty_cycle *tduty)
 {
+#ifdef CONFIG_THERMAL_DEBUG
+	printk(KERN_DEBUG "%s\n", __func__);
+#endif
 	if (!IS_ERR_OR_NULL(t_governor)) {
 		if (t_governor->tduty == NULL) {
 			t_governor->tduty = tduty;
@@ -164,9 +179,13 @@ int omap4_duty_cycle_register(struct duty_cycle *tduty)
 
 static int __init omap4_duty_governor_init(void)
 {
+#ifndef CONFIG_MACH_OMAP4_JET
 	if (!cpu_is_omap443x())
 		return 0;
-
+#endif
+#ifdef CONFIG_THERMAL_DEBUG
+	printk(KERN_DEBUG "%s\n", __func__);
+#endif
 	t_governor = kzalloc(sizeof(struct duty_governor), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(t_governor)) {
 		pr_err("%s:Cannot allocate memory\n", __func__);

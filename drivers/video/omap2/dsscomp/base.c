@@ -461,11 +461,13 @@ struct omap_overlay_manager *find_dss_mgr(int display_ix)
 int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb,
 								bool m2m_mode)
 {
+	int ret_val =0;
 	struct omap_overlay_manager_info info;
 	struct omap_overlay_manager *mgr;
 
 	if (!mi)
 		return -EINVAL;
+
 	mgr = find_dss_mgr(mi->ix);
 	if (!mgr)
 		return -EINVAL;
@@ -484,7 +486,9 @@ int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb,
 	info.cb = *cb;
 	info.wb_only = m2m_mode;
 
-	return mgr->set_manager_info(mgr, &info);
+	ret_val = mgr->set_manager_info(mgr, &info);
+
+	return ret_val;
 }
 
 void swap_rb_in_mgr_info(struct dss2_mgr_info *mi)

@@ -6295,8 +6295,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_mcbsp4_hwmod,
 
 	/* mcpdm class */
+//#ifndef CONFIG_MACH_OMAP4_JET
 	&omap44xx_mcpdm_hwmod,
-
+//#endif
 	/* mcspi class */
 	&omap44xx_mcspi1_hwmod,
 	&omap44xx_mcspi2_hwmod,

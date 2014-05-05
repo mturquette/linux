@@ -31,6 +31,16 @@ static u16 control_mmc1;
 
 #define HSMMC_NAME_LEN	9
 
+#if 0
+
+static int hsmmc_get_context_loss(struct device *dev)
+{
+	return omap_pm_get_dev_context_loss_count(dev);
+}
+
+#else
+#define hsmmc_get_context_loss NULL
+#endif
 
 static void omap_hsmmc1_before_set_reg(struct device *dev, int slot,
 				  int power_on, int vdd)
@@ -270,11 +280,94 @@ static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
 		 */
 	}
 }
+static int omap_hsmmc_set_clks_src(struct device *dev, unsigned int id)
+{
+	struct clk *fclk_child;
+	struct clk *fclk_parent;
+	int r;
+	char *child_name;
+	char *parent_name;
+
+	/* Cannot change clock sources for MMC id > 1 */
+	if (id > 1)
+		return 0;
+
+	if (cpu_is_omap44xx()) {
+		parent_name = "func_96m_fclk";
+		if (id == 0)
+			child_name = "mmc1_fck";
+		else
+			child_name = "mmc2_fck";
+	} else
+		return 0;
+
+	fclk_parent = clk_get(dev, parent_name);
+	if (IS_ERR_OR_NULL(fclk_parent))
+		return -EINVAL;
+	fclk_child = clk_get(dev, child_name);
+	if (IS_ERR_OR_NULL(fclk_child)) {
+		clk_put(fclk_child);
+		return -EINVAL;
+	}
+
+	r = clk_set_parent(fclk_child, fclk_parent);
+	if (IS_ERR_VALUE(r)) {
+		clk_put(fclk_child);
+		clk_put(fclk_parent);
+		return -EINVAL;
+	}
+	clk_put(fclk_child);
+	clk_put(fclk_parent);
+	return 0;
+}
+
+static int __init
+omap_hsmmc_max_min(u8 slot, unsigned long *max, unsigned long *min)
+{
+	if (cpu_is_omap44xx()) {
+		switch (slot) {
+		case 0:
+		case 1:
+			*max = 96000000;
+			break;
+		case 2:
+		case 3:
+		case 4:
+			*max = 48000000;
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else if (cpu_is_omap34xx()) {
+		switch (slot) {
+		case 0:
+		case 1:
+		case 2:
+			*max = 96000000;
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else if (cpu_is_omap24xx()) {
+		switch (slot) {
+		case 0:
+		case 1:
+			*max = 96000000;
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else
+		return -EINVAL;
+	*min = 40000;
+	return 0;
+}
 
 static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 					struct omap_mmc_platform_data *mmc)
 {
 	char *hc_name;
+	unsigned long max_freq, min_freq;
 
 	hc_name = kzalloc(sizeof(char) * (HSMMC_NAME_LEN + 1), GFP_KERNEL);
 	if (!hc_name) {
@@ -291,12 +384,30 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	mmc->slots[0].name = hc_name;
 	mmc->nr_slots = 1;
 	mmc->slots[0].caps = c->caps;
+	mmc->slots[0].pm_caps = c->pm_caps;
 	mmc->slots[0].internal_clock = !c->ext_clock;
 	mmc->dma_mask = 0xffffffff;
+
+	mmc->set_clk_src = omap_hsmmc_set_clks_src;
+	if (omap_hsmmc_max_min(c->mmc - 1, &max_freq, &min_freq)) {
+		pr_err("Invalid mmc slot");
+		kfree(hc_name);
+		return -EINVAL;
+	}
+
+	if (c->max_freq >  0)
+		mmc->max_freq = min(c->max_freq, max_freq);
+	else
+		mmc->max_freq = max_freq;
+	mmc->max_si_freq = max_freq;
+	mmc->min_freq = min_freq;
+
 	if (cpu_is_omap44xx())
 		mmc->reg_offset = OMAP4_MMC_REG_OFFSET;
 	else
 		mmc->reg_offset = 0;
+
+	//mmc->get_context_loss_count = hsmmc_get_context_loss;
 
 	mmc->slots[0].switch_pin = c->gpio_cd;
 	mmc->slots[0].gpio_wp = c->gpio_wp;
@@ -322,6 +433,23 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 	if (c->vcc_aux_disable_is_sleep)
 		mmc->slots[0].vcc_aux_disable_is_sleep = 1;
 
+	/*
+	 * NOTE:  MMC slots should have a Vcc regulator set up.
+	 * This may be from a TWL4030-family chip, another
+	 * controllable regulator, or a fixed supply.
+	 *
+	 * temporary HACK: ocr_mask instead of fixed supply
+	 */
+	//if (cpu_is_omap3505() || cpu_is_omap3517())
+		//mmc->slots[0].ocr_mask = MMC_VDD_165_195 |
+					 //MMC_VDD_26_27 |
+					 //MMC_VDD_27_28 |
+					 //MMC_VDD_29_30 |
+					 //MMC_VDD_30_31 |
+					 //MMC_VDD_31_32;
+	//else
+	mmc->slots[0].built_in = c->built_in;
+
 	if (cpu_is_omap44xx()) {
 		if (omap_rev() > OMAP4430_REV_ES1_0)
 			mmc->slots[0].features |= HSMMC_HAS_UPDATED_RESET;
@@ -329,12 +457,12 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
 			mmc->slots[0].features |= HSMMC_HAS_48MHZ_MASTER_CLK;
 	}
 
-	if (c->mmc_data) {
-		memcpy(&mmc->slots[0].mmc_data, c->mmc_data,
-				sizeof(struct mmc_platform_data));
-		mmc->slots[0].card_detect =
-				(mmc_card_detect_func)c->mmc_data->status;
-	}
+	//if (c->mmc_data) {
+		//memcpy(&mmc->slots[0].mmc_data, c->mmc_data,
+				//sizeof(struct mmc_platform_data));
+		//mmc->slots[0].card_detect =
+				//(mmc_card_detect_func)c->mmc_data->status;
+	//}
 
 	/*
 	 * NOTE:  MMC slots should have a Vcc regulator set up.
@@ -475,7 +603,7 @@ void __init omap_init_hsmmc(struct omap2_hsmmc_info *hsmmcinfo, int ctrl_nr)
 	 * return device handle to board setup code
 	 * required to populate for regulator framework structure
 	 */
-	hsmmcinfo->dev = &od->pdev.dev;
+	hsmmcinfo->pdev = &od->pdev;
 
 done:
 	kfree(mmc_data);
@@ -502,7 +630,7 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 			OMAP4_SDMMC1_PUSTRENGTH_GRP1_MASK);
 		reg &= ~(OMAP4_SDMMC1_PUSTRENGTH_GRP2_MASK |
 			OMAP4_SDMMC1_PUSTRENGTH_GRP3_MASK);
-		reg |= (OMAP4_USBC1_DR0_SPEEDCTRL_MASK|
+		reg |= (OMAP4_SDMMC1_DR0_SPEEDCTRL_MASK |
 			OMAP4_SDMMC1_DR1_SPEEDCTRL_MASK |
 			OMAP4_SDMMC1_DR2_SPEEDCTRL_MASK);
 		omap4_ctrl_pad_writel(reg, control_mmc1);

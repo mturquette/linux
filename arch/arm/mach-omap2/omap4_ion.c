@@ -108,6 +108,8 @@ void __init omap_ion_init(void)
 
 	system_512m = (omap_total_ram_size() == SZ_512M);
 
+	printk(KERN_INFO "[%s:%u] omap_total_ram_size()=0x%x\n",__FUNCTION__,__LINE__,omap_total_ram_size());
+
 	/* carveout sizes */
 	omap4_smc_size = (SZ_1M * 3);
 
@@ -120,7 +122,7 @@ void __init omap_ion_init(void)
 	} else {
 		omap4_ion_heap_secure_input_size = (SZ_1M * 90);
 		omap4_ion_heap_secure_output_wfdhdcp_size = (SZ_1M * 16);
-		omap4_ducati_heap_size = (SZ_1M * 109);
+		omap4_ducati_heap_size = (SZ_1M * 107);
 		omap4_ion_heap_nonsec_tiler_mem_size = nonsecure;
 		omap4_ion_heap_tiler_mem_size =
 					 (ALIGN(omap4_ion_pdata.tiler2d_size +
@@ -142,7 +144,7 @@ void __init omap_ion_init(void)
 	omap4_ion_heap_nonsec_tiler_mem_addr = omap4_ion_heap_tiler_mem_addr -
 				omap4_ion_heap_nonsec_tiler_mem_size;
 
-	pr_info("omap4_total_ram_size = 0x%x\n" \
+	printk(KERN_INFO "omap4_total_ram_size = 0x%x\n" \
 				"omap4_smc_size = 0x%x\n"  \
 				"omap4_ion_heap_secure_input_size = 0x%x\n"  \
 				"omap4_ion_heap_secure_output_wfdhdcp_size = 0x%x\n"  \
@@ -157,7 +159,7 @@ void __init omap_ion_init(void)
 				omap4_ion_heap_tiler_mem_size,
 				omap4_ion_heap_nonsec_tiler_mem_size);
 
-	pr_info(" omap4_smc_addr = 0x%x\n"  \
+	printk(KERN_INFO "omap4_smc_addr = 0x%x\n"  \
 				"omap4_ion_heap_secure_input_addr = 0x%x\n"  \
 				"omap4_ion_heap_secure_output_wfdhdcp_addr = 0x%x\n"  \
 				"omap4_ducati_heap_addr = 0x%x\n"  \

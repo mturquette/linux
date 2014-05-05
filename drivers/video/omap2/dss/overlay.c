@@ -867,7 +867,8 @@ void dss_init_overlays(struct platform_device *pdev)
 
 		ovl->set_manager = &omap_dss_set_manager;
 		ovl->unset_manager = &omap_dss_unset_manager;
-		ovl->set_overlay_info = &dss_ovl_set_overlay_info;
+		//ovl->set_overlay_info = &dss_ovl_set_overlay_info;
+		ovl->set_overlay_info = &omap_dss_ovl_set_info;
 		ovl->get_overlay_info = &dss_ovl_get_overlay_info;
 
 		omap_dss_add_overlay(ovl);

@@ -623,9 +623,13 @@ static int mmc_sd_init_uhs_card(struct mmc_card *card)
 	if (err)
 		goto out;
 
-	/* SPI mode doesn't define CMD19 */
-	if (!mmc_host_is_spi(card->host) && card->host->ops->execute_tuning)
-		err = card->host->ops->execute_tuning(card->host);
+    /* SPI mode doesn't define CMD19 */
+    if (!mmc_host_is_spi(card->host) && card->host->ops->execute_tuning) {
+        mmc_host_clk_hold(card->host);
+        err = card->host->ops->execute_tuning(card->host,
+                              MMC_SEND_TUNING_BLOCK);
+        mmc_host_clk_release(card->host);
+    }
 
 out:
 	kfree(status);
@@ -1065,7 +1069,7 @@ static int mmc_sd_suspend(struct mmc_host *host)
 	if (!mmc_host_is_spi(host))
 		mmc_deselect_cards(host);
 	host->card->state &= ~MMC_STATE_HIGHSPEED;
-	mmc_release_host_sync(host);
+	mmc_release_host(host);
 
 	return 0;
 }
@@ -1104,7 +1108,7 @@ static int mmc_sd_resume(struct mmc_host *host)
 #else
 	err = mmc_sd_init_card(host, host->ocr, host->card);
 #endif
-	mmc_release_host_sync(host);
+	mmc_release_host(host);
 
 	return err;
 }

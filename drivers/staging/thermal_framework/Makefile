@@ -1,6 +1,7 @@
 #
 # Makefile for sensor chip drivers.
 #
+ccflags-$(CONFIG_THERMAL_DEBUG) := -DDEBUG
 obj-$(CONFIG_THERMAL_FRAMEWORK) += thermal_framework.o \
 				    governor/ \
 				    sensor/

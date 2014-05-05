@@ -1041,8 +1041,7 @@ static struct omap_board_mux board_mux[] __initdata = {
  * Same devices installed on EMIF1 and EMIF2
  */
 static __initdata struct emif_device_details emif_devices = {
-	.cs0_device = &lpddr2_elpida_2G_S4_dev,
-	.cs1_device = &lpddr2_elpida_2G_S4_dev
+	.cs0_device = &lpddr2_elpida_4G_S4_dev,
 };
 
 /*
@@ -1096,7 +1095,7 @@ static void omap4_sdp4430_wifi_init(void)
 #if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
 struct usbhs_omap_board_data usbhs_bdata __initdata = {
 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
-	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,//OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.phy_reset  = false,
 	.reset_gpio_port[0]  = -EINVAL,

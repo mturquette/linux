@@ -16,6 +16,7 @@ struct omap2_hsmmc_info {
 	u8	mmc;		/* controller 1/2/3 */
 	u32	caps;		/* 4/8 wires and any additional host
 				 * capabilities OR'd (ref. linux/mmc/host.h) */
+	u32	pm_caps;	/* PM capabilities */
 	bool	transceiver;	/* MMC-2 option */
 	bool	ext_clock;	/* use external pin for input clock */
 	bool	cover_only;	/* No card detect - just cover switch */
@@ -24,12 +25,21 @@ struct omap2_hsmmc_info {
 	bool	no_off;		/* power_saving and power is not to go off */
 	bool	no_off_init;	/* no power off when not in MMC sleep state */
 	bool	vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
+	bool	deferred;	/* mmc needs a deferred probe */
 	int	gpio_cd;	/* or -EINVAL */
 	int	gpio_wp;	/* or -EINVAL */
 	char	*name;		/* or NULL for default */
-	struct device *dev;	/* returned: pointer to mmc adapter */
+	struct platform_device *pdev;	/* mmc controller instance */
 	int	ocr_mask;	/* temporary HACK */
-	struct mmc_platform_data *mmc_data;
+	/* built_in: Use this flag to keep power to MMC/SDIO card
+	 * during suspend in case the driver for the card
+	 * (Eg: SDIO/Wifi driver) has not yet been loaded
+	 */
+	int	built_in;
+	/* Maximum clock, if constrained by external circuitly,
+	 * or 0 for default
+	 */
+	unsigned long	max_freq;
 	/* Remux (pad configuration) when powering on/off */
 	void (*remux)(struct device *dev, int slot, int power_on);
 	/* init some special card */

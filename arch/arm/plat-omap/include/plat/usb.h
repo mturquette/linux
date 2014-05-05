@@ -5,7 +5,7 @@
 
 #include <linux/usb/musb.h>
 #include <plat/board.h>
-
+#include <linux/usb/otg.h>
 #define OMAP3_HS_USB_PORTS	3
 
 enum usbhs_omap_port_mode {
@@ -31,6 +31,12 @@ struct usbhs_omap_board_data {
 	/* have to be valid if phy_reset is true and portx is in phy mode */
 	int	reset_gpio_port[OMAP3_HS_USB_PORTS];
 
+	/*
+	 * have to be valid if HSIC disconnect feature needed
+	 * and portx is in HSIC mode
+	 */
+	int	hsic_aux_port[OMAP3_HS_USB_PORTS];
+
 	/* Set this to true for ES2.x silicon */
 	unsigned			es2_compatibility:1;
 
@@ -51,6 +57,7 @@ struct usbhs_omap_board_data {
 struct ehci_hcd_omap_platform_data {
 	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
 	int				reset_gpio_port[OMAP3_HS_USB_PORTS];
+	int				hsic_aux_port[OMAP3_HS_USB_PORTS];
 	struct regulator		*regulator[OMAP3_HS_USB_PORTS];
 	unsigned			phy_reset:1;
 	/*
@@ -113,10 +120,10 @@ extern void usb_musb_init(struct omap_musb_board_data *board_data);
 extern void usbhs_init(const struct usbhs_omap_board_data *pdata);
 
 extern int omap4430_phy_power(struct device *dev, int ID, int on);
-extern int omap4430_phy_set_clk(struct device *dev, int on);
 extern int omap4430_phy_init(struct device *dev);
 extern int omap4430_phy_exit(struct device *dev);
 extern int omap4_charger_detect(void);
+extern u32 omap4_force_charge(void);
 extern int omap4430_phy_suspend(struct device *dev, int suspend);
 extern int omap4430_usbhs_update_sar(void);
 #endif
@@ -306,7 +313,9 @@ static inline u32 omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
 
 extern void usbhs_wakeup(void);
 extern void omap4_trigger_ioctrl(void);
-
+#ifdef CONFIG_MACH_OMAP4_JET
+extern int twl6030_enable_irq(struct otg_transceiver *x);
+#endif
 #define USBHS_EHCI_HWMODNAME	"usbhs_ehci"
 #define USBHS_OHCI_HWMODNAME    "usbhs_ohci"
 

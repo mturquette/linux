@@ -226,6 +226,7 @@ extern int prom_update_property(struct device_node *np,
 extern void of_attach_node(struct device_node *);
 extern void of_detach_node(struct device_node *);
 #endif
+#define of_match_ptr(_ptr)  (_ptr)
 
 #else
 
@@ -234,5 +235,7 @@ static inline bool of_have_populated_dt(void)
 	return false;
 }
 
+#define of_match_ptr(_ptr)  NULL
+#define of_match_node(_matches, _node)  NULL
 #endif /* CONFIG_OF */
 #endif /* _LINUX_OF_H */

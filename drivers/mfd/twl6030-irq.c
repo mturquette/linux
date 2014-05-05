@@ -268,14 +268,14 @@ static irqreturn_t handle_twl6030_vlow(int irq, void *unused)
 	pr_err("twl6030: BAT_VLOW interrupt; threshold=%dmV\n",
 	       2300 + (vbatmin_hi_threshold - 0b110) * 50);
 
-#if 1 /* temporary */
+//#ifdef CONFIG_TWL6030_BCI_BATTERY /* Need to investigate  */
+//	printk(KERN_EMERG "[%s:%u] handle_twl6030_vlow: kernel_power_off()\n",__FUNCTION__,__LINE__);
+//	kernel_power_off();
+//#else
 	pr_err("%s: disabling BAT_VLOW interrupt\n", __func__);
 	disable_irq_nosync(twl6030_irq_base + TWL_VLOW_INTR_OFFSET);
 	WARN_ON(1);
-#else
-	pr_emerg("handle_twl6030_vlow: kernel_power_off()\n");
-	kernel_power_off();
-#endif
+//#endif
 	return IRQ_HANDLED;
 }
 
@@ -470,11 +470,12 @@ int twl6030_vlow_init(int vlow_irq)
 
 	twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &vbatmin_hi_threshold,
 			TWL6030_VBATMIN_HI_THRESHOLD);
-
+#ifndef CONFIG_MACH_OMAP4_JET//Jet didn't use this interrupt
 	/* install an irq handler for vlow */
 	status = request_threaded_irq(vlow_irq, NULL, handle_twl6030_vlow,
 			IRQF_ONESHOT,
 			"TWL6030-VLOW", handle_twl6030_vlow);
+#endif
 	if (status < 0) {
 		pr_err("twl6030: could not claim vlow irq %d: %d\n", vlow_irq,
 				status);

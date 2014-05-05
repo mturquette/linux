@@ -694,7 +694,7 @@ static void __init gpmc_mem_init(void)
 			BUG();
 	}
 }
-
+#ifndef CONFIG_MACH_OMAP4_JET
 static int __init gpmc_init(void)
 {
 	u32 l, irq;
@@ -763,7 +763,7 @@ static int __init gpmc_init(void)
 	return ret;
 }
 postcore_initcall(gpmc_init);
-
+#endif
 static irqreturn_t gpmc_handle_irq(int irq, void *dev)
 {
 	u8 cs;

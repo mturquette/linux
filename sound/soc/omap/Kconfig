@@ -111,6 +111,20 @@ config SND_OMAP_SOC_SDP3430
 	  Say Y if you want to add support for SoC audio on Texas Instruments
 	  SDP3430.
 
+config SND_OMAP_SOC_JET
+	tristate "SoC Audio support for OMAP4430 JET"
+	depends on MACH_OMAP4_JET
+	select SND_OMAP_SOC
+	select SND_OMAP_SOC_MCPDM
+	select SND_OMAP_SOC_ABE
+	select SND_OMAP_SOC_MCBSP
+	select SND_SOC_DMIC
+	select SND_OMAP_SOC_DMIC
+	select SND_OMAP_SOC_ABE_DSP
+	select SND_OMAP_SOC_VXREC
+	help
+	  Say Y if you want to add support for SoC audio on Jet
+
 config SND_OMAP_SOC_SDP4430
 	tristate "SoC Audio support for Texas Instruments SDP4430 or PandaBoard"
 	depends on TWL4030_CORE && \

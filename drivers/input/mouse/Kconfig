@@ -322,4 +322,11 @@ config MOUSE_SYNAPTICS_I2C
 	  To compile this driver as a module, choose M here: the
 	  module will be called synaptics_i2c.
 
+config MOUSE_OFM_PARTRON
+	bool "PARTRON I2C OFM SUPPORT"
+	depends on I2C
+	help
+	  Say Y here if you have an PARTRON OFM mouse connected 
+	  to your system
+
 endif

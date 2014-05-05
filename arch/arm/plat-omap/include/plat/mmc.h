@@ -32,7 +32,24 @@
 
 #define OMAP_MMC_MAX_SLOTS	2
 
-#define OMAP_HSMMC_SUPPORTS_DUAL_VOLT	BIT(1)
+/*
+ * struct omap_mmc_dev_attr.flags possibilities
+ *
+ * OMAP_HSMMC_SUPPORTS_DUAL_VOLT: Some HSMMC controller instances can
+ *    operate with either 1.8Vdc or 3.0Vdc card voltages; this flag
+ *    should be set if this is the case.  See for example Section 22.5.3
+ *    "MMC/SD/SDIO1 Bus Voltage Selection" of the OMAP34xx Multimedia
+ *    Device Silicon Revision 3.1.x Revision ZR (July 2011) (SWPU223R).
+ *
+ * OMAP_HSMMC_BROKEN_MULTIBLOCK_READ: Multiple-block read transfers
+ *    don't work correctly on some MMC controller instances on some
+ *    OMAP3 SoCs; this flag should be set if this is the case.  See
+ *    for example Advisory 2.1.1.128 "MMC: Multiple Block Read
+ *    Operation Issue" in _OMAP3530/3525/3515/3503 Silicon Errata_
+ *    Revision F (October 2010) (SPRZ278F).
+ */
+#define OMAP_HSMMC_SUPPORTS_DUAL_VOLT       BIT(0)
+#define OMAP_HSMMC_BROKEN_MULTIBLOCK_READ   BIT(1)
 
 struct omap_mmc_dev_attr {
 	u8 flags;
@@ -48,6 +65,24 @@ struct omap_mmc_platform_data {
 	/* set if your board has components or wiring that limits the
 	 * maximum frequency on the MMC bus */
 	unsigned int max_freq;
+    /* Silicon can have a limitation on how fast the MMC controller can
+     * run.
+     */
+    unsigned long max_si_freq;
+    unsigned long min_freq;
+
+    /* To handle core OPP scaling */
+    struct clk *fclk;
+
+    /*Function pointer to set clk source */
+    int (*set_clk_src)(struct device *dev, unsigned int slot);
+
+    /* To handle Core OPP scaling */
+    int (*opp_scale_init)(struct omap_mmc_platform_data *pdata);
+    int (*opp_scale)(struct omap_mmc_platform_data *pdata,
+                    unsigned int clock);
+    int (*opp_relax)(struct omap_mmc_platform_data *pdata);
+
 
 	/* switch the bus to a new slot */
 	int (*switch_slot)(struct device *dev, int slot);
@@ -60,6 +95,9 @@ struct omap_mmc_platform_data {
 	/* To handle board related suspend/resume functionality for MMC */
 	int (*suspend)(struct device *dev, int slot);
 	int (*resume)(struct device *dev, int slot);
+
+    /* Return context loss count due to PM states changing */
+    int (*get_context_loss_count)(struct device *dev);
 
 	u64 dma_mask;
 
@@ -77,6 +115,8 @@ struct omap_mmc_platform_data {
 		 */
 		u8  wires;	/* Used for the MMC driver on omap1 and 2420 */
 		u32 caps;	/* Used for the MMC driver on 2430 and later */
+        u32 caps2;
+        u32 pm_caps;    /* PM capabilities of the mmc */
 
 		/*
 		 * nomux means "standard" muxing is wrong on this board, and
@@ -127,6 +167,11 @@ struct omap_mmc_platform_data {
 		/* Call back after enabling / disabling regulators */
 		void (*after_set_reg)(struct device *dev, int slot,
 				      int power_on, int vdd);
+        /* Data and callback to enable clk pull up/down */
+        struct omap_mux_partition *p_mmc_clk;
+        struct omap_mux *mux_mmc_clk; 
+        void (*clk_pull_up)(struct device *dev, int slot, bool pull_up);
+
 		/* if we have special card, init it using this callback */
 		void (*init_card)(struct mmc_card *card);
 
@@ -140,6 +185,11 @@ struct omap_mmc_platform_data {
 
 		const char *name;
 		u32 ocr_mask;
+        /* built_in: Use this flag to keep power to MMC/SDIO card
+         * during suspend in case the driver for the card
+         * (Eg: SDIO/Wifi driver) has not yet been loaded
+         */
+        int built_in;
 
 		/* Card detection IRQs */
 		int card_detect_irq;

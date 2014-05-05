@@ -44,8 +44,8 @@
 #include "omap-pcm.h"
 #include "omap-dmic.h"
 
-#define OMAP_DMIC_RATES		(SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000)
-#define OMAP_DMIC_FORMATS	SNDRV_PCM_FMTBIT_S32_LE
+#define OMAP_DMIC_RATES		(SNDRV_PCM_RATE_96000| SNDRV_PCM_RATE_192000)//SNDRV_PCM_RATE_44100
+#define OMAP_DMIC_FORMATS	SNDRV_PCM_FMTBIT_S32_LE//SNDRV_PCM_FMTBIT_S16_LE
 
 #define OMAP4_LEGACY_DMIC0		0
 #define OMAP4_ABE_DMIC0		1
@@ -131,7 +131,9 @@ static int omap_dmic_set_clkdiv(struct snd_soc_dai *dai,
 
 	if (div_id != OMAP_DMIC_CLKDIV)
 		return -ENODEV;
-
+#ifdef CONFIG_SND_DEBUG
+	printk(KERN_DEBUG "%s clk_freq=%d, div=%d\n", __func__, dmic->clk_freq, div);
+#endif
 	switch (dmic->clk_freq) {
 	case 19200000:
 		switch (div) {
@@ -211,9 +213,12 @@ static void omap_dmic_open(struct omap_dmic *dmic)
 	/* Set dmic out format */
 	ctrl = omap_dmic_read(dmic, OMAP_DMIC_CTRL)
 		& ~(OMAP_DMIC_FORMAT | OMAP_DMIC_POLAR_MASK);
+#ifdef CONFIG_SND_DEBUG
+	printk(KERN_DEBUG "%s OMAP_DMIC_CTRL=0x%x\n", __func__, ctrl);
+#endif
 	omap_dmic_write(dmic, OMAP_DMIC_CTRL,
-			ctrl | OMAP_DMICOUTFORMAT_LJUST |
-			OMAP_DMIC_POLAR1 | OMAP_DMIC_POLAR2 | OMAP_DMIC_POLAR3);
+			ctrl | OMAP_DMICOUTFORMAT_LJUST);
+			//OMAP_DMIC_POLAR1 | OMAP_DMIC_POLAR2 | OMAP_DMIC_POLAR3);
 }
 
 /*
@@ -280,7 +285,9 @@ static int omap_dmic_dai_hw_params(struct snd_pcm_substream *substream,
 	struct omap_dmic *dmic = snd_soc_dai_get_drvdata(dai);
 	int channels, rate, div;
 	int ret = 0;
-
+#ifdef CONFIG_SND_DEBUG
+	printk(KERN_DEBUG "%s id=%d\n", __func__, dai->id);
+#endif
 	channels = params_channels(params);
 	if (dai->id == OMAP4_LEGACY_DMIC0) {
 		switch (channels) {
@@ -323,6 +330,9 @@ static int omap_dmic_dai_hw_params(struct snd_pcm_substream *substream,
 static void dmic_config_up_channels(struct omap_dmic *dmic, int dai_id,
 		int enable)
 {
+#ifdef CONFIG_SND_DEBUG
+	printk(KERN_DEBUG "%s dai_id=%d, enable=%d\n", __func__, dai_id, enable);
+#endif
 	if (enable) {
 		switch (dai_id) {
 		case OMAP4_LEGACY_DMIC0:
@@ -515,6 +525,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 	},
 	.ops = &omap_dmic_dai_ops,
 },
+
 {
 	.name = "omap-dmic-abe-dai-0",
 	.id	= OMAP4_ABE_DMIC0,
@@ -526,6 +537,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 	},
 	.ops = &omap_dmic_dai_ops,
 },
+//#ifndef CONFIG_MACH_OMAP4_JET
 {
 	.name = "omap-dmic-abe-dai-1",
 	.id	= OMAP4_ABE_DMIC1,
@@ -537,6 +549,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 	},
 	.ops = &omap_dmic_dai_ops,
 },
+//#ifndef CONFIG_MACH_OMAP4_JET
 {
 	.name = "omap-dmic-abe-dai-2",
 	.id	= OMAP4_ABE_DMIC2,
@@ -548,6 +561,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 	},
 	.ops = &omap_dmic_dai_ops,
 },
+//#endif
 };
 
 static __devinit int asoc_dmic_probe(struct platform_device *pdev)

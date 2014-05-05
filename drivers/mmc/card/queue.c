@@ -39,8 +39,8 @@ static int mmc_prep_request(struct request_queue *q, struct request *req)
 		return BLKPREP_KILL;
 	}
 
-	if (mq && mq->card && !mmc_card_inserted(mq->card))
-		return BLKPREP_KILL;
+    if (mq && mmc_card_removed(mq->card))
+        return BLKPREP_KILL;
 
 	req->cmd_flags |= REQ_DONTPREP;
 

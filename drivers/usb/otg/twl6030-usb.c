@@ -19,7 +19,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
-
+//#define DEBUG
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -147,21 +147,6 @@ static inline u8 twl6030_readb(struct twl6030_usb *twl, u8 module, u8 address)
 }
 
 /*-------------------------------------------------------------------------*/
-static int twl6030_set_phy_clk(struct otg_transceiver *x, int on)
-{
-	struct twl6030_usb *twl;
-	struct device *dev;
-	struct twl4030_usb_data *pdata;
-
-	twl = xceiv_to_twl(x);
-	dev  = twl->dev;
-	pdata = dev->platform_data;
-
-	pdata->phy_set_clock(twl->dev, on);
-
-	return 0;
-}
-
 static int twl6030_phy_init(struct otg_transceiver *x)
 {
 	struct twl6030_usb *twl;
@@ -313,7 +298,7 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 		charger_type = omap4_charger_detect();
 		twl6030_phy_suspend(&twl->otg, 1);
 		if ((charger_type == POWER_SUPPLY_TYPE_USB_CDP)
-				|| (charger_type == POWER_SUPPLY_TYPE_USB)) {
+			|| (charger_type == POWER_SUPPLY_TYPE_USB)) {
 
 			status = USB_EVENT_VBUS;
 			twl->otg.default_a = false;
@@ -321,10 +306,15 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 			twl->otg.state = OTG_STATE_B_IDLE;
 			twl->linkstat = status;
 			twl->otg.last_event = status;
-		} else if (charger_type == POWER_SUPPLY_TYPE_USB_DCP) {
+		} else if (charger_type == POWER_SUPPLY_TYPE_USB_DCP
+					|| (charger_type == POWER_SUPPLY_TYPE_USB_ACA)
+					|| (charger_type == POWER_SUPPLY_TYPE_USB_UNKNOWN)) {
 			regulator_disable(twl->usb3v3);
 			status = USB_EVENT_CHARGER;
-			twl->usb_cinlimit_mA = 1800;
+			if(charger_type == POWER_SUPPLY_TYPE_USB_UNKNOWN)
+				twl->usb_cinlimit_mA = 500;
+			else
+				twl->usb_cinlimit_mA = 750;
 			twl->otg.state = OTG_STATE_B_IDLE;
 			twl->linkstat = status;
 			twl->otg.last_event = status;
@@ -444,8 +434,11 @@ static int twl6030_set_peripheral(struct otg_transceiver *x,
 
 	return 0;
 }
-
+#ifdef CONFIG_MACH_OMAP4_JET
+int twl6030_enable_irq(struct otg_transceiver *x)
+#else
 static int twl6030_enable_irq(struct otg_transceiver *x)
+#endif
 {
 	struct twl6030_usb *twl = xceiv_to_twl(x);
 
@@ -622,7 +615,9 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->is_phy_suspended = true;
 	pdata->phy_init(dev);
 	twl6030_phy_suspend(&twl->otg, 0);
+#ifndef CONFIG_MACH_OMAP4_JET
 	twl6030_enable_irq(&twl->otg);
+#endif
 	dev_info(&pdev->dev, "Initialized TWL6030 USB module\n");
 
 	return 0;

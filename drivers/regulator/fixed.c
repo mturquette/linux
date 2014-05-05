@@ -26,7 +26,9 @@
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-
+#ifdef CONFIG_JET_V2
+	#define GPIO_TCXO_CLK_REQ_IN 48
+#endif
 struct fixed_voltage_data {
 	struct regulator_desc desc;
 	struct regulator_dev *dev;
@@ -48,6 +50,9 @@ static int fixed_voltage_enable(struct regulator_dev *dev)
 {
 	struct fixed_voltage_data *data = rdev_get_drvdata(dev);
 
+#ifdef CONFIG_JET_V2
+	gpio_direction_output(GPIO_TCXO_CLK_REQ_IN, 1);
+#endif
 	if (gpio_is_valid(data->gpio)) {
 		gpio_set_value_cansleep(data->gpio, data->enable_high);
 		data->is_enabled = true;

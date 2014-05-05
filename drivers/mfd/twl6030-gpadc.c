@@ -288,8 +288,13 @@ static const struct twl6032_ideal_code
 	{	/* CHANNEL 18 */
 		.code1 = 1441,
 		.code2 = 3276,
+#ifdef CONFIG_JET_SUN
+		.v1 = 2175,
+		.v2 = 5000,
+#else
 		.v1 = 2200,
 		.v2 = 5000,
+#endif
 	},
 };
 

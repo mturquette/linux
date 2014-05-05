@@ -57,7 +57,7 @@
 #include "tcm.h"
 
 #ifndef MEM_SIZE
-#define MEM_SIZE	(16*1024*1024)
+#define MEM_SIZE	(8*1024*1024)
 #endif
 
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
@@ -474,6 +474,8 @@ int __init arm_add_memory(phys_addr_t start, unsigned long size)
 	bank->start = PAGE_ALIGN(start);
 	bank->size  = size & PAGE_MASK;
 
+	printk(KERN_INFO "[%s:%u] size=0x%x, start=0x%x, nr_banks=%d\n", __FUNCTION__,__LINE__, bank->size, bank->start, meminfo.nr_banks);
+
 	/*
 	 * Check whether this memory region has non-zero size or
 	 * invalid node number.
@@ -496,6 +498,7 @@ static int __init early_mem(char *p)
 	phys_addr_t start;
 	char *endp;
 
+	printk(KERN_INFO "[%s:%u] usermem=%d, %s\n",__FUNCTION__,__LINE__,usermem, p);
 	/*
 	 * If the user specifies memory size, we
 	 * blow away any automatically generated

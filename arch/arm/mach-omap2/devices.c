@@ -425,12 +425,12 @@ static struct platform_device codec_dmic1 = {
 	.name	= "dmic-codec",
 	.id	= 1,
 };
-
+//#ifndef CONFIG_MACH_OMAP4_JET
 static struct platform_device codec_dmic2 = {
 	.name	= "dmic-codec",
 	.id	= 2,
 };
-
+//#endif
 static struct platform_device omap_abe_dai = {
 	.name	= "omap-abe-dai",
 	.id	= -1,
@@ -445,7 +445,9 @@ static inline void omap_init_abe(void)
 {
 	platform_device_register(&codec_dmic0);
 	platform_device_register(&codec_dmic1);
+//#ifndef CONFIG_MACH_OMAP4_JET
 	platform_device_register(&codec_dmic2);
+//#endif
 	platform_device_register(&omap_abe_dai);
 	platform_device_register(&omap_abe_vxrec);
 }
@@ -459,7 +461,7 @@ static struct platform_device omap_pcm = {
 	.name	= "omap-pcm-audio",
 	.id	= -1,
 };
-
+#ifndef CONFIG_MACH_OMAP4_JET
 /*
  * Device for the ASoC OMAP4 HDMI machine driver
  */
@@ -467,7 +469,7 @@ static struct platform_device omap4_hdmi_audio = {
 	.name	= "omap4-hdmi-audio",
 	.id	= -1,
 };
-
+#endif
 /*
  * OMAP2420 has 2 McBSP ports
  * OMAP2430 has 5 McBSP ports
@@ -482,8 +484,10 @@ OMAP_MCBSP_PLATFORM_DEVICE(5);
 
 static void omap_init_audio(void)
 {
+#ifndef CONFIG_MACH_OMAP4_JET
 	struct omap_hwmod *oh_hdmi;
 	struct omap_device *od_hdmi, *od_hdmi_codec;
+
 	char *oh_hdmi_name = "dss_hdmi";
 	char *dev_hdmi_name = "hdmi-audio-dai";
 	char *dev_hdmi_codec_name = "omap-hdmi-codec";
@@ -506,7 +510,7 @@ static void omap_init_audio(void)
 
 		platform_device_register(&omap4_hdmi_audio);
 	}
-
+#endif
 	platform_device_register(&omap_mcbsp1);
 	platform_device_register(&omap_mcbsp2);
 	if (cpu_is_omap243x() || cpu_is_omap34xx() || cpu_is_omap44xx()) {
@@ -913,16 +917,18 @@ int omap_device_scale_gpu(struct device *req_dev, struct device *target_dev,
 			unsigned long rate)
 {
 	unsigned long freq = 0;
+	int ret;
 
 	/* find lowest frequency */
 	opp_find_freq_ceil(target_dev, &freq);
 
 	if (rate > freq)
 		omap4_dpll_cascading_blocker_hold(target_dev);
-	else
+	ret = omap_device_scale(req_dev, target_dev, rate);
+	if (!ret && rate <= freq)
 		omap4_dpll_cascading_blocker_release(target_dev);
 
-	return omap_device_scale(req_dev, target_dev, rate);
+	return ret;
 }
 #endif
 

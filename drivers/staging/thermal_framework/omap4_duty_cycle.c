@@ -52,11 +52,17 @@ module_param(nitro_interval, int, 0);
 
 static unsigned int nitro_percentage = 25;
 module_param(nitro_percentage, int, 0);
-
+#ifdef CONFIG_MACH_OMAP4_JET
+static unsigned int nitro_rate = 800000;
+#else
 static unsigned int nitro_rate = 1200000;
+#endif
 module_param(nitro_rate, int, 0);
-
+#ifdef CONFIG_MACH_OMAP4_JET
+static unsigned int cooling_rate = 300000;
+#else
 static unsigned int cooling_rate = 1008000;
+#endif
 module_param(cooling_rate, int, 0);
 
 struct duty_cycle_desc {
@@ -98,7 +104,11 @@ static void omap4_duty_enter_normal(void)
 	duty_desc.heating_budget = NITRO_P(nitro_percentage, nitro_interval);
 
 	if (duty_desc.cool_device != NULL)
+#ifdef CONFIG_MACH_OMAP4_JET
+		duty_desc.cool_device(NULL, nitro_rate);
+#else
 		duty_desc.cool_device(NULL, 0);
+#endif
 
 }
 
@@ -125,7 +135,11 @@ static void omap4_duty_enter_cooling(unsigned int next_max,
 	pr_debug("%s enter at (%u)\n", __func__, policy->cur);
 
 	if ((duty_desc.cool_device != NULL) && (next_max != nitro_rate))
+#ifdef CONFIG_MACH_OMAP4_JET
+		duty_desc.cool_device(NULL, next_max);
+#else
 		duty_desc.cool_device(NULL, 1);
+#endif
 
 	queue_delayed_work(duty_wq, &work_exit_cool, msecs_to_jiffies(
 		NITRO_P(100 - nitro_percentage, nitro_interval)));
@@ -180,7 +194,6 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 					unsigned long val, void *data)
 {
 	struct cpufreq_freqs *freqs = data;
-	pr_debug("%s enter\n", __func__);
 
 	/* We are interested only in POSTCHANGE transactions */
 	if (val != CPUFREQ_POSTCHANGE)
@@ -190,7 +203,7 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 							freqs->new, state);
 	switch (state) {
 	case OMAP4_DUTY_NORMAL:
-		if (freqs->new == nitro_rate) {
+		if (freqs->new >= nitro_rate) {
 			duty_desc.t_heating_start = jiffies;
 			queue_work(duty_wq, &work_enter_heat.work);
 		}
@@ -214,7 +227,7 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 	case OMAP4_DUTY_COOLING_0:
 		break;
 	case OMAP4_DUTY_COOLING_1:
-		if (freqs->new == nitro_rate) {
+		if (freqs->new >= nitro_rate) {
 			duty_desc.t_heating_start = jiffies;
 			cancel_delayed_work_sync(&work_exit_cool);
 			queue_work(duty_wq, &work_enter_heat.work);
@@ -233,7 +246,9 @@ static struct notifier_block omap4_duty_nb = {
 static int omap4_duty_cycle_set_enabled(bool val, bool update)
 {
 	int ret;
-
+#ifdef CONFIG_THERMAL_DEBUG
+	pr_debug("%s val=%d,update=%d\n", __func__, val, update);
+#endif
 	ret = mutex_lock_interruptible(&mutex_enabled);
 	if (ret)
 		return ret;
@@ -255,9 +270,14 @@ static int omap4_duty_cycle_set_enabled(bool val, bool update)
 			}
 			omap4_duty_enter_normal();
 			/* We need to check in which frequency we are */
-			if (cpufreq_get(0) == nitro_rate)
+
+			if (cpufreq_get(0) >= nitro_rate){
+#ifdef CONFIG_THERMAL_DEBUG
+				pr_debug("default cpu freq=nitro_rate\n");
+#endif
 				queue_delayed_work(duty_wq, &work_enter_heat,
 						msecs_to_jiffies(1));
+			}
 		} else {
 			cpufreq_unregister_notifier(&omap4_duty_nb,
 					CPUFREQ_TRANSITION_NOTIFIER);
@@ -286,6 +306,7 @@ unlock_enabled:
 
 static void omap4_duty_enable_wq(struct work_struct *work)
 {
+	pr_debug("%s enter at ()\n", __func__);
 	omap4_duty_cycle_set_enabled(duty_desc.saved_hotplug_enabled, false);
 }
 
@@ -293,6 +314,7 @@ static void omap4_duty_disable_wq(struct work_struct *work)
 {
 	/* we don't want to overwrite what the user has requested */
 	mutex_lock(&mutex_duty);
+	pr_debug("%s enter at ()\n", __func__);
 	duty_desc.saved_hotplug_enabled = duty_desc.enabled;
 	mutex_unlock(&mutex_duty);
 	omap4_duty_cycle_set_enabled(false, false);
@@ -564,7 +586,9 @@ static struct platform_driver omap4_duty_driver = {
 static int update_params(struct duty_cycle_params *dc_params)
 {
 	int ret;
-
+#ifdef CONFIG_THERMAL_DEBUG
+	pr_debug("%s\n", __func__);
+#endif
 	ret = mutex_lock_interruptible(&mutex_duty);
 	if (ret)
 		return ret;

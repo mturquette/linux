@@ -10,6 +10,7 @@ config SENSORS_LIS3LV02D
 	select INPUT_POLLDEV
 	default n
 
+
 menuconfig MISC_DEVICES
 	bool "Misc devices"
 	---help---
@@ -555,5 +556,5 @@ source "drivers/misc/gcx/gccore/Kconfig"
 source "drivers/misc/gcx/gcioctl/Kconfig"
 source "drivers/misc/gcx/gcbv/Kconfig"
 source "drivers/misc/cache-2dmanager/Kconfig"
-
+source "drivers/misc/recon/Kconfig"
 endif # MISC_DEVICES

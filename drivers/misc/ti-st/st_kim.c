@@ -19,7 +19,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-
+//#define DEBUG
 #define pr_fmt(fmt) "(stk) :" fmt
 #include <linux/platform_device.h>
 #include <linux/jiffies.h>
@@ -39,7 +39,9 @@
 
 #define MAX_ST_DEVICES	3	/* Imagine 1 on each UART for now */
 static struct platform_device *st_kim_devices[MAX_ST_DEVICES];
-
+#ifdef CONFIG_JET_SUN
+static char kim_bt_mode;
+#endif
 /**********************************************************************/
 /* internal functions */
 
@@ -276,6 +278,14 @@ static long download_firmware(struct kim_data_s *kim_gdata)
 		pr_err("kim: failed to read local ver");
 		return err;
 	}
+
+#ifdef CONFIG_JET_SUN
+	if(kim_bt_mode){
+		memset(bts_scr_name, 0, sizeof(bts_scr_name));
+		strcpy(bts_scr_name,"BT2.12_ANT_1.17.bts");
+		pr_info("%s", bts_scr_name);
+	}
+#endif
 	err =
 	    request_firmware(&kim_gdata->fw_entry, bts_scr_name,
 			     &kim_gdata->kim_pdev->dev);
@@ -445,7 +455,7 @@ long st_kim_start(void *kim_data)
 	struct ti_st_plat_data	*pdata;
 	struct kim_data_s	*kim_gdata = (struct kim_data_s *)kim_data;
 
-	pr_info(" %s", __func__);
+	pr_debug(" %s", __func__);
 	pdata = kim_gdata->kim_pdev->dev.platform_data;
 
 	do {
@@ -509,7 +519,7 @@ long st_kim_stop(void *kim_data)
 	struct ti_st_plat_data	*pdata =
 		kim_gdata->kim_pdev->dev.platform_data;
 	struct tty_struct	*tty = kim_gdata->core_data->tty;
-
+	pr_debug(" %s", __func__);
 	INIT_COMPLETION(kim_gdata->ldisc_installed);
 
 	if (tty) {	/* can be called before ldisc is installed */
@@ -571,6 +581,46 @@ static ssize_t show_install(struct device *dev,
 	struct kim_data_s *kim_data = dev_get_drvdata(dev);
 	return sprintf(buf, "%d\n", kim_data->ldisc_install);
 }
+
+#ifdef CONFIG_JET_SUN
+static ssize_t show_bt_mode(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	if(kim_bt_mode)
+		return sprintf(buf, "%s\n", "ANT");
+	else
+		return sprintf(buf, "%s\n", "BLE");
+}
+
+static ssize_t store_bt_mode(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	sscanf(buf, "%d", &kim_bt_mode);
+
+	if(kim_bt_mode)
+		kim_bt_mode=1;
+	return count;
+}
+#if 0
+static ssize_t store_bt_reset(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int err;
+	struct kim_data_s *kim_data = dev_get_drvdata(dev);
+	err=st_kim_stop(kim_data);
+	if(err<0)
+		goto error_case;
+
+	err=st_kim_start(kim_data);
+	if(err<0)
+		goto error_case;
+	return count;
+error_case:
+	pr_err("%s fail:%d\n",__func__,err);
+	return err;
+}
+#endif
+#endif
 
 #ifdef DEBUG
 static ssize_t store_dev_name(struct device *dev,
@@ -636,11 +686,20 @@ __ATTR(baud_rate, 0444, (void *)show_baud_rate, NULL);
 static struct kobj_attribute uart_flow_cntrl =
 __ATTR(flow_cntrl, 0444, (void *)show_flow_cntrl, NULL);
 
+#ifdef CONFIG_JET_SUN
+static struct kobj_attribute bt_mode =
+__ATTR(bt_mode, 0666, (void *)show_bt_mode, (void *)store_bt_mode);
+
+#endif
+
 static struct attribute *uim_attrs[] = {
 	&ldisc_install.attr,
 	&uart_dev_name.attr,
 	&uart_baud_rate.attr,
 	&uart_flow_cntrl.attr,
+#ifdef CONFIG_JET_SUN
+	&bt_mode.attr,
+#endif
 	NULL,
 };
 
@@ -749,7 +808,9 @@ static int kim_probe(struct platform_device *pdev)
 	kim_gdata->kim_pdev = pdev;
 	init_completion(&kim_gdata->kim_rcvd);
 	init_completion(&kim_gdata->ldisc_installed);
-
+#ifdef CONFIG_JET_SUN
+	kim_bt_mode=0;
+#endif
 	status = sysfs_create_group(&pdev->dev.kobj, &uim_attr_grp);
 	if (status) {
 		pr_err("failed to create sysfs entries");

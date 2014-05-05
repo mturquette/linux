@@ -24,6 +24,8 @@ menuconfig SOUND
 	  will be called soundcore.
 
 if SOUND
+config SOUND_DEBUG
+	bool "Sound debug message"
 
 config SOUND_OSS_CORE
 	bool

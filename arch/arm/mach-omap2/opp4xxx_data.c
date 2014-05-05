@@ -29,6 +29,13 @@
 #include "omap_opp_data.h"
 #include "pm.h"
 
+#ifdef CONFIG_OMAP443X_SUPPORT_OPPTURBO
+#define OMAP443X_OPPTURBO_EN true
+#else
+#define OMAP443X_OPPTURBO_EN false
+#endif
+
+
 /*
  * STD_FUSE_OPP_DPLL_1 contains info about ABB trim type for MPU/IVA.
  * This probably is an ugly location to put the DPLL trim details.. but,
@@ -174,9 +181,9 @@ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 	/* MPU OPP2 - OPP100 */
 	OPP_INITIALIZER("mpu", "dpll_mpu_ck", "mpu", true, 600000000, OMAP4430_VDD_MPU_OPP100_UV),
 	/* MPU OPP3 - OPP-Turbo */
-	OPP_INITIALIZER("mpu", "dpll_mpu_ck", "mpu", true, 800000000, OMAP4430_VDD_MPU_OPPTURBO_UV),
+	OPP_INITIALIZER("mpu", "dpll_mpu_ck", "mpu", OMAP443X_OPPTURBO_EN, 800000000, OMAP4430_VDD_MPU_OPPTURBO_UV),
 	/* MPU OPP4 - OPP-NT */
-	OPP_INITIALIZER("mpu", "dpll_mpu_ck", "mpu", true, 1008000000, OMAP4430_VDD_MPU_OPPNITRO_UV),
+	OPP_INITIALIZER("mpu", "dpll_mpu_ck", "mpu", false, 1008000000, OMAP4430_VDD_MPU_OPPNITRO_UV),
 	/* MPU OPP5 - OPP-SB */
 	OPP_INITIALIZER("mpu", "dpll_mpu_ck", "mpu", false, 1200000000, OMAP4430_VDD_MPU_OPPNITROSB_UV),
 	/* L3 OPP1 - OPP50 */
@@ -188,7 +195,7 @@ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 	/* IVA OPP2 - OPP100 */
 	OPP_INITIALIZER("iva", "virt_iva_ck", "iva", true, 266100000, OMAP4430_VDD_IVA_OPP100_UV),
 	/* IVA OPP3 - OPP-Turbo */
-	OPP_INITIALIZER("iva", "virt_iva_ck", "iva", true, 332000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
+	OPP_INITIALIZER("iva", "virt_iva_ck", "iva", OMAP443X_OPPTURBO_EN, 332000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
 	/* SGX OPP1 - OPP50 */
 	OPP_INITIALIZER("gpu", "dpll_per_m7x2_ck", "core", true, 153600000, OMAP4430_VDD_CORE_OPP50_UV),
 	/* SGX OPP2 - OPP100 */
@@ -204,7 +211,7 @@ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 	/* DSP OPP2 - OPP100 */
 	OPP_INITIALIZER("dsp_c0", "virt_dsp_ck", "iva", true, 465500000, OMAP4430_VDD_IVA_OPP100_UV),
 	/* DSP OPP3 - OPPTB */
-	OPP_INITIALIZER("dsp_c0", "virt_dsp_ck", "iva", true, 496000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
+	OPP_INITIALIZER("dsp_c0", "virt_dsp_ck", "iva", OMAP443X_OPPTURBO_EN, 496000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
 	/* HSI OPP1 - OPP50 */
 	OPP_INITIALIZER("hsi", "hsi_fck", "core", true, 96000000, OMAP4430_VDD_CORE_OPP50_UV),
 	/* HSI OPP2 - OPP100 */
@@ -438,7 +445,7 @@ struct omap_vdd_dep_info omap447x_vddmpu_dep_info[] = {
 /* OMAP 4470 MPU IVA VDD dependency table */
 static struct omap_vdd_dep_volt omap447x_vdd_iva_core_dep_data[] = {
 	{.main_vdd_volt = OMAP4470_VDD_IVA_OPP50_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP50_UV},
-	{.main_vdd_volt = OMAP4470_VDD_IVA_OPP100_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
+	{.main_vdd_volt = OMAP4470_VDD_IVA_OPP100_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100H_UV},
 	{.main_vdd_volt = OMAP4470_VDD_IVA_OPPTURBO_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
 	{.main_vdd_volt = OMAP4470_VDD_IVA_OPPNITRO_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
 	{.main_vdd_volt = OMAP4470_VDD_IVA_OPPNITROSB_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},

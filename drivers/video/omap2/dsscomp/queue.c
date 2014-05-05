@@ -673,8 +673,7 @@ skip_ovl_set:
 		goto done;
 	} else {
 		if (r)
-			dev_warn(DEV(cdev), "[%p] ignoring set failure %d\n",
-								comp, r);
+			dev_warn(DEV(cdev), "[%s:%u:%p] ignoring set failure %d\n", __FUNCTION__,__LINE__,comp, r);
 		comp->blank = dmask == comp->ovl_mask;
 		comp->ovl_dmask = dmask;
 

@@ -25,10 +25,17 @@
 #include <linux/i2c/twl.h>
 #include <linux/power_supply.h>
 #include <linux/i2c/twl6030-gpadc.h>
+#ifdef CONFIG_CHARGER_BQ2415x
 #include <linux/i2c/bq2415x.h>
+#endif
 #include <linux/wakelock.h>
 #include <linux/usb/otg.h>
-
+#ifdef CONFIG_MACH_OMAP4_JET
+#include <plat/usb.h>
+#ifndef CONFIG_FUEL_GAUGE
+#include "voltage_capacity.h"
+#endif
+#endif
 #define CONTROLLER_INT_MASK	0x00
 #define CONTROLLER_CTRL1	0x01
 #define CONTROLLER_WDG		0x02
@@ -81,6 +88,8 @@
 #define FG_REG_09	0x09
 #define FG_REG_10	0x0A
 #define FG_REG_11	0x0B
+
+#define CONTROLLER_WDG_RESET	  0x0
 
 /* CONTROLLER_INT_MASK */
 #define MVAC_FAULT		(1 << 7)
@@ -166,12 +175,15 @@
 /* CHARGERUSB_VICHRG */
 #define CHARGERUSB_VICHRG_300		0x0
 #define CHARGERUSB_VICHRG_500		0x4
+#define CHARGERUSB_VICHRG_600		0x5
 #define CHARGERUSB_VICHRG_1500		0xE
 
 /* CHARGERUSB_CINLIMIT */
 #define CHARGERUSB_CIN_LIMIT_100	0x1
 #define CHARGERUSB_CIN_LIMIT_300	0x5
+#define CHARGERUSB_CIN_LIMIT_400	0x7
 #define CHARGERUSB_CIN_LIMIT_500	0x9
+#define CHARGERUSB_CIN_LIMIT_550	0xA
 #define CHARGERUSB_CIN_LIMIT_NONE	0xF
 
 /* CHARGERUSB_CTRLLIMIT1 */
@@ -180,10 +192,14 @@
 
 /* CHARGERUSB_CTRLLIMIT2 */
 #define CHARGERUSB_CTRLLIMIT2_1500	0x0E
+#define CHARGERUSB_CTRLLIMIT2_700	0x06
+#define CHARGERUSB_CTRLLIMIT2_400	0x03
 #define		LOCK_LIMIT		(1 << 4)
 
 /* ANTICOLLAPSE_CTRL2 */
 #define BUCK_VTH_SHIFT			5
+#define ANTICOLL_ANA			(1 << 2)
+#define ANTICOLL_DIG			(1 << 1)
 
 /* FG_REG_00 */
 #define CC_ACTIVE_MODE_SHIFT	6
@@ -216,6 +232,7 @@
 #define TWL6032_GPADC_VBAT_CHNL	0x12
 
 /* TWL6030_GPADC_CTRL2 */
+#define GPADC_CTRL2_CH18_VBAT_SCALER_DIV4	BIT(3)
 #define GPADC_CTRL2_CH18_SCALER_EN	BIT(2)
 
 #define ENABLE_ISOURCE		0x80
@@ -235,8 +252,8 @@
 
 #define STS_HW_CONDITIONS	0x21
 #define STS_USB_ID		(1 << 2)	/* Level status of USB ID */
-
-#define BATTERY_RESISTOR	10000
+#define ADC_TO_uV_FACTOR 1220  //1000
+#define BATTERY_RESISTOR	5100
 #define SIMULATOR_RESISTOR	5000
 #define BATTERY_DETECT_THRESHOLD	((BATTERY_RESISTOR + SIMULATOR_RESISTOR) / 2)
 #define CHARGING_CAPACITY_UPDATE_PERIOD	(1000 * 60 * 10)
@@ -252,6 +269,9 @@ static inline unsigned int twl6030_get_usb_max_power(struct otg_transceiver *x)
 #endif
 
 /* Ptr to thermistor table */
+#ifdef CONFIG_FUEL_GAUGE
+static int noted_acc_q;
+#endif
 static const unsigned int fuelgauge_rate[4] = {1, 4, 16, 64};
 static struct wake_lock chrg_lock;
 
@@ -295,13 +315,24 @@ struct twl6030_bci_device_info {
 	unsigned int		charger_outcurrentmA;
 	unsigned long		usb_max_power;
 	unsigned long		event;
-
+#ifdef CONFIG_FUEL_GAUGE
+	struct cell_state	cell;
+#else
+#ifdef CONFIG_MACH_OMAP4_JET
+	unsigned int		capacity;
+	unsigned int		value_debounce_count;
+	unsigned int		prev_voltage;
+	int prev_temperature;
+	bool init;
+#else
 	unsigned int		capacity;
 	unsigned int		capacity_debounce_count;
-	unsigned long		ac_next_refresh;
+	unsigned int		max_battery_capacity;
+	unsigned int		boot_capacity_mAh;
 	unsigned int		prev_capacity;
+#endif
+#endif
 	unsigned int		wakelock_enabled;
-
 	struct power_supply	bat;
 	struct power_supply	usb;
 	struct power_supply	ac;
@@ -322,39 +353,61 @@ struct twl6030_bci_device_info {
 
 	/* max scale current based on sense resitor */
 	int			current_max_scale;
+
+	unsigned int		min_vbus_val;
+};
+#if !defined(CONFIG_FUEL_GAUGE) && !defined(CONFIG_MACH_OMAP4_JET)
+/* Battery capacity estimation table */
+struct batt_capacity_chart {
+	int volt;
+	unsigned int cap;
 };
 
+static struct batt_capacity_chart volt_cap_table[] = {
+	{ .volt = 3345, .cap =  7 },
+	{ .volt = 3450, .cap = 15 },
+	{ .volt = 3500, .cap = 30 },
+	{ .volt = 3600, .cap = 50 },
+	{ .volt = 3650, .cap = 70 },
+	{ .volt = 3780, .cap = 85 },
+	{ .volt = 3850, .cap = 95 },
+};
+#endif
+
+#ifdef CONFIG_CHARGER_BQ2415x
 static BLOCKING_NOTIFIER_HEAD(notifier_list);
+#endif
 extern u32 wakeup_timer_seconds;
 
-static void twl6030_config_min_vbus_reg(struct twl6030_bci_device_info *di,
+static int twl6030_config_min_vbus_reg(struct twl6030_bci_device_info *di,
 						unsigned int value)
 {
 	u8 rd_reg = 0;
 	int ret;
+	u8 anticollapse_ctrl = ANTICOLLAPSE_CTRL2;
 
-	/* not required on TWL6032 */
 	if (di->features & TWL6032_SUBCLASS)
-		return;
+		anticollapse_ctrl = ANTICOLLAPSE_CTRL1;
 
 	if (value > 4760 || value < 4200) {
 		dev_dbg(di->dev, "invalid min vbus\n");
-		return;
+		return -EINVAL;
 	}
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg,
-					ANTICOLLAPSE_CTRL2);
+					anticollapse_ctrl);
 	if (ret)
 		goto err;
 	rd_reg = rd_reg & 0x1F;
 	rd_reg = rd_reg | (((value - 4200)/80) << BUCK_VTH_SHIFT);
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, rd_reg,
-					ANTICOLLAPSE_CTRL2);
+					anticollapse_ctrl);
 
 	if (!ret)
-		return;
+		return ret;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+	return ret;
 }
 
 static void twl6030_config_iterm_reg(struct twl6030_bci_device_info *di,
@@ -373,7 +426,7 @@ static void twl6030_config_iterm_reg(struct twl6030_bci_device_info *di,
 	if (ret)
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
-
+#ifdef CONFIG_JET_V1
 static unsigned int twl6030_get_iterm_reg(struct twl6030_bci_device_info *di)
 {
 	int ret;
@@ -389,7 +442,7 @@ static unsigned int twl6030_get_iterm_reg(struct twl6030_bci_device_info *di)
 
 	return currentmA;
 }
-
+#endif
 static void twl6030_config_voreg_reg(struct twl6030_bci_device_info *di,
 							unsigned int voltagemV)
 {
@@ -406,7 +459,7 @@ static void twl6030_config_voreg_reg(struct twl6030_bci_device_info *di,
 	if (ret)
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
-
+#ifdef CONFIG_JET_V1
 static unsigned int twl6030_get_voreg_reg(struct twl6030_bci_device_info *di)
 {
 	int ret;
@@ -422,7 +475,7 @@ static unsigned int twl6030_get_voreg_reg(struct twl6030_bci_device_info *di)
 
 	return voltagemV;
 }
-
+#endif
 static void twl6030_config_vichrg_reg(struct twl6030_bci_device_info *di,
 							unsigned int currentmA)
 {
@@ -467,7 +520,7 @@ static void twl6030_config_cinlimit_reg(struct twl6030_bci_device_info *di,
 	if (ret)
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
-
+#ifndef CONFIG_JET_V2
 static void twl6030_config_limit1_reg(struct twl6030_bci_device_info *di,
 							unsigned int voltagemV)
 {
@@ -484,7 +537,8 @@ static void twl6030_config_limit1_reg(struct twl6030_bci_device_info *di,
 	if (ret)
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
-
+#endif
+#ifdef CONFIG_JET_V1
 static unsigned int twl6030_get_limit1_reg(struct twl6030_bci_device_info *di)
 {
 	int ret;
@@ -501,12 +555,19 @@ static unsigned int twl6030_get_limit1_reg(struct twl6030_bci_device_info *di)
 
 	return voltagemV;
 }
-
+#endif
 static void twl6030_config_limit2_reg(struct twl6030_bci_device_info *di,
 							unsigned int currentmA)
 {
 	int ret;
-
+#ifdef CONFIG_JET_V2
+	if ((currentmA >= 100) && (currentmA <= 1500))
+		currentmA=(currentmA/100)-1;
+	else {
+		dev_dbg(di->dev, "invalid max_charger_currentmA\n");
+		return;
+	}
+#else
 	if ((currentmA >= 300) && (currentmA <= 450))
 		currentmA = (currentmA - 300) / 50;
 	else if ((currentmA >= 500) && (currentmA <= 1500))
@@ -515,14 +576,14 @@ static void twl6030_config_limit2_reg(struct twl6030_bci_device_info *di,
 		dev_dbg(di->dev, "invalid max_charger_currentmA\n");
 		return;
 	}
-
 	currentmA |= LOCK_LIMIT;
+#endif
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, currentmA,
 						CHARGERUSB_CTRLLIMIT2);
 	if (ret)
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
-
+#ifdef CONFIG_JET_V1
 static const int vichrg[] = {
 	300, 350, 400, 450, 500, 600, 700, 800,
 	900, 1000, 1100, 1200, 1300, 1400, 1500, 300
@@ -544,7 +605,7 @@ static unsigned int twl6030_get_limit2_reg(struct twl6030_bci_device_info *di)
 
 	return currentmA;
 }
-
+#endif
 /*
  * Return channel value
  * Or < 0 on failure.
@@ -560,6 +621,7 @@ static int twl6030_get_gpadc_conversion(struct twl6030_bci_device_info *di,
 	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
+	req.type = TWL6030_GPADC_WAIT;
 	ret = twl6030_gpadc_conversion(&req);
 	if (ret < 0)
 		return ret;
@@ -572,6 +634,9 @@ static int twl6030_get_gpadc_conversion(struct twl6030_bci_device_info *di,
 
 static int is_battery_present(struct twl6030_bci_device_info *di)
 {
+#ifdef CONFIG_MACH_OMAP4_JET//For Jet the battery ID is permenantly present in the board
+	return 1;
+#else
 	int val;
 	static unsigned int current_src_val;
 
@@ -580,7 +645,7 @@ static int is_battery_present(struct twl6030_bci_device_info *di)
 	 * less than 5K.
 	 */
 	val = twl6030_get_gpadc_conversion(di, 0);
-
+	
 	/*
 	 * twl6030_get_gpadc_conversion for
 	 * 6030 return resistance, for 6032 - voltage and
@@ -600,14 +665,24 @@ static int is_battery_present(struct twl6030_bci_device_info *di)
 					GPADC_ISOURCE_7uA;
 	}
 
-	val = (val * 1000) / current_src_val;
+	val = (val * ADC_TO_uV_FACTOR) / current_src_val;
 
 	if (val < BATTERY_DETECT_THRESHOLD)
 		return 0;
 
 	return 1;
+#endif
 }
-
+static int twl6030_get_discharge_status(struct twl6030_bci_device_info *di)
+{
+#ifdef CONFIG_FUEL_GAUGE
+	if (di->cell.full){
+		printk(KERN_DEBUG "%s: cell.full happen\n",__func__);
+		return POWER_SUPPLY_STATUS_FULL;
+	}
+#endif
+	return POWER_SUPPLY_STATUS_DISCHARGING;
+}
 static inline int twl6030_vbus_above_thres(struct twl6030_bci_device_info *di)
 {
 	return (di->vbus_charge_thres < twl6030_get_gpadc_conversion(di, 10));
@@ -617,6 +692,11 @@ static void twl6030_stop_usb_charger(struct twl6030_bci_device_info *di)
 {
 	int ret;
 	u8 reg = 0;
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s\n",__func__);
+#endif
+	di->charger_source = POWER_SUPPLY_TYPE_BATTERY;
+	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 
 	if (di->use_hw_charger) {
 		ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg,
@@ -632,9 +712,6 @@ static void twl6030_stop_usb_charger(struct twl6030_bci_device_info *di)
 		return;
 	}
 
-	di->charger_source = 0;
-	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
-
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
 
 err:
@@ -646,6 +723,7 @@ static void twl6030_start_usb_charger_sw(struct twl6030_bci_device_info *di)
 {
 	int ret;
 	u8 reg = 0;
+	u8 reg_int_mask = 0;
 
 	if (!is_battery_present(di)) {
 		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
@@ -671,6 +749,23 @@ static void twl6030_start_usb_charger_sw(struct twl6030_bci_device_info *di)
 		return;
 	}
 
+	if (di->errata & TWL6030_ERRATA_DB00110684) {
+		/* mask CHARGERUSB_THMREG interrupt */
+
+		ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg_int_mask,
+				CHARGERUSB_INT_MASK);
+
+		if (ret)
+			goto err;
+
+		reg_int_mask &= ~MASK_MCHARGERUSB_THMREG;
+
+		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg_int_mask,
+				CHARGERUSB_INT_MASK);
+		if (ret)
+			goto err;
+	}
+
 	twl6030_config_vichrg_reg(di, di->charger_outcurrentmA);
 	twl6030_config_cinlimit_reg(di, di->charger_incurrentmA);
 	twl6030_config_voreg_reg(di, di->platform_data->max_bat_voltagemV);
@@ -689,6 +784,17 @@ static void twl6030_start_usb_charger_sw(struct twl6030_bci_device_info *di)
 
 		di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 	}
+
+	if (di->errata & TWL6030_ERRATA_DB00110684) {
+		/* unmask CHARGERUSB_THMREG interrupt */
+		reg_int_mask |= MASK_MCHARGERUSB_THMREG;
+
+		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg_int_mask,
+				CHARGERUSB_INT_MASK);
+		if (ret)
+			goto err;
+	}
+
 	return;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
@@ -698,18 +804,24 @@ static void twl6032_start_usb_charger_hw(struct twl6030_bci_device_info *di)
 {
 	int ret;
 	u8 reg = 0;
-
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s:%d\n",__func__,di->charger_incurrentmA );
+#endif
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg,
 				CHARGERUSB_CTRL1);
 	if (ret)
 		goto err;
-
+#ifdef CONFIG_MACH_OMAP4_JET
+	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, CHARGERUSB_VOREG_4P2,CHARGERUSB_VOREG);
+#endif
 	if (di->charger_incurrentmA < 50) {
 		reg |= HZ_MODE;
 		di->charge_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
 	} else {
 		reg &= ~HZ_MODE;
 		twl6030_config_cinlimit_reg(di, di->charger_incurrentmA);
+		twl6030_config_vichrg_reg(di, di->charger_outcurrentmA);
+		twl6030_config_limit2_reg(di,di->platform_data->max_charger_currentmA);
 	}
 
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg,
@@ -727,6 +839,10 @@ err:
 
 static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 {
+#ifdef CONFIG_FUEL_GAUGE
+	if (di->cell.full)
+		return;
+#endif
 	if (di->use_hw_charger)
 		twl6032_start_usb_charger_hw(di);
 	else
@@ -737,18 +853,22 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 
 static void twl6030_stop_ac_charger(struct twl6030_bci_device_info *di)
 {
+#ifdef CONFIG_CHARGER_BQ2415x
 	long int events;
+#endif
 	int ret;
 
 	di->charger_source = 0;
-	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+	di->charge_status =  twl6030_get_discharge_status(di);
+	//di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+#ifdef CONFIG_CHARGER_BQ2415x
 	events = BQ2415x_STOP_CHARGING;
-
+#endif
 	if (di->use_hw_charger)
 		return;
-
+#ifdef CONFIG_CHARGER_BQ2415x
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
-
+#endif
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
 	if (ret)
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
@@ -759,9 +879,14 @@ static void twl6030_stop_ac_charger(struct twl6030_bci_device_info *di)
 
 static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 {
+#ifdef CONFIG_CHARGER_BQ2415x
 	long int events;
+#endif
 	int ret;
-
+#ifdef CONFIG_FUEL_GAUGE
+	if (di->cell.full)
+		return;
+#endif
 	if (!is_battery_present(di)) {
 		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
 		return;
@@ -769,13 +894,14 @@ static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 	dev_dbg(di->dev, "AC charger detected\n");
 	di->charger_source = POWER_SUPPLY_TYPE_MAINS;
 	di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
+#ifdef CONFIG_CHARGER_BQ2415x
 	events = BQ2415x_START_CHARGING;
-
+#endif
 	if (di->use_hw_charger)
 		return;
-
+#ifdef CONFIG_CHARGER_BQ2415x
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
-
+#endif
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
 			CONTROLLER_CTRL1_EN_CHARGER |
 			CONTROLLER_CTRL1_SEL_CHARGER,
@@ -789,6 +915,9 @@ static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 
 static void twl6030_stop_charger(struct twl6030_bci_device_info *di)
 {
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s\n",__func__);
+#endif
 	if (di->charger_source == POWER_SUPPLY_TYPE_MAINS)
 		twl6030_stop_ac_charger(di);
 	else if (di->charger_source == POWER_SUPPLY_TYPE_USB)
@@ -867,7 +996,9 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	struct twl6030_bci_device_info *di = _di;
 	int ret;
 	int charger_fault = 0;
+#ifdef CONFIG_CHARGER_BQ2415x
 	long int events;
+#endif
 	u8 stat_toggle, stat_reset, stat_set = 0;
 	u8 charge_state = 0;
 	u8 present_charge_state = 0;
@@ -908,8 +1039,12 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	di->stat1 = present_charge_state;
 	if ((charge_state & VAC_DET) &&
 		(charge_state & CONTROLLER_STAT1_EXTCHRG_STATZ)) {
+
+#ifdef CONFIG_CHARGER_BQ2415x
+		dev_dbg(di->dev, "BQ2415x_CHARGER_FAULT\n");
 		events = BQ2415x_CHARGER_FAULT;
 		blocking_notifier_call_chain(&notifier_list, events, NULL);
+#endif
 	}
 
 	if (stat_reset & VBUS_DET) {
@@ -1018,13 +1153,16 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 		di->charge_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
 		dev_err(di->dev, "Charger Fault stop charging\n");
 	}
-
+#ifndef CONFIG_FUEL_GAUGE
 	if (di->capacity != -1)
 		power_supply_changed(&di->bat);
 	else {
 		cancel_delayed_work(&di->twl6030_bci_monitor_work);
 		schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
 	}
+#else
+	power_supply_changed(&di->bat);
+#endif
 err:
 	return IRQ_HANDLED;
 }
@@ -1034,9 +1172,10 @@ static irqreturn_t twl6030charger_fault_interrupt(int irq, void *_di)
 	struct twl6030_bci_device_info *di = _di;
 	int charger_fault = 0;
 	int ret;
-
 	u8 usb_charge_sts = 0, usb_charge_sts1 = 0, usb_charge_sts2 = 0;
-
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s\n",__func__);
+#endif
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &usb_charge_sts,
 						CHARGERUSB_INT_STATUS);
 	if (ret)
@@ -1115,7 +1254,9 @@ static irqreturn_t twl6032charger_ctrl_interrupt_hw(int irq, void *_di)
 	u8 stat1 = 0, linear = 0;
 	int charger_stop = 0, end_of_charge = 0;
 	int ret;
-
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s\n",__func__);
+#endif
 	/* read charger controller_stat1 */
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &stat1,
 			CONTROLLER_STAT1);
@@ -1161,10 +1302,10 @@ static irqreturn_t twl6032charger_ctrl_interrupt_hw(int irq, void *_di)
 
 	if ((stat1 & CONTROLLER_STAT1_LINCH_GATED) &&
 			di->use_power_path) {
-
+		dev_dbg(di->dev, "LINCH_GATE linear=0x%.2X\n",linear);
 		charger_stop = 1;
 
-		if (linear & LINEAR_CHRG_STS_CRYSTL_OSC_OK) {
+		if ((linear & LINEAR_CHRG_STS_CRYSTL_OSC_OK)==0) {
 			di->bat_health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
 			dev_dbg(di->dev, "Charger error: CRYSTAL OSC OK\n");
 		}
@@ -1190,11 +1331,12 @@ static irqreturn_t twl6032charger_ctrl_interrupt_hw(int irq, void *_di)
 
 	if (charger_stop) {
 		if (!(stat1 & (VBUS_DET | VAC_DET))) {
-			di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+			di->charge_status = twl6030_get_discharge_status(di);
 		} else {
-			if (end_of_charge)
+			if (end_of_charge){
 				di->charge_status =
 					POWER_SUPPLY_STATUS_FULL;
+			}
 			else
 				di->charge_status =
 					POWER_SUPPLY_STATUS_NOT_CHARGING;
@@ -1213,7 +1355,9 @@ static irqreturn_t twl6032charger_fault_interrupt_hw(int irq, void *_di)
 	int charger_stop = 0, charger_start = 0;
 	int ret;
 	u8 sts = 0, sts_int1 = 0, sts_int2 = 0, stat1 = 0;
-
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s\n",__func__);
+#endif
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &sts,
 						CHARGERUSB_INT_STATUS);
 	if (ret)
@@ -1305,7 +1449,7 @@ static irqreturn_t twl6032charger_fault_interrupt_hw(int irq, void *_di)
 
 	if (charger_stop) {
 		if (!(stat1 & (VBUS_DET | VAC_DET)))
-			di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+			di->charge_status = twl6030_get_discharge_status(di);//POWER_SUPPLY_STATUS_DISCHARGING;
 		else
 			di->charge_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
 	}
@@ -1442,6 +1586,15 @@ static int twl6030battery_current_setup(bool enable)
 	u8  reg = 0;
 
 	/*
+	 * Autoclear the register at init
+	 * This is done so early, because it might take
+	 * a while for the autoclear to take effect
+	 * and let's not add an unnecessary delay
+	 */
+	ret = twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, CC_AUTOCLEAR,
+								FG_REG_00);
+
+	/*
 	 * Writing 0 to REG_TOGGLE1 has no effect, so
 	 * can directly set/reset FG.
 	 */
@@ -1497,7 +1650,9 @@ static void twl6030_current_avg(struct work_struct *work)
 	struct twl6030_bci_device_info *di = container_of(work,
 		struct twl6030_bci_device_info,
 		twl6030_current_avg_work.work);
-
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s\n",__func__);
+#endif
 	di->charge_n2 = di->charge_n1;
 	di->timer_n2 = di->timer_n1;
 
@@ -1514,12 +1669,22 @@ static void twl6030_current_avg(struct work_struct *work)
 							FG_REG_04, 4);
 	if (ret < 0)
 		goto err;
+
+
+#ifdef CONFIG_JET_SUN
+/*Disable cc_offset as it is causing 20mA discrepancy in current calculation, see JET-376.*/
+	// printk(KERN_DEBUG "calibration offset value:%d \n",cc_offset);
+	//cc_offset = 0;
+
+#else
 	/* FG_REG_08, 09 is 10 bit signed calibration offset value */
 	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &cc_offset,
 							FG_REG_08, 2);
 	if (ret < 0)
 		goto err;
 	cc_offset = ((s16)(cc_offset << 6) >> 6);
+#endif
+
 	di->cc_offset = cc_offset;
 
 	samples = di->timer_n1 - di->timer_n2;
@@ -1558,7 +1723,6 @@ err:
 static int twl6030_usb_autogate_charger(struct twl6030_bci_device_info *di)
 {
 	int ret = 0;
-
 	if ((di->charger_source == POWER_SUPPLY_TYPE_USB) &&
 			!twl6030_vbus_above_thres(di)) {
 
@@ -1582,11 +1746,246 @@ static int twl6030_usb_autogate_charger(struct twl6030_bci_device_info *di)
 	return ret;
 }
 
+#ifdef CONFIG_FUEL_GAUGE
+static void twl6030_gasgauge_calibrate(struct twl6030_bci_device_info *di)
+{
+	int ret;
+
+	dev_dbg(di->dev, "Calibrating TWL6030 CC");
+
+	ret = twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE,
+			       CC_AUTOCLEAR, FG_REG_00);
+
+	if (ret)
+		pr_err("%s: Couldn't autoclear gas gauge %d\n",
+		       __func__, ret);
+	noted_acc_q = 0;
+
+	ret = twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE,
+			       CC_CAL_EN, FG_REG_00);
+
+	if (ret)
+		pr_err("%s: Couldn't recalibrate gas gauge %d\n",
+		       __func__, ret);
+
+}
+#define FG_ACC_STEP 196608//see notes below
+#define FG_OVERFLOW_THRESHOLD 100
+static int capacity_changed(struct twl6030_bci_device_info *di)
+{
+	s32 acc_value, samples = 0;
+	int acc_q;
+	int ret;
+#ifdef CONFIG_MACH_OMAP4_JET
+	int delta_q, delta_raw;
+#endif
+	/* FG_REG_01, 02, 03 is 24 bit unsigned sample counter value */
+	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *)&samples,
+						FG_REG_01, 3);
+	if (ret < 0)
+		dev_err(di->dev, "Could not read fuel gauge samples\n");
+	/*
+	 * FG_REG_04, 5, 6, 7 is 32 bit signed accumulator value
+	 * accumulates instantaneous current value
+	 */
+	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *)&acc_value,
+							FG_REG_04, 4);
+	if (ret < 0)
+		dev_err(di->dev, "Could not read fuel gauge accumulator\n");
+
+	/*
+	 * 3000 mA maps to a count of 4096 per sample
+	 * We have 4 samples per second
+	 * Charge added in one second == (acc_value * 3000 / (4 * 4096))
+	 * mAh added == (Charge added in one second / 3600)
+	 * mAh added == acc_value * (3000/3600) / (4 * 4096)
+	 * mAh added == acc_value * (5/6) / (2^14)
+	 * Using 5/6 instead of 3000 to avoid overflow
+	 * FIXME: Take care of different value of samples/sec.
+	 */
+#ifdef CONFIG_MACH_OMAP4_JET
+	/*make  simpler and more accurate*/
+	acc_q=(acc_value - (di->cc_offset * samples));
+	/* mAh added == acc_value * *(10/r_sense)(5/6) / (2^14)*/
+	/* mAh added == acc_value * *(25/r_sense)(1/3) / (2^14)*/
+	/* Original FG_ACC_STEP= (2^14)*3*(r_sense/25)=(2^14)*12/5 */
+	/* FG_ACC_STEP= (2^14)*12*/
+	/* 5*acc_q=FG_ACC_STEP*real_acc_q */
+	acc_q= acc_q*5;
+
+	delta_q=0;
+	delta_raw=acc_q-noted_acc_q;
+	while(1){
+		if(delta_raw>=FG_ACC_STEP){
+			delta_raw-=FG_ACC_STEP;
+			delta_q++;
+			noted_acc_q+=FG_ACC_STEP;
+		}else if(delta_raw<=-FG_ACC_STEP){
+			delta_raw+=FG_ACC_STEP;
+			delta_q--;
+			noted_acc_q-=FG_ACC_STEP;
+		} else
+			break;
+	}
+	/*Check if coulomb counting overflow*/
+	if(delta_q>=FG_OVERFLOW_THRESHOLD||delta_q<=-FG_OVERFLOW_THRESHOLD){
+		delta_q=0;
+		twl6030_gasgauge_calibrate(di);
+	}
+	/* Call TI MIS Fuel Gauge */
+	fg_process(&di->cell, delta_q, di->voltage_mV,
+		   (int16_t)(di->current_avg_uA/1000), di->temp_C);
+#ifdef DEBUG
+	printk(KERN_DEBUG "accumulated raw q:%d,%d,%d\n",noted_acc_q,acc_value,samples);
+	printk(KERN_DEBUG "noted_acc_q:%d, acc_value:%d, samples:%d\n",noted_acc_q,acc_value,samples);
+	printk(KERN_DEBUG "cc_offset:%d, delta_raw:%d, delta_q:%d   \n",di->cc_offset, delta_raw, delta_q);
+#endif
+#else
+	/* FIXME: revisit this code for overflows*/
+	acc_q = ((acc_value - (di->cc_offset * samples)) * 5 / 6) >> 14;
+
+	/* Compensate based on the sense resistor value */
+	acc_q = acc_q * 10 / (int)di->cell.config->r_sense;
+	/* Call TI MIS Fuel Gauge */
+	fg_process(&di->cell, acc_q - noted_acc_q, di->voltage_mV,
+		   (int16_t)(di->current_avg_uA/1000), di->temp_C);
+	noted_acc_q = acc_q;
+#endif
+
+	/* Can charge the battery */
+	if ((di->charge_status != POWER_SUPPLY_STATUS_CHARGING) &&
+	    !di->cell.cc) {
+		if (di->usb_online && di->ac_online) {
+			if (di->vac_priority == 2)
+				twl6030_start_ac_charger(di);
+			else if (di->vac_priority == 3)
+				twl6030_start_usb_charger(di);
+			else
+				twl6030_start_ac_charger(di);
+		} else if (di->ac_online) {
+				twl6030_start_ac_charger(di);
+		} else if (di->usb_online) {
+#ifdef DEBUG
+				printk(KERN_DEBUG "%s:start usb charger\n",__func__);
+#endif
+				twl6030_start_usb_charger(di);
+		}
+	}
+
+	/* Stop the charger */
+	if ((di->charge_status == POWER_SUPPLY_STATUS_CHARGING) &&
+	    di->cell.full){
+		// twl6030_stop_charger(di); //charging is stopped by kernel, otherwise it causes high current discharge (JET-394)
+	}
+
+	/* Gas gauge requested CC autocalibration */
+	if (di->cell.calibrate) {
+		di->cell.calibrate = false;
+		twl6030_gasgauge_calibrate(di);
+		di->timer_n1 = 0;
+		di->charge_n1 = 0;
+	}
+
+	/* Battery state changes needs to be sent to the OS */
+	if (di->cell.updated) {
+		di->cell.updated = 0;
+		if (di->charge_status != POWER_SUPPLY_STATUS_CHARGING)
+			di->charge_status = twl6030_get_discharge_status(di);
+#ifdef DEBUG
+		printk(KERN_DEBUG "%s\n",__func__);
+#endif
+		return 1;
+	}
+
+	return 0;
+}
+static int twl6030_configure_cell(struct platform_device *pdev,
+				  struct twl6030_bci_device_info *di)
+{
+	/* Apply battery cell configuration */
+	if (di->platform_data->cell_cfg &&
+	    di->platform_data->cell_cfg->ocv &&
+	    di->platform_data->cell_cfg->edv) {
+		di->cell.config = di->platform_data->cell_cfg;
+	} else {
+		dev_err(di->dev, "Missing FG Cell Configuration\n");
+		return -EINVAL;
+	}
+
+	di->cell.dev = &pdev->dev;
+	di->cell.charge_status = &di->charge_status;
+
+	return 0;
+}
+#else
+#ifdef CONFIG_MACH_OMAP4_JET
+#define MIN_DELTAV 10
+#define MIN_DELTAT 50
+#define MIN_DEBOUNCE_COUNT 4
+#define CAP_CHECK_POINT 5
+static int capacity_changed(struct twl6030_bci_device_info *di)
+{
+	short curr_voltage,delta_voltage, delta_temp;
+	unsigned int curr_capacity=di->capacity;
+	int update=0;
+	if(di->init==false){
+		return 0;
+	}
+	curr_voltage=get_average_voltage(di->voltage_mV);
+#ifdef DEBUG
+	printk(KERN_DEBUG "Previous Volt:%d,T:%d\n"
+			"Volt Now:%d,Average:%d,#%d", 
+			di->prev_voltage, di->prev_temperature,
+			di->voltage_mV,curr_voltage,di->value_debounce_count);
+#endif
+
+	if(di->capacity > CAP_CHECK_POINT){
+		delta_voltage=(di->prev_voltage)-curr_voltage;
+		delta_temp=(di->prev_temperature)-di->temp_C;
+		if(delta_voltage>=MIN_DELTAV || delta_voltage<= -MIN_DELTAV
+		||delta_temp>=MIN_DELTAT || delta_temp <= -MIN_DELTAT)
+		{
+			di->value_debounce_count++;
+		}
+		if(di->value_debounce_count>=MIN_DEBOUNCE_COUNT){
+			di->value_debounce_count=0;
+			di->prev_voltage=curr_voltage;
+			di->prev_temperature=di->temp_C;
+			update=1;
+		}
+	} else if (di->capacity==0)
+		update=0;
+	else
+		update=1;
+	
+	if(update){
+		curr_capacity=voltage_cap_convert(curr_voltage,di->temp_C);
+	}
+	if(di->capacity != curr_capacity){
+		di->capacity = curr_capacity;
+		return 1;
+	}
+	return 0;
+}
+#else
+static int capacity_lookup(int volt)
+{
+	int i, table_size;
+	table_size = ARRAY_SIZE(volt_cap_table);
+
+	for (i = 1; i < table_size; i++) {
+		if (volt < volt_cap_table[i].volt)
+			break;
+	}
+
+	return volt_cap_table[i-1].cap;
+}
 static int capacity_changed(struct twl6030_bci_device_info *di)
 {
 	int curr_capacity = di->capacity;
-	int charger_source = di->charger_source;
-	int charging_disabled = 0;
+	s32 acc_value, samples = 0;
+	int accumulated_charge;
+	int ret;
 
 	/* Because system load is always greater than
 	 * termination current, we will never get a CHARGE DONE
@@ -1596,72 +1995,53 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 	 * we dont update capacity if we are charging.
 	 */
 
-	/* if it has been more than 10 minutes since our last update
-	 * and we are charging we force a update.
+	/* FG_REG_01, 02, 03 is 24 bit unsigned sample counter value */
+	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &samples,
+							FG_REG_01, 3);
+	if (ret < 0)
+		dev_dbg(di->dev, "Could not read fuel gauge samples\n");
+	/*
+	 * FG_REG_04, 5, 6, 7 is 32 bit signed accumulator value
+	 * accumulates instantaneous current value
+	 */
+	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &acc_value,
+							FG_REG_04, 4);
+	if (ret < 0)
+		dev_dbg(di->dev, "Could not read fuel gauge accumulator\n");
+
+	/*
+	 * 3000 mA maps to a count of 4096 per sample
+	 * We have 4 samples per second
+	 * Charge added in one second == (acc_value * 3000 / (4 * 4096))
+	 * mAh added == (Charge added in one second / 3600)
+	 * mAh added == acc_value * (3000/3600) / (4 * 4096)
+	 * mAh added == acc_value * (5/6) / (2^14)
+	 * Using 5/6 instead of 3000 to avoid overflow
+	 * FIXME: revisit this code for overflows
+	 * FIXME: Take care of different value of samples/sec
 	 */
 
-	if (time_after(jiffies, di->ac_next_refresh)
-		&& (di->charger_source != POWER_SUPPLY_TYPE_BATTERY)) {
+	accumulated_charge = ((acc_value - (di->cc_offset * samples))
+								* 5 / 6) >> 14;
+	curr_capacity = (di->boot_capacity_mAh + accumulated_charge) /
+					(di->max_battery_capacity / 100);
+	dev_dbg(di->dev,
+		"initial capacity %d mAh, accumulated %d mAh, total %d mAh\n",
+			di->boot_capacity_mAh, accumulated_charge,
+			di->boot_capacity_mAh + accumulated_charge);
 
-		charging_disabled = 1;
-		di->ac_next_refresh = jiffies +
-			msecs_to_jiffies(CHARGING_CAPACITY_UPDATE_PERIOD);
-		di->capacity = -1;
+	dev_dbg(di->dev, "voltage: %d\n", di->voltage_mV);
+	dev_dbg(di->dev, "percentage_capacity %d\n", curr_capacity);
 
-		/* We have to disable charging to read correct
-		 * voltages.
-		 */
-		twl6030_stop_charger(di);
-		/*voltage setteling time*/
-		msleep(200);
+	if (curr_capacity > 99)
+		curr_capacity = 99;
 
-		di->voltage_mV = twl6030_get_gpadc_conversion(di,
-						di->gpadc_vbat_chnl);
-	}
-
-	/* Setting the capacity level only makes sense when on
-	 * the battery is powering the board.
-	 */
-	if ((di->charge_status == POWER_SUPPLY_STATUS_DISCHARGING) ||
-		(di->charge_status == POWER_SUPPLY_STATUS_NOT_CHARGING)) {
-
-		if (di->voltage_mV < 3500)
-			curr_capacity = 5;
-		else if (di->voltage_mV < 3600 && di->voltage_mV >= 3500)
-			curr_capacity = 20;
-		else if (di->voltage_mV < 3700 && di->voltage_mV >= 3600)
-			curr_capacity = 50;
-		else if (di->voltage_mV < 3800 && di->voltage_mV >= 3700)
-			curr_capacity = 75;
-		else if (di->voltage_mV < 3900 && di->voltage_mV >= 3800)
-			curr_capacity = 90;
-		else if (di->voltage_mV >= 3900)
-			curr_capacity = 100;
-	}
-
-	/* if we disabled charging to check capacity,
-	 * enable it again after we read the
-	 * correct voltage.
-	 */
-	if (charging_disabled) {
-		if (charger_source == POWER_SUPPLY_TYPE_MAINS)
-			twl6030_start_ac_charger(di);
-		else if (charger_source == POWER_SUPPLY_TYPE_USB)
-			twl6030_start_usb_charger(di);
-	}
 
 	/* if battery is not present we assume it is on battery simulator and
 	 * current capacity is set to 100%
 	 */
 	if (!is_battery_present(di))
 		curr_capacity = 100;
-
-       /* Debouncing of voltage change. */
-	if (di->capacity == -1) {
-		di->capacity = curr_capacity;
-		di->capacity_debounce_count = 0;
-		return 1;
-	}
 
 	if (curr_capacity != di->prev_capacity) {
 		di->prev_capacity = curr_capacity;
@@ -1674,6 +2054,9 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 
 	return 0;
 }
+#endif
+#endif
+
 
 static int twl6030_set_watchdog(struct twl6030_bci_device_info *di, int val)
 {
@@ -1684,7 +2067,7 @@ static int twl6030_set_watchdog(struct twl6030_bci_device_info *di, int val)
 	return twl_i2c_write_u8(TWL6030_MODULE_CHARGER, val, CONTROLLER_WDG);
 
 }
-
+#define TEMP_OFFSET 416
 static void twl6030_bci_battery_work(struct work_struct *work)
 {
 	struct twl6030_bci_device_info *di = container_of(work,
@@ -1692,8 +2075,13 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	struct twl6030_gpadc_request req;
 	int adc_code;
 	int temp;
+#ifdef CONFIG_JET_V2
+	int i;
+#endif
 	int ret, ret1;
-
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s\n",__func__);
+#endif
 	/* Kick the charger watchdog */
 	if (di->charge_status == POWER_SUPPLY_STATUS_CHARGING)
 		twl6030_set_watchdog(di, di->watchdog_duration);
@@ -1703,6 +2091,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 
 	req.active = 0;
 	req.func_cb = NULL;
+	req.type = TWL6030_GPADC_WAIT;
 	ret = twl6030_gpadc_conversion(&req);
 
 	schedule_delayed_work(&di->twl6030_bci_monitor_work,
@@ -1722,7 +2111,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 		return;
 
 	adc_code = req.buf[1].code;
-
+	//printk("\ngpad val0=%d, val7=%d, val8=%d\n",adc_code, req.rbuf[di->gpadc_vbat_chnl],req.rbuf[8] );
 	/*
 	 * TWL6032 has 12-bit ADC, TWL6030 has 10-bit ADC,
 	 * battery temperature table is calculated for the TWL6030.
@@ -1730,15 +2119,31 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	 */
 	if (di->features & TWL6032_SUBCLASS)
 		adc_code >>= 2;
+#ifdef CONFIG_JET_V2
+	for (i = 0; i < di->platform_data->tblsize; ) {
+		if (adc_code >= di->platform_data->battery_tmp_tbl[i])
+			break;
+		i+=3;
+	}
+	//temp-temp0=(adc-adc0)*slope
+	temp= adc_code-di->platform_data->battery_tmp_tbl[i];
+	temp= temp*di->platform_data->battery_tmp_tbl[i+2];
+	temp= di->platform_data->battery_tmp_tbl[i+1]-temp;
 
+	di->temp_C = temp/10;/* in tenths of degree Celsius */
+#ifdef DEBUG
+	printk(KERN_DEBUG "Battery temperature:%d:%d\n", di->temp_C,adc_code);
+#endif
+#else
 	for (temp = 0; temp < di->platform_data->tblsize; temp++) {
-		if (adc_code >= di->platform_data->
+		if (adc_code+TEMP_OFFSET >= di->platform_data->
 				battery_tmp_tbl[temp])
 			break;
 	}
-
 	/* first 2 values are for negative temperature */
 	di->temp_C = (temp - 2) * 10; /* in tenths of degree Celsius */
+#endif
+
 
 	ret = capacity_changed(di);
 	ret1 = twl6030_usb_autogate_charger(di);
@@ -1746,7 +2151,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	if (ret || ret1)
 		power_supply_changed(&di->bat);
 }
-
+#ifndef CONFIG_MACH_OMAP4_JET
 static void twl6030_current_mode_changed(struct twl6030_bci_device_info *di)
 {
 	int ret;
@@ -1779,7 +2184,7 @@ static void twl6030_work_interval_changed(struct twl6030_bci_device_info *di)
 	schedule_delayed_work(&di->twl6030_bci_monitor_work,
 		msecs_to_jiffies(1000 * di->monitoring_interval));
 }
-
+#endif
 #define to_twl6030_bci_device_info(x) container_of((x), \
 			struct twl6030_bci_device_info, bat);
 
@@ -1870,9 +2275,16 @@ static int twl6030_bci_battery_get_property(struct power_supply *psy,
 		val->intval = di->charge_status;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		di->voltage_mV = twl6030_get_gpadc_conversion(di,
-						di->gpadc_vbat_chnl);
+		di->voltage_mV = twl6030_get_gpadc_conversion(di, di->gpadc_vbat_chnl);
+#ifdef CONFIG_JET_SUN
+		twl6030battery_current(di);
+		// GIL: This is a temp fix - but it actually works pretty well.
+		// TODO: We need to make sure that using this virtual voltage - we should not go below 3.0V
+		val->intval = (di->current_uA > -100000) ? di->voltage_mV * 1000 : di->voltage_mV * 1000 + ((-350 * (di->current_uA + 100000))/1000);
+		// printk(KERN_INFO "uA=%d, mV=%d, intval=%d\n",di->current_uA ,  di->voltage_mV*1000, val->intval);
+#else // CONFIG_JET_SNOW
 		val->intval = di->voltage_mV * 1000;
+#endif
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		twl6030battery_current(di);
@@ -1891,14 +2303,61 @@ static int twl6030_bci_battery_get_property(struct power_supply *psy,
 		val->intval = di->bat_health;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
+#ifdef CONFIG_FUEL_GAUGE
+		val->intval = di->cell.soc;
+#else
 		val->intval = di->capacity;
+#endif
 		break;
+	/*code commented below belong to TI release 2.5*/
+	//case POWER_SUPPLY_PROP_CHARGE_FULL:
+		//val->intval = di->cell.fcc;
+		//break;
+	//case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+		//val->intval = 0;
+		//break;
+	//case POWER_SUPPLY_PROP_CYCLE_COUNT:
+		//val->intval = di->cell.cycle_count;
+		//break;
 	default:
 		return -EINVAL;
 	}
 	return 0;
 }
+#if 0
+/*code commented below belong to TI release 2.5*/
+static int twl6030_bci_battery_set_property(struct power_supply *psy,
+				       enum power_supply_property psp,
+				       const union power_supply_propval *val)
+{
+	struct twl6030_bci_device_info *di;
 
+	di = to_twl6030_bci_device_info(psy);
+
+	switch (psp) {
+#ifdef CONFIG_FUEL_GAUGE
+	case POWER_SUPPLY_PROP_CHARGE_FULL:
+		if (val->intval > 500) {
+			di->cell.fcc = val->intval;
+			di->cell.nac = (di->cell.soc * di->cell.fcc) / 100;
+		} else {
+			pr_err("FCC is too low, ignoring it\n");
+		}
+		break;
+
+	case POWER_SUPPLY_PROP_CYCLE_COUNT:
+		di->cell.cycle_count = val->intval;
+		break;
+#endif
+
+	default:
+		return -EPERM;
+	}
+
+	return 0;
+}
+#endif
+#ifdef CONFIG_CHARGER_BQ2415x
 int twl6030_register_notifier(struct notifier_block *nb,
 				unsigned int events)
 {
@@ -1912,17 +2371,46 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 	return blocking_notifier_chain_unregister(&notifier_list, nb);
 }
 EXPORT_SYMBOL_GPL(twl6030_unregister_notifier);
-
+#endif
 static void twl6030_usb_charger_work(struct work_struct *work)
 {
 	struct twl6030_bci_device_info	*di =
 		container_of(work, struct twl6030_bci_device_info, usb_work);
-
+//Set default charging value
+#ifdef CONFIG_JET_SUN
+	di->charger_outcurrentmA = 400;
+	di->platform_data->max_charger_currentmA=400;
+#else
+	di->charger_outcurrentmA = 600;
+	di->platform_data->max_charger_currentmA=500;
+#endif
 	switch (di->event) {
 	case USB_EVENT_CHARGER:
-		/* POWER_SUPPLY_TYPE_USB_DCP */
-		di->usb_online = POWER_SUPPLY_TYPE_USB_DCP;
-		di->charger_incurrentmA = 1800;
+		switch (di->usb_online) {
+		case POWER_SUPPLY_TYPE_USB_DCP:
+#ifdef CONFIG_JET_SUN
+			di->charger_incurrentmA = 1000;
+#else
+			di->charger_incurrentmA = 750;
+			di->charger_outcurrentmA = 800;
+			di->platform_data->max_charger_currentmA=700;
+#endif
+			break;
+		case POWER_SUPPLY_TYPE_USB_ACA:
+			di->charger_incurrentmA = 550;
+			break;
+		case POWER_SUPPLY_TYPE_USB_UNKNOWN:
+			di->charger_incurrentmA = 400;
+#ifdef CONFIG_JET_SUN
+
+#else
+			di->charger_outcurrentmA = 500;
+#endif
+			di->platform_data->max_charger_currentmA=400;
+			break;
+		default:
+			break;
+		}
 		break;
 	case USB_EVENT_VBUS:
 		switch (di->usb_online) {
@@ -1933,6 +2421,10 @@ static void twl6030_usb_charger_work(struct work_struct *work)
 			 */
 			di->charger_incurrentmA = 500;
 		case POWER_SUPPLY_TYPE_USB:
+			//Before enumeration, set 100mA
+			di->charger_incurrentmA = 100;
+			break;
+		default:
 			break;
 		}
 		break;
@@ -1944,7 +2436,7 @@ static void twl6030_usb_charger_work(struct work_struct *work)
 		if (di->usb_online == POWER_SUPPLY_TYPE_USB_CDP)
 			di->charger_incurrentmA = 560;
 		else
-			di->charger_incurrentmA = di->usb_max_power;
+			di->charger_incurrentmA = 500;//di->usb_max_power;
 		break;
 	default:
 		return;
@@ -1968,6 +2460,8 @@ static int twl6030_usb_notifier_call(struct notifier_block *nb,
 		di->usb_max_power = *((unsigned int *) data);
 		break;
 	case USB_EVENT_CHARGER:
+		di->usb_online = *((unsigned int *) data);
+		break;
 	case USB_EVENT_NONE:
 		break;
 	case USB_EVENT_ID:
@@ -1979,7 +2473,9 @@ static int twl6030_usb_notifier_call(struct notifier_block *nb,
 
 	return NOTIFY_OK;
 }
+#ifdef CONFIG_MACH_OMAP4_JET
 
+#else
 static ssize_t set_fg_mode(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -2161,7 +2657,9 @@ static ssize_t set_charging(struct device *dev, struct device_attribute *attr,
 {
 	int status = count;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
-
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "%s\n",__func__);
+#endif
 	if (strncmp(buf, "startac", 7) == 0) {
 		if (di->charger_source == POWER_SUPPLY_TYPE_USB)
 			twl6030_stop_usb_charger(di);
@@ -2289,7 +2787,8 @@ static ssize_t set_min_vbus(struct device *dev, struct device_attribute *attr,
 	int status = count;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
 
-	if ((strict_strtol(buf, 10, &val) < 0) || (val < 4200) || (val > 4760))
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < di->min_vbus_val) ||
+						(val > 4760))
 		return -EINVAL;
 	di->min_vbus = val;
 	twl6030_config_min_vbus_reg(di, val);
@@ -2490,8 +2989,11 @@ static DEVICE_ATTR(status_int1, S_IRUGO, show_status_int1, NULL);
 static DEVICE_ATTR(status_int2, S_IRUGO, show_status_int2, NULL);
 static DEVICE_ATTR(vbus_charge_thres, S_IWUSR | S_IRUGO,
 		show_vbus_charge_thres, set_vbus_charge_thres);
-
+#endif
 static struct attribute *twl6030_bci_attributes[] = {
+#ifdef CONFIG_MACH_OMAP4_JET
+
+#else
 	&dev_attr_fg_mode.attr,
 	&dev_attr_charge_src.attr,
 	&dev_attr_vbus_voltage.attr,
@@ -2516,6 +3018,7 @@ static struct attribute *twl6030_bci_attributes[] = {
 	&dev_attr_status_int2.attr,
 	&dev_attr_wakelock_enable.attr,
 	&dev_attr_vbus_charge_thres.attr,
+#endif
 	NULL,
 };
 
@@ -2526,7 +3029,43 @@ static const struct attribute_group twl6030_bci_attr_group = {
 static char *twl6030_bci_supplied_to[] = {
 	"twl6030_battery",
 };
-
+#if 0
+static void twl6030_bci_battery_shutdown(struct platform_device *pdev)
+{
+	int ret;
+	u8 val;
+	struct twl6030_bci_device_info *di = platform_get_drvdata(pdev);
+//force to charge even the device turn off
+	if(di->charge_status == POWER_SUPPLY_STATUS_CHARGING)
+	{
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+		printk(KERN_DEBUG "%s:usb_online=%d\n",__func__,di->usb_online );
+#endif
+		if(di->usb_online!=POWER_SUPPLY_TYPE_USB)//usb port should go back default <100ma charge after off
+		{
+			ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &val,CHARGERUSB_CTRLLIMIT2);
+			if(ret)
+				goto err;
+			val |= LOCK_LIMIT;
+			ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, val,CHARGERUSB_CTRLLIMIT2);
+			if(ret)
+				goto err;
+			twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 32, CONTROLLER_WDG);
+		}
+		if(di->usb_online==POWER_SUPPLY_TYPE_USB_ACA)
+		{
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+			printk(KERN_INFO "USBPHY_CHRG_DET=0x%x\n", omap4_force_charge());
+#else
+			omap4_force_charge();
+#endif
+		}
+	}
+	return;
+err:
+	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+}
+#endif
 static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 {
 	struct twl4030_bci_platform_data *pdata = pdev->dev.platform_data;
@@ -2547,6 +3086,18 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	if (!di)
 		return -ENOMEM;
 
+#ifdef CONFIG_FUEL_GAUGE
+	memset(&di->cell, 0, sizeof(struct cell_state));
+#else
+#if defined(CONFIG_MACH_OMAP4_JET)
+	di->capacity = 100;
+	di->temp_C=250;
+	di->value_debounce_count=0;
+#else
+	di->capacity = -1;
+	di->capacity_debounce_count = 0;
+#endif
+#endif
 	di->platform_data = kmemdup(pdata, sizeof(*pdata), GFP_KERNEL);
 	if (!di->platform_data) {
 		kfree(di);
@@ -2589,7 +3140,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 		di->use_power_path = 0;
 		di->use_hw_charger = 0;
 	}
-
+#ifdef CONFIG_JET_V1
 	if (di->use_hw_charger) {
 		di->platform_data->max_charger_currentmA =
 				twl6030_get_limit2_reg(di);
@@ -2600,7 +3151,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 		di->platform_data->max_bat_voltagemV =
 				twl6030_get_voreg_reg(di);
 	}
-
+#endif
 	di->bat.name = "twl6030_battery";
 	di->bat.supplied_to = twl6030_bci_supplied_to;
 	di->bat.num_supplicants = ARRAY_SIZE(twl6030_bci_supplied_to);
@@ -2624,7 +3175,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->ac.num_properties = ARRAY_SIZE(twl6030_ac_props);
 	di->ac.get_property = twl6030_ac_get_property;
 
-	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+	di->charge_status = twl6030_get_discharge_status(di);
 
 	di->bk_bat.name = "twl6030_bk_battery";
 	di->bk_bat.type = POWER_SUPPLY_TYPE_BATTERY;
@@ -2633,11 +3184,14 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->bk_bat.get_property = twl6030_bk_bci_battery_get_property;
 
 	di->vac_priority = 2;
-	di->capacity = -1;
-	di->capacity_debounce_count = 0;
-	di->ac_next_refresh = jiffies - 1;
 	platform_set_drvdata(pdev, di);
 
+#ifdef CONFIG_FUEL_GAUGE
+	ret = twl6030_configure_cell(pdev, di);
+	if (ret)
+		goto temp_setup_fail;
+	di->cell.soc = 100;
+#endif
 	/* calculate current max scale from sense */
 	if (pdata->sense_resistor_mohm) {
 		di->current_max_scale = (62000) / pdata->sense_resistor_mohm;
@@ -2651,21 +3205,32 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	wake_lock_init(&chrg_lock, WAKE_LOCK_SUSPEND, "ac_chrg_wake_lock");
 
-	if (di->errata & TWL6032_ERRATA_DB00119490) {
+	di->min_vbus_val = 4200;
+	if ((di->errata & TWL6032_ERRATA_DB00119490) ||
+		(di->errata & TWL6030_ERRATA_DB00112620)) {
 		/*
-		 * Set Anti-collapse threshold correspond
-		 * to the ERRATA DB00119490 (4.4 volts)
+		 * Enable Anti-collapse threshold:
+		 * for ERRATA DB00119490: 4.4 volts
+		 * for ERRATA DB00112620: 4.2 volts
 		 */
+		if (di->errata & TWL6032_ERRATA_DB00119490)
+			di->min_vbus_val = 4400;
+
+		ret = twl6030_config_min_vbus_reg(di, di->min_vbus_val);
+
+		if (ret)
+			goto temp_setup_fail;
+
+		/* Enable Anti-collapse threshold */
 		ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg,
 						ANTICOLLAPSE_CTRL1);
 		if (ret)
 			goto temp_setup_fail;
 
-		reg = reg & 0x1F;
-		reg = reg | ((0x3) << BUCK_VTH_SHIFT);
+		reg &= ~ANTICOLL_DIG;
+		reg |= ANTICOLL_ANA;
 		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg,
 						ANTICOLLAPSE_CTRL1);
-
 		if (ret)
 			goto temp_setup_fail;
 	}
@@ -2750,11 +3315,21 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "current measurement setup failed\n");
 
 	/* initialize for USB charging */
+#ifdef CONFIG_JET_V2
+	//uboot already set those values, so no need to set default values anyway
+	//twl6030_config_limit1_reg(di, pdata->max_charger_voltagemV);
+	//twl6030_config_voreg_reg(di, di->platform_data->max_bat_voltagemV);
+	//twl6030_config_iterm_reg(di, di->platform_data->termination_currentmA);
+	//twl6030_config_cinlimit_reg(di, di->charger_incurrentmA);
+	//twl6030_config_vichrg_reg(di, di->charger_outcurrentmA);
+	//twl6030_config_limit2_reg(di,di->platform_data->max_charger_currentmA);
+#else
 	if (!di->use_hw_charger) {
 		twl6030_config_limit1_reg(di, pdata->max_charger_voltagemV);
 		twl6030_config_limit2_reg(di,
 				di->platform_data->max_charger_currentmA);
 	}
+#endif
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MBAT_TEMP,
 						CONTROLLER_INT_MASK);
 	if (ret)
@@ -2775,17 +3350,6 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	twl6030_set_watchdog(di, 32);
 
-	INIT_WORK(&di->usb_work, twl6030_usb_charger_work);
-	di->nb.notifier_call = twl6030_usb_notifier_call;
-	di->otg = otg_get_transceiver();
-	if (di->otg) {
-		ret = otg_register_notifier(di->otg, &di->nb);
-		if (ret)
-			dev_err(&pdev->dev, "otg register notifier"
-						" failed %d\n", ret);
-	} else
-		dev_err(&pdev->dev, "otg_get_transceiver failed %d\n", ret);
-
 	if (di->features & TWL6032_SUBCLASS) {
 		di->charger_incurrentmA = 100;
 		di->gpadc_vbat_chnl = TWL6032_GPADC_VBAT_CHNL;
@@ -2794,10 +3358,46 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 		di->gpadc_vbat_chnl = TWL6030_GPADC_VBAT_CHNL;
 	}
 
-	di->voltage_mV = twl6030_get_gpadc_conversion(di, di->gpadc_vbat_chnl);
-	dev_info(&pdev->dev, "Battery Voltage at Bootup is %d mV\n",
-							di->voltage_mV);
+	INIT_WORK(&di->usb_work, twl6030_usb_charger_work);
+	di->nb.notifier_call = twl6030_usb_notifier_call;
+	di->otg = otg_get_transceiver();
+	if (di->otg) {
+		ret = otg_register_notifier(di->otg, &di->nb);
+		if (ret)
+			dev_err(&pdev->dev, "otg register notifier"
+						" failed %d\n", ret);
+#ifdef CONFIG_MACH_OMAP4_JET
+		else
+			twl6030_enable_irq(di->otg);
+#endif
+	} else
+		dev_err(&pdev->dev, "otg_get_transceiver failed %d\n", ret);
 
+	di->voltage_mV = twl6030_get_gpadc_conversion(di, di->gpadc_vbat_chnl);
+#ifndef CONFIG_FUEL_GAUGE
+#if defined(CONFIG_MACH_OMAP4_JET)
+	di->prev_voltage=di->voltage_mV;
+	di->prev_temperature=di->temp_C;
+	di->capacity=voltage_cap_init(di->voltage_mV,di->temp_C);
+	dev_dbg(&pdev->dev, "BAT Bootup %d mV,cap %d\n",
+			di->voltage_mV,di->capacity);
+	di->init=true;
+#else
+	di->capacity = capacity_lookup(di->voltage_mV);
+	/*
+	 * If platform data did not report the battery capacity,
+	 * then assume a default value of 1000 mAh
+	 */
+	if (!pdata->max_battery_capacity) {
+		di->max_battery_capacity = 1000;
+		dev_dbg(di->dev,
+				"battery capacity unknown. Assume 1000 mAh\n");
+	} else {
+		di->max_battery_capacity = pdata->max_battery_capacity;
+	}
+	di->boot_capacity_mAh = di->max_battery_capacity * di->capacity / 100;
+#endif
+#endif
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (ret)
 		goto  bk_batt_failed;
@@ -2853,11 +3453,9 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 			di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 		else {
 			if (di->stat1 & (VBUS_DET | VAC_DET))
-				di->charge_status =
-					POWER_SUPPLY_STATUS_NOT_CHARGING;
+				di->charge_status =POWER_SUPPLY_STATUS_NOT_CHARGING;
 			else
-				di->charge_status =
-					POWER_SUPPLY_STATUS_DISCHARGING;
+				di->charge_status =twl6030_get_discharge_status(di);;
 		}
 	}
 
@@ -2873,14 +3471,25 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 						REG_INT_MSK_LINE_C);
 	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
 						REG_INT_MSK_STS_C);
-
+#ifdef CONFIG_FUEL_GAUGE
+	if (is_battery_present(di)) {
+			fg_init(&di->cell, di->voltage_mV);
+		} else {
+			di->cell.cc = 1;
+			di->cell.full = 1;
+			power_supply_changed(&di->bat);
+	}
+#endif
 	ret = sysfs_create_group(&pdev->dev.kobj, &twl6030_bci_attr_group);
 	if (ret)
-		dev_dbg(&pdev->dev, "could not create sysfs files\n");
-
+		dev_err(&pdev->dev, "could not create sysfs files\n");
+#ifdef CONFIG_MACH_OMAP4_JET
+	schedule_delayed_work(&di->twl6030_bci_monitor_work, msecs_to_jiffies(5000));//delay 5 second
+	schedule_delayed_work(&di->twl6030_current_avg_work, msecs_to_jiffies(5000));
+#else
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
-
 	schedule_delayed_work(&di->twl6030_current_avg_work, 0);
+#endif
 
 	return 0;
 
@@ -2946,10 +3555,12 @@ static int twl6030_bci_battery_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct twl6030_bci_device_info *di = platform_get_drvdata(pdev);
+#ifdef CONFIG_CHARGER_BQ2415x
 	long int events;
+#endif
 	u8 rd_reg = 0;
 	int ret;
-
+	dev_dbg(di->dev, "%s\n",__func__);
 	/* mask to prevent wakeup due to 32s timeout from External charger */
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg,
 						CONTROLLER_INT_MASK);
@@ -2972,21 +3583,14 @@ static int twl6030_bci_battery_suspend(struct device *dev)
 		((wakeup_timer_seconds > 25) || !wakeup_timer_seconds)) {
 		wakeup_timer_seconds = 25;
 	}
-
+#ifdef CONFIG_CHARGER_BQ2415x
 	/*reset the BQ watch dog*/
 	events = BQ2415x_RESET_TIMER;
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
-
+#endif
 	ret = twl6030battery_temp_setup(false);
 	if (ret) {
 		pr_err("%s: Temp measurement setup failed (%d)!\n",
-				__func__, ret);
-		return ret;
-	}
-
-	ret = twl6030battery_current_setup(false);
-	if (ret) {
-		pr_err("%s: Current measurement setup failed (%d)!\n",
 				__func__, ret);
 		return ret;
 	}
@@ -3001,20 +3605,15 @@ static int twl6030_bci_battery_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct twl6030_bci_device_info *di = platform_get_drvdata(pdev);
+#ifdef CONFIG_CHARGER_BQ2415x
 	long int events;
+#endif
 	u8 rd_reg = 0;
 	int ret;
-
+	dev_dbg(di->dev, "%s\n",__func__);
 	ret = twl6030battery_temp_setup(true);
 	if (ret) {
 		pr_err("%s: Temp measurement setup failed (%d)!\n",
-				__func__, ret);
-		return ret;
-	}
-
-	ret = twl6030battery_current_setup(true);
-	if (ret) {
-		pr_err("%s: Current measurement setup failed (%d)!\n",
 				__func__, ret);
 		return ret;
 	}
@@ -3031,10 +3630,10 @@ static int twl6030_bci_battery_resume(struct device *dev)
 
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
 	schedule_delayed_work(&di->twl6030_current_avg_work, 50);
-
+#ifdef CONFIG_CHARGER_BQ2415x
 	events = BQ2415x_RESET_TIMER;
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
-
+#endif
 	return 0;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
@@ -3053,6 +3652,9 @@ static const struct dev_pm_ops pm_ops = {
 static struct platform_driver twl6030_bci_battery_driver = {
 	.probe		= twl6030_bci_battery_probe,
 	.remove		= __devexit_p(twl6030_bci_battery_remove),
+#if 0
+	.shutdown	= twl6030_bci_battery_shutdown,
+#endif
 	.driver		= {
 		.name	= "twl6030_bci",
 		.pm	= &pm_ops,
@@ -3061,6 +3663,7 @@ static struct platform_driver twl6030_bci_battery_driver = {
 
 static int __init twl6030_battery_init(void)
 {
+	printk(KERN_DEBUG "%s\n",__func__);
 	return platform_driver_register(&twl6030_bci_battery_driver);
 }
 module_init(twl6030_battery_init);

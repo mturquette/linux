@@ -23,7 +23,9 @@
 void __init omap_pmic_data_init(void)
 {
 	omap_twl_init();
+#ifndef CONFIG_TWL6032_PMIC
 	omap_tps6236x_init();
+#endif
 }
 
 /**

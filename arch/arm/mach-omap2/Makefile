@@ -30,7 +30,12 @@ clock-common				= clock.o clock_common_data.o \
 obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
 obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common)
 obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common)
-obj-$(CONFIG_ARCH_OMAP4) += emif.o lpddr2_jedec_data.o lpddr2_elpida_data.o
+
+ifeq ($(CONFIG_MACH_OMAP4_JET), y)
+	obj-$(CONFIG_ARCH_OMAP4) += emif.o lpddr2_jedec_data.o lpddr2_micron_data.o
+else
+	obj-$(CONFIG_ARCH_OMAP4) += emif.o lpddr2_jedec_data.o lpddr2_elpida_data.o
+endif
 
 obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
 
@@ -266,7 +271,18 @@ obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
 					   hsmmc.o
-obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
+ifeq ($(CONFIG_MACH_OMAP4_JET), y)
+   obj-$(CONFIG_MACH_OMAP4_JET)		+= board-4430jet.o \
+					   board-44xx-identity.o \
+					   board-44xx-power.o \
+					   board-44xx-serial.o \
+					   hsmmc.o \
+					   omap_phy_internal.o \
+					   omap4_apps_brd_id.o \
+					   board-jet-sensors.o \
+					   board-jet-pwbutton.o
+else
+    obj-$(CONFIG_MACH_OMAP_4430SDP)	+= board-4430sdp.o \
 					   board-blaze-touch.o \
 					   board-blaze-panel.o \
 					   board-blaze-keypad.o \
@@ -277,7 +293,9 @@ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   board-44xx-serial.o \
 					   hsmmc.o \
 					   omap_phy_internal.o \
-					   omap4_apps_brd_id.o
+					   omap4_apps_brd_id.o                   
+endif					   
+					   
 obj-$(CONFIG_MACH_OMAP_BLAZE)		+= board-44xx-tablet.o \
 					   board-44xx-identity.o \
 					   board-44xx-power.o \

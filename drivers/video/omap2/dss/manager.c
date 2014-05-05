@@ -2371,17 +2371,19 @@ static int dss_check_manager(struct omap_overlay_manager *mgr)
 {
 	/* if we have OMAP3 alpha compatibility, alpha blending is always on */
 	if (dss_has_feature(FEAT_ALPHA_OMAP3_COMPAT)) {
-		if (!mgr->info.alpha_enabled)
+		if (!mgr->info.alpha_enabled) {
+			printk(KERN_INFO "[%s:%u]\n",__FUNCTION__,__LINE__);
 			return -EINVAL;
+		}
 	} else {
 		/*
 		 * OMAP3- supports only graphics destination transparency
 		 * color key and alpha blending simultaneously.
 		 * See TRM 15.4.2.4.2.2 Alpha Mode.
 		 */
-		if (mgr->info.alpha_enabled && mgr->info.trans_enabled &&
-			mgr->info.trans_key_type != OMAP_DSS_COLOR_KEY_GFX_DST)
+		if (mgr->info.alpha_enabled && mgr->info.trans_enabled && mgr->info.trans_key_type != OMAP_DSS_COLOR_KEY_GFX_DST) {
 			return -EINVAL;
+		}
 	}
 
 	return 0;

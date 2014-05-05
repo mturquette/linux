@@ -1,4 +1,6 @@
 menu "CPU Frequency scaling"
+config CPU_FREQ_DEBUG
+bool "CPU Frequency debug"
 
 config CPU_FREQ
 	bool "CPU Frequency scaling"

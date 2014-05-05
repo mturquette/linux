@@ -59,13 +59,13 @@
 #include "vc.h"
 #include "control.h"
 
+#define TWL603X_WARMRESET_TIME 9500
+
 struct power_state {
 	struct powerdomain *pwrdm;
 	u32 next_state;
-#ifdef CONFIG_SUSPEND
 	u32 saved_state;
 	u32 saved_logic_state;
-#endif
 	struct list_head node;
 };
 
@@ -255,6 +255,93 @@ void omap4_trigger_ioctrl(void)
 		pr_err("%s: Max IO latch time reached for WUCLKIN disable\n",
 			__func__);
 	return;
+}
+
+/**
+ * get_achievable_state() - Provide achievable state
+ * @available_states:	what states are available
+ * @req_min_state:	what state is the minimum we'd like to hit
+ * @is_parent_pd:	is this a parent power domain?
+ *
+ * Power domains have varied capabilities. When attempting a low power
+ * state such as OFF/RET, a specific min requested state may not be
+ * supported on the power domain, in which case:
+ * a) if this power domain is a parent power domain, we do not intend
+ * for it to go to a lower power state(because we are not targetting it),
+ * select the next higher power state which is supported is returned.
+ * b) However, for all children power domains, we first try to match
+ * with a lower power domain state before attempting a higher state.
+ * This is because a combination of system power states where the
+ * parent PD's state is not in line with expectation can result in
+ * system instabilities.
+ */
+static inline u8 get_achievable_state(u8 available_states, u8 req_min_state,
+				      bool is_parent_pd)
+{
+	u8 max_mask = 0xFF << req_min_state;
+	u8 min_mask = ~max_mask;
+
+	/* First see if we have an accurate match */
+	if (available_states & BIT(req_min_state))
+		return req_min_state;
+
+	/* See if a lower power state is possible on this child domain */
+	if (!is_parent_pd && available_states & min_mask)
+		return __ffs(available_states & min_mask);
+
+	if (available_states & max_mask)
+		return __ffs(available_states & max_mask);
+
+	return PWRDM_POWER_ON;
+}
+
+/**
+ * _set_pwrdm_state() - Program powerdomain to the requested state
+ * @pwrst: pwrdm state struct
+ *
+ * This takes pointer to power_state struct as the function parameter.
+ * Program pwrst and logic state of the requested pwrdm.
+ */
+static int _set_pwrdm_state(struct power_state *pwrst, u32 state,
+			    u32 logic_state)
+{
+	u32 als;
+	bool parent_power_domain = false;
+	int ret = 0;
+
+	pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
+	pwrst->saved_logic_state = pwrdm_read_logic_retst(pwrst->pwrdm);
+	if (!strcmp(pwrst->pwrdm->name, "core_pwrdm") ||
+		!strcmp(pwrst->pwrdm->name, "mpu_pwrdm") ||
+		!strcmp(pwrst->pwrdm->name, "iva_pwrdm"))
+			parent_power_domain = true;
+	/*
+	 * Write only to registers which are writable! Don't touch
+	 * read-only/reserved registers. If pwrdm->pwrsts_logic_ret or
+	 * pwrdm->pwrsts are 0, consider those power domains containing
+	 * readonly/reserved registers which cannot be controlled by
+	 * software.
+	 */
+	if (pwrst->pwrdm->pwrsts_logic_ret) {
+		als =
+		   get_achievable_state(pwrst->pwrdm->pwrsts_logic_ret,
+				logic_state, parent_power_domain);
+		if (als < pwrst->saved_logic_state)
+			ret = pwrdm_set_logic_retst(pwrst->pwrdm, als);
+	}
+
+	if (pwrst->pwrdm->pwrsts) {
+		pwrst->next_state =
+		   get_achievable_state(pwrst->pwrdm->pwrsts, state,
+						parent_power_domain);
+		if (pwrst->next_state < pwrst->saved_state)
+			ret |= omap_set_pwrdm_state(pwrst->pwrdm,
+					     pwrst->next_state);
+		else
+			pwrst->next_state = pwrst->saved_state;
+	}
+
+	return ret;
 }
 
 #ifdef CONFIG_SUSPEND
@@ -683,93 +770,6 @@ static void omap4_print_wakeirq(void)
 #endif
 
 /**
- * get_achievable_state() - Provide achievable state
- * @available_states:	what states are available
- * @req_min_state:	what state is the minimum we'd like to hit
- * @is_parent_pd:	is this a parent power domain?
- *
- * Power domains have varied capabilities. When attempting a low power
- * state such as OFF/RET, a specific min requested state may not be
- * supported on the power domain, in which case:
- * a) if this power domain is a parent power domain, we do not intend
- * for it to go to a lower power state(because we are not targetting it),
- * select the next higher power state which is supported is returned.
- * b) However, for all children power domains, we first try to match
- * with a lower power domain state before attempting a higher state.
- * This is because a combination of system power states where the
- * parent PD's state is not in line with expectation can result in
- * system instabilities.
- */
-static inline u8 get_achievable_state(u8 available_states, u8 req_min_state,
-				      bool is_parent_pd)
-{
-	u8 max_mask = 0xFF << req_min_state;
-	u8 min_mask = ~max_mask;
-
-	/* First see if we have an accurate match */
-	if (available_states & BIT(req_min_state))
-		return req_min_state;
-
-	/* See if a lower power state is possible on this child domain */
-	if (!is_parent_pd && available_states & min_mask)
-		return __ffs(available_states & min_mask);
-
-	if (available_states & max_mask)
-		return __ffs(available_states & max_mask);
-
-	return PWRDM_POWER_ON;
-}
-
-/**
- * _set_pwrdm_state() - Program powerdomain to the requested state
- * @pwrst: pwrdm state struct
- *
- * This takes pointer to power_state struct as the function parameter.
- * Program pwrst and logic state of the requested pwrdm.
- */
-static int _set_pwrdm_state(struct power_state *pwrst, u32 state,
-			    u32 logic_state)
-{
-	u32 als;
-	bool parent_power_domain = false;
-	int ret = 0;
-
-	pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
-	pwrst->saved_logic_state = pwrdm_read_logic_retst(pwrst->pwrdm);
-	if (!strcmp(pwrst->pwrdm->name, "core_pwrdm") ||
-		!strcmp(pwrst->pwrdm->name, "mpu_pwrdm") ||
-		!strcmp(pwrst->pwrdm->name, "iva_pwrdm"))
-			parent_power_domain = true;
-	/*
-	 * Write only to registers which are writable! Don't touch
-	 * read-only/reserved registers. If pwrdm->pwrsts_logic_ret or
-	 * pwrdm->pwrsts are 0, consider those power domains containing
-	 * readonly/reserved registers which cannot be controlled by
-	 * software.
-	 */
-	if (pwrst->pwrdm->pwrsts_logic_ret) {
-		als =
-		   get_achievable_state(pwrst->pwrdm->pwrsts_logic_ret,
-				logic_state, parent_power_domain);
-		if (als < pwrst->saved_logic_state)
-			ret = pwrdm_set_logic_retst(pwrst->pwrdm, als);
-	}
-
-	if (pwrst->pwrdm->pwrsts) {
-		pwrst->next_state =
-		   get_achievable_state(pwrst->pwrdm->pwrsts, state,
-						parent_power_domain);
-		if (pwrst->next_state < pwrst->saved_state)
-			ret |= omap_set_pwrdm_state(pwrst->pwrdm,
-					     pwrst->next_state);
-		else
-			pwrst->next_state = pwrst->saved_state;
-	}
-
-	return ret;
-}
-
-/**
  * omap4_configure_pwrst() - Program powerdomain to their supported state
  * @is_off_mode: is this an OFF mode transition?
  *
@@ -979,7 +979,7 @@ static const struct platform_suspend_ops omap_pm_ops = {
 	.valid		= suspend_valid_only_mem,
 };
 #else
-void omap4_enter_sleep(unsigned int cpu, unsigned int power_state){ return; }
+void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend){ return; }
 #endif /* CONFIG_SUSPEND */
 
 /**
@@ -1204,6 +1204,7 @@ static void __init prcm_setup_regs(void)
 	 */
 	if (!voltdm_for_each(_voltdm_sum_time, (void *)&reset_delay_time)) {
 		reset_delay_time += tstart + tshut;
+		reset_delay_time = max(reset_delay_time,(u32)TWL603X_WARMRESET_TIME);
 		val = _usec_to_val_scrm(rate32k, reset_delay_time,
 			OMAP4430_RSTTIME1_SHIFT, OMAP4430_RSTTIME1_MASK);
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RSTTIME1_MASK, val,

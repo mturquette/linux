@@ -700,7 +700,7 @@ static int __init macfb_init(void)
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			break;
 		case NUBUS_DRHW_APPLE_JET:
-			strcpy(macfb_fix.id, "Jet");
+			strcpy(macfb_fix.id, "jet");
 			macfb_setpalette = jet_setpalette;
 			macfb_defined.activate = FB_ACTIVATE_NOW;
 			break;

@@ -16,6 +16,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#ifdef CONFIG_CPU_FREQ_DEBUG
+#define DEBUG
+#endif
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -256,7 +259,7 @@ static int omap_target(struct cpufreq_policy *policy,
 	ret = cpufreq_frequency_table_target(policy, freq_table, target_freq,
 			relation, &i);
 	if (ret) {
-		dev_dbg(mpu_dev, "%s: cpu%d: no freq match for %d(ret=%d)\n",
+		dev_err(mpu_dev, "%s: cpu%d: no freq match for %d(ret=%d)\n",
 			__func__, policy->cpu, target_freq, ret);
 		return ret;
 	}
@@ -289,6 +292,68 @@ static inline void freq_table_free(void)
 }
 
 #if defined(CONFIG_OMAP_THERMAL) || defined(CONFIG_OMAP4_DUTY_CYCLE)
+#ifdef CONFIG_MACH_OMAP4_JET
+static unsigned int omap_thermal_speed(void)
+{
+	unsigned int max = 0;
+	unsigned int curr;
+	int i;
+
+	curr = max_thermal;
+
+	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++){
+#ifdef CONFIG_CPU_FREQ_DEBUG
+		pr_debug("availible frequency=%i\n", freq_table[i].frequency);
+#endif
+		if (freq_table[i].frequency <= curr)
+			max = freq_table[i].frequency;
+	}
+	if (!max)
+		return curr;
+
+	return max;
+}
+static int cpufreq_apply_cooling(struct thermal_dev *dev, int max)
+{
+	unsigned int cur;
+	struct cpufreq_policy policy;
+#ifdef CONFIG_CPU_FREQ_DEBUG
+	pr_debug("%s: setting max from %i to %i\n", __func__, max_thermal, max);
+#endif
+	if (!omap_cpufreq_ready)
+		return 0;
+
+	cpufreq_get_policy(&policy, 0);
+
+	mutex_lock(&omap_cpufreq_lock);
+
+	if (max_thermal == max) {
+#ifdef CONFIG_CPU_FREQ_DEBUG
+		pr_warn("%s: not throttling\n", __func__);
+#endif
+		goto out;
+	}
+
+	max_thermal = max;
+	max_thermal = omap_thermal_speed();
+#ifdef CONFIG_CPU_FREQ_DEBUG
+		pr_debug("intend for frequency %i\n", max_thermal);
+#endif
+	if (!omap_cpufreq_suspended) {
+		cur = omap_getspeed(0);
+#ifdef CONFIG_CPU_FREQ_DEBUG
+		pr_debug("current frequency %i\n", cur);
+#endif
+		if (cur != max_thermal)
+			omap_cpufreq_scale(max_thermal, cur);
+	}
+
+out:
+	mutex_unlock(&omap_cpufreq_lock);
+
+	return 0;
+}
+#else
 void omap_thermal_step_freq_down(void)
 {
 	unsigned int cur;
@@ -341,7 +406,6 @@ void omap_thermal_step_freq_up(void)
 out:
 	mutex_unlock(&omap_cpufreq_lock);
 }
-
 /*
  * cpufreq_apply_cooling: based on requested cooling level, throttle the cpu
  * @param cooling_level: percentage of required cooling at the moment
@@ -366,6 +430,7 @@ static int cpufreq_apply_cooling(struct thermal_dev *dev,
 
 	return 0;
 }
+#endif
 #endif
 
 #ifdef CONFIG_OMAP4_DUTY_CYCLE

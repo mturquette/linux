@@ -631,15 +631,6 @@ static int dvb_init(struct em28xx *dev)
 			}
 		}
 		break;
-	case EM2880_BOARD_HAUPPAUGE_WINTV_HVR_900_R2:
-	case EM2882_BOARD_PINNACLE_HYBRID_PRO_330E:
-		dvb->fe[0] = dvb_attach(drxd_attach, &em28xx_drxd, NULL,
-					   &dev->i2c_adap, &dev->udev->dev);
-		if (attach_xc3028(0x61, dev) < 0) {
-			result = -EINVAL;
-			goto out_free;
-		}
-		break;
 	case EM2870_BOARD_REDDO_DVB_C_USB_BOX:
 		/* Philips CU1216L NIM (Philips TDA10023 + Infineon TUA6034) */
 		dvb->fe[0] = dvb_attach(tda10023_attach,

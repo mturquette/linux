@@ -32,6 +32,8 @@
 #include <plat/usb.h>
 #include "control.h"
 
+#define USBPHY_CHRG_DET 0x2094
+
 /* OMAP control module register for UTMI PHY */
 #define CONTROL_DEV_CONF		0x300
 #define PHY_PD				0x1
@@ -45,17 +47,19 @@
 
 #define CONTROL_USB2PHYCORE		0x620
 #define CHARGER_TYPE_PS2		0x2
+#define CHARGER_TYPE_UNKOWN		0x3
 #define CHARGER_TYPE_DEDICATED		0x4
 #define CHARGER_TYPE_HOST		0x5
 #define CHARGER_TYPE_PC			0x6
+#define CHARGER_TYPE_APPLE		0x8
 #define USB2PHY_CHGDETECTED		BIT(13)
 #define USB2PHY_RESTARTCHGDET		BIT(15)
 #define USB2PHY_DISCHGDET		BIT(30)
+#define USB2PHY_CHG_DET_DP_COMP		BIT(19)
 
 static struct clk *phyclk, *clk48m, *clk32k;
 static void __iomem *ctrl_base;
 static int usbotghs_control;
-
 #ifdef CONFIG_OMAP4_HSOTG_ED_CORRECTION
 #define OMAP4_HSOTG_SWTRIM_MASK		0xFFFF00FF
 #define OMAP4_HSOTG_REF_GEN_TEST_MASK	0xF8FFFFFF
@@ -134,7 +138,6 @@ static void omap44xx_hsotg_ed_correction(void)
 	 * bit field SYNC2 of OCP2SCP_TIMING
 	 * should be set to value >6
 	 */
-
 	val = __raw_readl(hsotg_base + 0x2018);
 	val |= 0x0F;
 	__raw_writel(val, hsotg_base + 0x2018);
@@ -185,7 +188,7 @@ static void omap44xx_hsotg_ed_correction(void)
 }
 #endif
 
-int omap4430_phy_set_clk(struct device *dev, int on)
+static int omap4430_phy_set_clk(struct device *dev, int on)
 {
 	static int state;
 
@@ -211,7 +214,9 @@ int omap4_charger_detect(void)
 	int charger = POWER_SUPPLY_TYPE_USB;
 	u32 usb2phycore = 0;
 	u32 chargertype = 0;
-
+#ifdef CONFIG_MACH_OMAP4_JET
+	omap4_force_charge();
+#endif
 	/* enable charger detection and restart it */
 	usb2phycore = omap4_ctrl_pad_readl(CONTROL_USB2PHYCORE);
 	usb2phycore &= ~USB2PHY_DISCHGDET;
@@ -230,8 +235,20 @@ int omap4_charger_detect(void)
 			break;
 		msleep_interruptible(10);
 	} while (!time_after(jiffies, timeout));
-
+#ifdef CONFIG_POWER_SUPPLY_DEBUG
+	printk(KERN_DEBUG "CONTROL_USB2PHYCORE=0x%X\n",usb2phycore);
+#endif
+	if(chargertype==CHARGER_TYPE_PS2 || chargertype==CHARGER_TYPE_UNKOWN)
+	{
+		if(usb2phycore&USB2PHY_CHG_DET_DP_COMP)
+			chargertype= CHARGER_TYPE_APPLE;
+	}
+	
 	switch (chargertype) {
+	case CHARGER_TYPE_APPLE:
+		charger = POWER_SUPPLY_TYPE_USB_ACA;
+		pr_info("Apple detected\n");
+		break;
 	case CHARGER_TYPE_DEDICATED:
 		charger = POWER_SUPPLY_TYPE_USB_DCP;
 		pr_info("DCP detected\n");
@@ -249,7 +266,15 @@ int omap4_charger_detect(void)
 		break;
 	default:
 		pr_err("Unknown charger detected! %d\n", chargertype);
+		charger=POWER_SUPPLY_TYPE_USB_UNKNOWN;//TODO: treat unknown charger as CDP or disable charging?
+		break;
 	}
+#ifdef CONFIG_MACH_OMAP4_JET
+	if(charger==POWER_SUPPLY_TYPE_USB_ACA)
+	{
+		omap4_force_charge();
+	}
+#endif
 
 	usb2phycore = omap4_ctrl_pad_readl(CONTROL_USB2PHYCORE);
 	usb2phycore |= USB2PHY_DISCHGDET;
@@ -258,6 +283,17 @@ int omap4_charger_detect(void)
 	return charger;
 }
 
+u32 omap4_force_charge(void)
+{
+	u32 val;
+	val = __raw_readl(hsotg_base + USBPHY_CHRG_DET);
+	val |=0x11;
+	__raw_writel(val, hsotg_base + USBPHY_CHRG_DET);
+	mdelay(2);
+	val = __raw_readl(hsotg_base + USBPHY_CHRG_DET);
+	//printk("CONTROL_rede94=0x%X\n",val);
+	return val;
+}
 int omap4430_phy_power(struct device *dev, int ID, int on)
 {
 	if (on) {
@@ -344,7 +380,6 @@ void am35x_musb_phy_power(u8 on)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(100);
 	u32 devconf2;
-
 	if (on) {
 		/*
 		 * Start the on-chip PHY and its PLL.

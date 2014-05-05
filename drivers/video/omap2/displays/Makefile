@@ -6,5 +6,7 @@ obj-$(CONFIG_PANEL_NEC_NL8048HL11_01B) += panel-nec-nl8048hl11-01b.o
 obj-$(CONFIG_PANEL_TAAL) += panel-taal.o
 obj-$(CONFIG_PANEL_TPO_TD043MTEA1) += panel-tpo-td043mtea1.o
 obj-$(CONFIG_PANEL_ACX565AKM) += panel-acx565akm.o
+obj-$(CONFIG_PANEL_KOPIN_A230) += panel-kopin-a230.o
 
 obj-$(CONFIG_PANEL_TC358765) += panel-tc358765.o
+obj-$(CONFIG_PANEL_LD089WU1) += panel-ld089wu1.o

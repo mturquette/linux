@@ -10,6 +10,12 @@ menuconfig THERMAL_FRAMEWORK
 	  a central hub for sensors, governors and cooling devices
 	  to register and pass data to.
 
+config THERMAL_DEBUG
+	bool "Thermal Debug support"
+	default n
+	help
+	  Say 'Y' here if you want to have the debug support for
+	  the Thermal.
 
 config THERMAL_FRAMEWORK_DEBUG
 	bool "Thermal Framework Debug support"
