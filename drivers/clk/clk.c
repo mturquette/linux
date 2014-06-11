@@ -1566,6 +1566,7 @@ static void clk_change_rate(struct clk *clk)
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
 	struct clk *top, *fail_clk;
+	struct clk **recalc_clks;
 	int ret = 0;
 
 	if (!clk)
@@ -1583,6 +1584,15 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 		goto out;
 	}
 
+	/*
+	 * support for the .coord_rates callback overrides the general
+	 * walk-up-the-tree algorithm
+	 */
+	if (clk->ops->coord_rates) {
+		ret = clk->ops->coord_rates(clk->hw, rate, NULL, recalc_clks);
+		__clk_recalc_rates
+
+	/* FIXME can we re-use clk_calc_new_rates for coord clocks */
 	/* calculate new rates and get the topmost changed clock */
 	top = clk_calc_new_rates(clk, rate);
 	if (!top) {

@@ -140,6 +140,17 @@ struct dentry;
  *		directory is provided as an argument.  Called with
  *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
  *
+ * @coord_rates: Make bulk changes to clock rates and/or parents. Useful for
+ * complex clock providers that need to adjust several clocks as part of
+ * correct operation of the hardware, or for providers that need to atomically
+ * update multiple clocks (e.g. shadow registers that are flushed all at once).
+ * Returns 0 on success, -EERROR otherwise. Note that the .coord_rates
+ * implementation should populate the recalc_clks array so that the clock
+ * framework can properly recalculate clock tree rates. Additionally any
+ * multiplexer clocks with multiple input parent signals must implement the
+ * .get_parent callback, so that the clock framework can make properly model
+ * the clock hierarchy after .coord_rates completes.
+ *
  *
  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
  * implementations to split any work between atomic (enable) and sleepable
@@ -179,6 +190,9 @@ struct clk_ops {
 					   unsigned long parent_accuracy);
 	void		(*init)(struct clk_hw *hw);
 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
+	int		(*coordinate_rates)(struct clk_hw *hw,
+				unsigned long rate, struct clk *parent,
+				struct clk **recalc_clks);
 };
 
 /**
