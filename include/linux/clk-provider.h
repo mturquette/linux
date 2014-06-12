@@ -34,6 +34,12 @@
 struct clk_hw;
 struct dentry;
 
+struct coord_rate_table {
+	struct clk *clk;
+	struct clk *parent;
+	unsigned long rate;
+};
+
 /**
  * struct clk_ops -  Callback operations for hardware clocks; these are to
  * be provided by the clock implementation, and will be called by drivers
