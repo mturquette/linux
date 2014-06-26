@@ -787,6 +787,14 @@ out:
 }
 EXPORT_SYMBOL_GPL(__clk_mux_determine_rate);
 
+static bool clk_is_coord(struct clk *clk)
+{
+	if (clk->ops->coord_rates)
+		return true;
+
+	return false;
+}
+
 /***        clk api        ***/
 
 void __clk_unprepare(struct clk *clk)
@@ -1120,6 +1128,17 @@ EXPORT_SYMBOL_GPL(clk_get_accuracy);
 
 static unsigned long clk_recalc(struct clk *clk, unsigned long parent_rate)
 {
+#if 0
+	/* update the framework bookkeeping for rate-coordinated clocks */
+	/* FIXME probably don't do this here. See clk_calc_subtree instead */
+	if (clk_is_coord(clk)) {
+		this_clk_opp = find_group_opp(struct clk *clk);
+		clk->new_rate = this_clk_opp->rate;
+		clk->new_parent = this_clk_opp->parent;
+		clk->new_parent_index = this_clk_opp->parent_index;
+	}
+#endif
+
 	if (clk->ops->recalc_rate)
 		return clk->ops->recalc_rate(clk->hw, parent_rate);
 	return parent_rate;
@@ -1363,10 +1382,16 @@ out:
 	return ret;
 }
 
-static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
+static int clk_calc_subtree(struct clk *clk, unsigned long new_rate,
 			     struct clk *new_parent, u8 p_index)
 {
 	struct clk *child;
+
+#if 0
+	if (clk->ops->next_rate) {
+		clk->ops->new_rate(&clk->new_rate, &clk->new_parent,
+				&clk->new_parent_index);
+#endif
 
 	clk->new_rate = new_rate;
 	clk->new_parent = new_parent;
@@ -1376,7 +1401,14 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
 	if (new_parent && new_parent != clk->parent)
 		new_parent->new_child = clk;
 
+	if (clk_is_coord(clk)) {
+		
 	hlist_for_each_entry(child, &clk->children, child_node) {
+		/*
+		 * FIXME is this where I should save clk->new_rate & friends?
+		 * Probably, since this is where I'm doing it above. And this
+		 * is clk_CALC_subtree after all...
+		 */
 		child->new_rate = clk_recalc(child, new_rate);
 		clk_calc_subtree(child, child->new_rate, NULL, 0);
 	}
@@ -1404,6 +1436,8 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
 		best_parent_rate = parent->rate;
 
 	/* find the closest rate and parent clk/rate */
+	if (clk->ops->coord_rate) {
+		j
 	if (clk->ops->determine_rate) {
 		new_rate = clk->ops->determine_rate(clk->hw, rate,
 						    &best_parent_rate,
@@ -1588,11 +1622,13 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 	 * support for the .coord_rates callback overrides the general
 	 * walk-up-the-tree algorithm
 	 */
+#if 0
 	if (clk->ops->coord_rates) {
 		ret = clk->ops->coord_rates(clk->hw, rate, NULL, recalc_clks);
 		__clk_recalc_rates
+#endif
 
-	/* FIXME can we re-use clk_calc_new_rates for coord clocks */
+	/* FIXME can we re-use clk_calc_new_rates for coord clocks??? */
 	/* calculate new rates and get the topmost changed clock */
 	top = clk_calc_new_rates(clk, rate);
 	if (!top) {
@@ -1723,6 +1759,12 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 
 	if (!clk)
 		return 0;
+
+	/*
+	 * FIXME handle coordinated rate clocks here
+	 * don't use .set_parent, but instead look up the opp that corresponds
+	 * to this parent and call .coord_rate
+	 */
 
 	/* verify ops for for multi-parent clks */
 	if ((clk->num_parents > 1) && (!clk->ops->set_parent))
