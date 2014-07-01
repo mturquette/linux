@@ -508,6 +508,27 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
 		unsigned long flags);
 
+/* FIXME */
+/**
+ * struct clk_coord_desc
+ *
+ * @prepare_op
+ * @unprepare_op
+ * @enable_op
+ * @disable_op
+ * @coord_rates_op
+ * //@parents
+ * @name
+ * @get_parent
+ * @recalc_rate
+ * @rate_table
+ * @rate_table_index
+ * @pdata?
+ */
+
+/**
+ * struct clk_coord_table_desc - 
+
 /**
  * clk_register - allocate a new clock, register it and return an opaque cookie
  * @dev: device that is registering this clock
