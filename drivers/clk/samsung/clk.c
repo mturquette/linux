@@ -276,6 +276,36 @@ void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
 	}
 }
 
+void __init samsung_clk_register_coord(struct samsung_clk_provider *ctx,
+				struct samsung_coord_clock *list,
+				unsigned int nr_clk)
+{
+	struct clk *clk;
+	unsigned int idx, ret;
+
+	for (idx = 0; idx < nr_clk; idx++, list++) {
+		clk = clk_register_coord(NULL, list->name, list->parent_name,
+				list->flags, ctx->reg_base + list->offset,
+				list->bit_idx, list->coord_flags, &ctx->lock);
+		if (IS_ERR(clk)) {
+			pr_err("%s: failed to register clock %s\n", __func__,
+				list->name);
+			continue;
+		}
+
+		/* register a clock lookup only if a clock alias is specified */
+		if (list->alias) {
+			ret = clk_register_clkdev(clk, list->alias,
+							list->dev_name);
+			if (ret)
+				pr_err("%s: failed to register lookup %s\n",
+					__func__, list->alias);
+		}
+
+		samsung_clk_add_lookup(ctx, clk, list->id);
+	}
+}
+
 /*
  * obtain the clock speed of all external fixed clock sources from device
  * tree and register it

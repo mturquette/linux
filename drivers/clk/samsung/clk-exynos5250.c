@@ -687,6 +687,11 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
 			GATE_IP_ISP1, 7, 0, 0),
 };
 
+static struct samsung_coord_clock exynos5250_coord_clks[] __initdata = {
+	COORD(),
+	COORD(),
+};
+
 static struct samsung_pll_rate_table vpll_24mhz_tbl[] __initdata = {
 	/* sorted in descending order */
 	/* PLL_36XX_RATE(rate, m, p, s, k) */
@@ -797,6 +802,8 @@ static void __init exynos5250_clk_init(struct device_node *np)
 			ARRAY_SIZE(exynos5250_div_clks));
 	samsung_clk_register_gate(ctx, exynos5250_gate_clks,
 			ARRAY_SIZE(exynos5250_gate_clks));
+	samsung_clk_register_coord(ctx, exynos5250_coord_clks,
+			ARRAY_SIZE(exynos5250_coord_clks));
 
 	/*
 	 * Enable arm clock down (in idle) and set arm divider
