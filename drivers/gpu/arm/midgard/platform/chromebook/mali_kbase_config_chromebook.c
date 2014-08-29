@@ -43,7 +43,7 @@
 #include <mach/map.h>
 #include <generated/autoconf.h>
 #include <plat/cpu.h>
-#if defined(CONFIG_MALI_MIDGARD_DVFS) && defined(CONFIG_CPU_FREQ)
+#if 0
 #include <mach/asv-5250.h>
 #include <mach/asv-exynos.h>
 #endif
@@ -71,7 +71,7 @@
 #ifdef CONFIG_MALI_MIDGARD_DVFS
 #define KBASE_PM_DVFS_FREQUENCY (100) /* 100ms */
 #ifdef CONFIG_CPU_FREQ
-#define MALI_DVFS_ASV_ENABLE
+//#define MALI_DVFS_ASV_ENABLE
 #endif
 #endif
 
