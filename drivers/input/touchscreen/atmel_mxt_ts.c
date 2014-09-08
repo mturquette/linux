@@ -1678,15 +1678,39 @@ static int mxt_read_t9_resolution(struct mxt_data *data)
 static int mxt_input_open(struct input_dev *dev);
 static void mxt_input_close(struct input_dev *dev);
 
+static bool mxt_initialize_t19 (struct input_dev *input_dev,
+	struct mxt_data *data)
+{
+	const struct mxt_platform_data *pdata = data->pdata;
+	if (pdata->t19_num_keys) {
+		int i;
+		__set_bit(INPUT_PROP_BUTTONPAD, input_dev->propbit);
+
+		for (i = 0; i < pdata->t19_num_keys; i++)
+			if (pdata->t19_keymap[i] != KEY_RESERVED)
+				input_set_capability(input_dev, EV_KEY,
+						     pdata->t19_keymap[i]);
+
+		input_abs_set_res(input_dev, ABS_X, MXT_PIXELS_PER_MM);
+		input_abs_set_res(input_dev, ABS_Y, MXT_PIXELS_PER_MM);
+		input_abs_set_res(input_dev, ABS_MT_POSITION_X,
+				  MXT_PIXELS_PER_MM);
+		input_abs_set_res(input_dev, ABS_MT_POSITION_Y,
+				  MXT_PIXELS_PER_MM);
+
+		input_dev->name = "Atmel maXTouch Touchpad";
+		return true;
+	}
+	return false;
+}
+
 static int mxt_initialize_t9_input_device(struct mxt_data *data)
 {
 	struct device *dev = &data->client->dev;
-	const struct mxt_platform_data *pdata = data->pdata;
 	struct input_dev *input_dev;
 	int error;
 	unsigned int num_mt_slots;
 	unsigned int mt_flags = 0;
-	int i;
 
 	error = mxt_read_t9_resolution(data);
 	if (error)
@@ -1709,25 +1733,8 @@ static int mxt_initialize_t9_input_device(struct mxt_data *data)
 	__set_bit(EV_KEY, input_dev->evbit);
 	__set_bit(BTN_TOUCH, input_dev->keybit);
 
-	if (pdata->t19_num_keys) {
-		__set_bit(INPUT_PROP_BUTTONPAD, input_dev->propbit);
-
-		for (i = 0; i < pdata->t19_num_keys; i++)
-			if (pdata->t19_keymap[i] != KEY_RESERVED)
-				input_set_capability(input_dev, EV_KEY,
-						     pdata->t19_keymap[i]);
-
+	if (mxt_initialize_t19 (input_dev, data))
 		mt_flags |= INPUT_MT_POINTER;
-
-		input_abs_set_res(input_dev, ABS_X, MXT_PIXELS_PER_MM);
-		input_abs_set_res(input_dev, ABS_Y, MXT_PIXELS_PER_MM);
-		input_abs_set_res(input_dev, ABS_MT_POSITION_X,
-				  MXT_PIXELS_PER_MM);
-		input_abs_set_res(input_dev, ABS_MT_POSITION_Y,
-				  MXT_PIXELS_PER_MM);
-
-		input_dev->name = "Atmel maXTouch Touchpad";
-	}
 
 	/* For single touch */
 	input_set_abs_params(input_dev, ABS_X,
@@ -1866,6 +1873,7 @@ static int mxt_initialize_t100_input_device(struct mxt_data *data)
 	struct device *dev = &data->client->dev;
 	struct input_dev *input_dev;
 	int error;
+	unsigned int mt_flags = 0;
 
 	error = mxt_read_t100_config(data);
 	if (error)
@@ -1888,6 +1896,9 @@ static int mxt_initialize_t100_input_device(struct mxt_data *data)
 	set_bit(EV_ABS, input_dev->evbit);
 	input_set_capability(input_dev, EV_KEY, BTN_TOUCH);
 
+	if (mxt_initialize_t19 (input_dev, data))
+		mt_flags |= INPUT_MT_POINTER;
+
 	/* For single touch */
 	input_set_abs_params(input_dev, ABS_X,
 			     0, data->max_x, 0, 0);
@@ -1899,7 +1910,7 @@ static int mxt_initialize_t100_input_device(struct mxt_data *data)
 				     0, 255, 0, 0);
 
 	/* For multi touch */
-	error = input_mt_init_slots(input_dev, data->num_touchids, 0);
+	error = input_mt_init_slots(input_dev, data->num_touchids, mt_flags);
 	if (error) {
 		dev_err(dev, "Error %d initialising slots\n", error);
 		goto err_free_mem;
