@@ -6511,6 +6511,12 @@ void fix_small_imbalance(struct lb_env *env, struct sd_lb_stats *sds)
 	local = &sds->local_stat;
 	busiest = &sds->busiest_stat;
 
+	if (busiest->group_no_capacity &&
+			group_has_capacity(env, local))	{
+		env->imbalance = min(busiest->load_per_task, sds->avg_load);
+		return;
+	}
+
 	if (!local->sum_nr_running)
 		local->load_per_task = cpu_avg_load_per_task(env->dst_cpu);
 	else if (busiest->load_per_task > local->load_per_task)
@@ -6691,7 +6697,7 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 		goto force_balance;
 
 	/* SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
-	if (env->idle == CPU_NEWLY_IDLE && group_has_capacity(env, local) &&
+	if (env->idle != CPU_NOT_IDLE && group_has_capacity(env, local) &&
 	    busiest->group_no_capacity)
 		goto force_balance;
 
@@ -6707,6 +6713,12 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 	 * average load.
 	 */
 	if (local->avg_load >= sds.avg_load)
+		goto out_balanced;
+
+	/* If busiest is not overloaded and local hasn't got any free capacity,
+	 * the system is balanced whatever the avg_load
+	 */
+	if (!busiest->group_no_capacity && !group_has_capacity(env, local))
 		goto out_balanced;
 
 	if (env->idle == CPU_IDLE) {
@@ -6729,6 +6741,9 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 				env->sd->imbalance_pct * local->avg_load)
 			goto out_balanced;
 	}
+
+	if (!busiest->group_no_capacity && !group_has_capacity(env, local))
+		goto out_balanced;
 
 force_balance:
 	/* Looks like there is an imbalance. Compute it */
