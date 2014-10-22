@@ -101,6 +101,15 @@ config CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
 	  Be aware that not all cpufreq drivers support the conservative
 	  governor. If unsure have a look at the help section of the
 	  driver. Fallback governor will be the performance governor.
+
+config CPU_FREQ_DEFAULT_GOV_ENERGY_MODEL
+	bool "energy_model"
+	select CPU_FREQ_GOV_ENERGY_MODEL
+	select CPU_FREQ_GOV_PERFORMANCE
+	help
+	  Use the CPUfreq governor 'energy_model' as default. This
+	  scales cpu frequency from the scheduler as per-task statistics
+	  are updated.
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -194,6 +203,18 @@ config CPUFREQ_DT
 	  This adds a generic DT based cpufreq driver for frequency management.
 	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
 	  systems which share clock and voltage across all CPUs.
+
+	  If in doubt, say N.
+
+config CPU_FREQ_GOV_ENERGY_MODEL
+	tristate "'energy model' cpufreq governor"
+	depends on CPU_FREQ
+	select CPU_FREQ_GOV_COMMON
+	help
+	  'energy_model' - this governor scales cpu frequency from the
+	  scheduler as a function of cpu utilization. It does not
+	  evaluate utilization on a periodic basis (unlike ondemand) but
+	  instead is invoked from CFS when updating per-task statistics.
 
 	  If in doubt, say N.
 

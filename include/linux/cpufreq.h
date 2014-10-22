@@ -484,6 +484,9 @@ extern struct cpufreq_governor cpufreq_gov_ondemand;
 #elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE)
 extern struct cpufreq_governor cpufreq_gov_conservative;
 #define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_conservative)
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_ENERGY_MODEL)
+extern struct cpufreq_governor cpufreq_gov_energy_model;
+#define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_energy_model)
 #endif
 
 /*********************************************************************
