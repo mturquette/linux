@@ -96,3 +96,9 @@ SCHED_FEAT(NUMA_FAVOUR_HIGHER, true)
  */
 SCHED_FEAT(NUMA_RESIST_LOWER, false)
 #endif
+
+/*
+ * Scheduler-driven CPU frequency selection aimed to save energy based on
+ * load tracking
+ */
+SCHED_FEAT(SCHED_ENERGY_FREQ, false)

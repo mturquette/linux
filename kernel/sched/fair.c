@@ -4207,6 +4207,11 @@ static inline void hrtick_update(struct rq *rq)
 }
 #endif
 
+static inline bool sched_energy_freq(void)
+{
+	return sched_feat(SCHED_ENERGY_FREQ);
+}
+
 /*
  * The enqueue_task method is called before nr_running is
  * increased. Here we update the fair scheduling stats and
