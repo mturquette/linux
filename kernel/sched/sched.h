@@ -1365,6 +1365,14 @@ extern unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu);
 int get_cpu_usage(int cpu);
 unsigned long capacity_of(int cpu);
 
+#ifdef CONFIG_CPU_FREQ_GOV_CAP_GOV
+void cap_gov_update_cpu(int cpu);
+void cap_gov_kick_thread(int cpu);
+#else
+static inline void cap_gov_update_cpu(int cpu) {}
+static inline void cap_gov_kick_thread(int cpu) {}
+#endif
+
 static inline void sched_rt_avg_update(struct rq *rq, u64 rt_delta)
 {
 	rq->rt_avg += rt_delta * arch_scale_freq_capacity(NULL, cpu_of(rq));
