@@ -2473,6 +2473,8 @@ static u32 __compute_runnable_contrib(u64 n)
 }
 
 unsigned long __weak arch_scale_freq_capacity(struct sched_domain *sd, int cpu);
+void arch_eval_cpu_freq(struct cpumask *cpus);
+void arch_scale_cpu_freq(void);
 
 /*
  * We can represent the historical contribution to runnable average as the
@@ -6059,6 +6061,16 @@ static unsigned long default_scale_cpu_capacity(struct sched_domain *sd, int cpu
 unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
 {
 	return default_scale_cpu_capacity(sd, cpu);
+}
+
+void __weak arch_eval_cpu_freq(struct cpumask *cpus)
+{
+	return;
+}
+
+void __weak arch_scale_cpu_freq(void)
+{
+	return;
 }
 
 static unsigned long scale_rt_capacity(int cpu)
