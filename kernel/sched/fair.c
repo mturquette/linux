@@ -178,8 +178,8 @@ void sched_init_granularity(void)
 	update_sysctl();
 }
 
-static unsigned long capacity_orig_of(int cpu);
-static unsigned long capacity_of(int cpu);
+unsigned long capacity_orig_of(int cpu);
+unsigned long capacity_of(int cpu);
 static int get_cpu_usage(int cpu);
 
 #ifdef CONFIG_SCHED_PACKING_TASKS
@@ -4633,12 +4633,12 @@ static unsigned long target_load(int cpu, int type)
 	return max(rq->cpu_load[type-1], total);
 }
 
-static unsigned long capacity_of(int cpu)
+unsigned long capacity_of(int cpu)
 {
 	return cpu_rq(cpu)->cpu_capacity;
 }
 
-static unsigned long capacity_orig_of(int cpu)
+unsigned long capacity_orig_of(int cpu)
 {
 	return cpu_rq(cpu)->cpu_capacity_orig;
 }
