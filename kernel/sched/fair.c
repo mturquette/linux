@@ -2505,6 +2505,11 @@ static inline void account_numa_dequeue(struct rq *rq, struct task_struct *p)
 }
 #endif /* CONFIG_NUMA_BALANCING */
 
+#ifdef CONFIG_SMP
+unsigned long capacity_of(int cpu);
+unsigned long usage_util_of(int cpu);
+#endif /* CONFIG_SMP */
+
 static void
 account_entity_enqueue(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
@@ -4641,6 +4646,12 @@ unsigned long capacity_of(int cpu)
 unsigned long capacity_orig_of(int cpu)
 {
 	return cpu_rq(cpu)->cpu_capacity_orig;
+}
+
+/* FIXME git rid of this? */
+unsigned long utilization_load_avg_of(int cpu)
+{
+	return cpu_rq(cpu)->cfs.utilization_load_avg;
 }
 
 static unsigned long cpu_avg_load_per_task(int cpu)
