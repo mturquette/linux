@@ -4143,7 +4143,8 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 /* Used instead of source_load when we know the type == 0 */
 static unsigned long weighted_cpuload(const int cpu)
 {
-	return cpu_rq(cpu)->cfs.runnable_load_avg;
+	return cpu_rq(cpu)->cfs.runnable_load_avg
+		+ cpu_rq(cpu)->cfs.blocked_load_avg;
 }
 
 /*
