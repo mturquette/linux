@@ -4600,12 +4600,11 @@ done:
 static int get_cpu_usage(int cpu)
 {
 	unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
-	unsigned long capacity = capacity_orig_of(cpu);
 
 	if (usage >= SCHED_LOAD_SCALE)
-		return capacity;
+		return capacity_orig_of(cpu);
 
-	return (usage * capacity) >> SCHED_LOAD_SHIFT;
+	return usage;
 }
 
 /*
