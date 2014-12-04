@@ -65,6 +65,9 @@ void hdmi_destroy(struct kref *kref)
 	if (hdmi->i2c)
 		hdmi_i2c_destroy(hdmi->i2c);
 
+	if (hdmi->bridge)
+		hdmi_bridge_destroy(hdmi->bridge);
+
 	platform_set_drvdata(hdmi->pdev, NULL);
 }
 
@@ -260,6 +263,12 @@ fail:
 	if (hdmi->connector) {
 		hdmi->connector->funcs->destroy(hdmi->connector);
 		hdmi->connector = NULL;
+	}
+	if (hdmi) {
+		/* bridge is normally destroyed by drm: */
+		if (hdmi->connector)
+			hdmi->connector->funcs->destroy(hdmi->connector);
+		hdmi_destroy(&hdmi->refcount);
 	}
 
 	return ret;
