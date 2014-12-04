@@ -88,6 +88,8 @@ static int exynos_power_up(unsigned int cpu, unsigned int cluster)
 		cluster >= EXYNOS5420_NR_CLUSTERS)
 		return -EINVAL;
 
+	pmu_raw_writel(0x1, S5P_PMU_SPARE2);
+
 	/*
 	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
 	 * variant exists, we need to disable IRQs manually here.

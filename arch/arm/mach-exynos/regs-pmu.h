@@ -49,6 +49,7 @@
 #define S5P_INFORM5				0x0814
 #define S5P_INFORM6				0x0818
 #define S5P_INFORM7				0x081C
+#define S5P_PMU_SPARE2				0x0908
 #define S5P_PMU_SPARE3				0x090C
 
 #define EXYNOS_IROM_DATA2			0x0988
