@@ -29,8 +29,13 @@ static DEFINE_SPINLOCK(lock);
 static struct clk **clk_table;
 static void __iomem *reg_base;
 static struct clk_onecell_data clk_data;
-
-static struct clk *pll_ref, *pll_in;
+/*
+ * On Exynos5420 this will be a clock which has to be enabled before any
+ * access to audss registers. Typically a child of EPLL.
+ *
+ * On other platforms this will be -ENODEV.
+ */
+static struct clk *epll;
 
 #define ASS_CLK_SRC 0x0
 #define ASS_CLK_DIV 0x4
@@ -85,7 +90,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
 	const char *mout_audss_p[] = {"fin_pll", "fout_epll"};
 	const char *mout_i2s_p[] = {"mout_audss", "cdclk0", "sclk_audio0"};
 	const char *sclk_pcm_p = "sclk_pcm0";
-	struct clk *cdclk, *sclk_audio, *sclk_pcm_in;
+	struct clk *pll_ref, *pll_in, *cdclk, *sclk_audio, *sclk_pcm_in;
 	const struct of_device_id *match;
 	enum exynos_audss_clk_type variant;
 
@@ -100,6 +105,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to map audss registers\n");
 		return PTR_ERR(reg_base);
 	}
+	/* EPLL don't have to be enabled for boards other than Exynos5420 */
+	epll = ERR_PTR(-ENODEV);
 
 	clk_table = devm_kzalloc(&pdev->dev,
 				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
@@ -115,13 +122,21 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
 
 	pll_ref = devm_clk_get(&pdev->dev, "pll_ref");
 	pll_in = devm_clk_get(&pdev->dev, "pll_in");
-	if (!IS_ERR(pll_ref)) {
+	if (!IS_ERR(pll_ref))
 		mout_audss_p[0] = __clk_get_name(pll_ref);
-		clk_prepare_enable(pll_ref);
-	}
 	if (!IS_ERR(pll_in)) {
 		mout_audss_p[1] = __clk_get_name(pll_in);
-		clk_prepare_enable(pll_in);
+
+		if (variant == TYPE_EXYNOS5420) {
+			epll = pll_in;
+
+			ret = clk_prepare_enable(epll);
+			if (ret) {
+				dev_err(&pdev->dev,
+						"failed to prepare the epll clock\n");
+				return ret;
+			}
+		}
 	}
 	clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
 				mout_audss_p, ARRAY_SIZE(mout_audss_p),
@@ -209,6 +224,9 @@ unregister:
 			clk_unregister(clk_table[i]);
 	}
 
+	if (!IS_ERR(epll))
+		clk_disable_unprepare(epll);
+
 	return ret;
 }
 
@@ -223,10 +241,8 @@ static int exynos_audss_clk_remove(struct platform_device *pdev)
 			clk_unregister(clk_table[i]);
 	}
 
-	if (!IS_ERR(pll_in))
-		clk_disable_unprepare(pll_in);
-	if (!IS_ERR(pll_ref))
-		clk_disable_unprepare(pll_ref);
+	if (!IS_ERR(epll))
+		clk_disable_unprepare(epll);
 
 	return 0;
 }
