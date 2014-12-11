@@ -31,10 +31,9 @@
 #include <linux/migrate.h>
 #include <linux/task_work.h>
 
-#include <trace/events/sched.h>
-
 #include "sched.h"
 
+#include <trace/events/sched.h>
 /*
  * Targeted preemption latency for CPU-bound tasks:
  * (default: 6ms * (1 + ilog(ncpus)), units: nanoseconds)
@@ -322,6 +321,7 @@ bool update_packing_buddy(int cpu, struct sched_domain *sd, long activity, long 
 	/* Get the state of 1st CPU of the power group */
 	if (!is_leader_cpu(cpu, sd)) {
 		per_cpu(sd_pack_buddy, cpu).packing = is_packing_cpu(get_leader(cpu));
+		trace_sched_buddy(cpu, per_cpu(sd_pack_buddy, cpu).packing, capacity, activity, perf);
 		return (per_cpu(sd_pack_buddy, cpu).packing != packing);
 	}
 
@@ -369,6 +369,7 @@ bool update_packing_buddy(int cpu, struct sched_domain *sd, long activity, long 
 			vperf = 0;
 	}
 
+	trace_sched_buddy(cpu, per_cpu(sd_pack_buddy, cpu).packing, capacity, activity, perf);
 	return (per_cpu(sd_pack_buddy, cpu).packing != packing);
 }
 
@@ -3028,8 +3029,14 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 		now = cfs_rq_clock_task(group_cfs_rq(se));
 
 	if (!__update_entity_runnable_avg(now, cpu, &se->avg, se->on_rq,
-					cfs_rq->curr == se))
+					cfs_rq->curr == se)) {
+		trace_sched_load_se(&se->avg,
+				entity_is_task(se) ? task_of(se)->pid : (int)(se),
+				cfs_rq->curr == se);
 		return;
+	}
+	trace_sched_load_se(&se->avg, entity_is_task(se) ? task_of(se)->pid : (int)(se),
+			cfs_rq->curr == se);
 
 	contrib_delta = __update_entity_load_avg_contrib(se);
 	utilization_delta = __update_entity_utilization_avg_contrib(se);
@@ -3045,6 +3052,11 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 		subtract_utilization_blocked_contrib(cfs_rq,
 							-utilization_delta);
 	}
+	trace_sched_load_contrib(cpu,
+			cfs_rq->utilization_load_avg,
+			cfs_rq->utilization_blocked_avg,
+			cfs_rq->runnable_load_avg,
+			cfs_rq->blocked_load_avg);
 }
 
 /*
@@ -3130,6 +3142,12 @@ static inline void enqueue_entity_load_avg(struct cfs_rq *cfs_rq,
 	cfs_rq->utilization_load_avg += se->avg.utilization_avg_contrib;
 	/* we force update consideration on load-balancer moves */
 	update_cfs_rq_blocked_load(cfs_rq, !wakeup);
+	trace_sched_load_contrib(cpu_of(rq_of(cfs_rq)),
+			cfs_rq->utilization_load_avg,
+			cfs_rq->utilization_blocked_avg,
+			cfs_rq->runnable_load_avg,
+			cfs_rq->blocked_load_avg);
+
 }
 
 /*
@@ -3153,6 +3171,11 @@ static inline void dequeue_entity_load_avg(struct cfs_rq *cfs_rq,
 						se->avg.utilization_avg_contrib;
 		se->avg.decay_count = atomic64_read(&cfs_rq->decay_counter);
 	} /* migrations, e.g. sleep=0 leave decay_count == 0 */
+	trace_sched_load_contrib(cpu_of(rq_of(cfs_rq)),
+			cfs_rq->utilization_load_avg,
+			cfs_rq->utilization_blocked_avg,
+			cfs_rq->runnable_load_avg,
+			cfs_rq->blocked_load_avg);
 }
 
 /*
@@ -4865,7 +4888,7 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
 	}
 
 	balanced = this_eff_load <= prev_eff_load;
-
+	trace_sched_wake_affine(this_eff_load, this_load, prev_eff_load, load);
 	schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
 
 	if (!balanced)
@@ -5062,6 +5085,11 @@ static int get_cpu_usage(int cpu)
 {
 	unsigned long usage = cpu_rq(cpu)->cfs.utilization_load_avg;
 	unsigned long capacity = capacity_orig_of(cpu);
+	trace_sched_load_contrib(cpu,
+			cpu_rq(cpu)->cfs.utilization_load_avg,
+			cpu_rq(cpu)->cfs.utilization_blocked_avg,
+			cpu_rq(cpu)->cfs.runnable_load_avg,
+			cpu_rq(cpu)->cfs.blocked_load_avg);
 
 	usage += cpu_rq(cpu)->cfs.utilization_blocked_avg;
 
@@ -5123,6 +5151,9 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 
 	if (sd_flag & SD_BALANCE_WAKE) {
 		new_cpu = select_idle_sibling(p, prev_cpu);
+
+		trace_sched_affine(task_cpu(p), prev_cpu, new_cpu);
+
 		goto unlock;
 	}
 
@@ -6601,6 +6632,11 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 
 	sgs->group_no_capacity = group_is_overloaded(env, sgs);
 	sgs->group_type = group_classify(env, group, sgs);
+
+	trace_sched_sg_lb_stats(cpumask_first(sched_group_cpus(group)),
+			sgs->group_load, sgs->group_usage,
+			sgs->group_capacity, group->sgc->capacity_orig,
+			sgs->sum_nr_running);
 }
 
 /**
@@ -6758,6 +6794,8 @@ next_group:
 		if (env->dst_rq->rd->overload != overload)
 			env->dst_rq->rd->overload = overload;
 	}
+
+	trace_sched_sd_lb_stats(sds->total_load, sds->total_usage, sds->total_capacity);
 
 }
 
@@ -7339,8 +7377,15 @@ redo:
 		schedstat_inc(sd, lb_nobusyg[idle]);
 		goto out_balanced;
 	}
+	trace_sched_fbg(env.sd->level, this_cpu,
+			cpumask_first(sched_group_cpus(group)), idle);
+
 
 	busiest = find_busiest_queue(&env, group);
+	trace_sched_fbq(this_cpu,
+			busiest ? cpu_of(busiest) : -1,
+			group, env.imbalance);
+
 	if (!busiest) {
 		schedstat_inc(sd, lb_nobusyq[idle]);
 		goto out_balanced;
@@ -7638,6 +7683,7 @@ static int idle_balance(struct rq *this_rq)
 		}
 
 		if (sd->flags & SD_BALANCE_NEWIDLE) {
+			trace_sched_lb(this_cpu, sd->level, CPU_NEWLY_IDLE);
 			t0 = sched_clock_cpu(this_cpu);
 
 			pulled_task = load_balance(this_cpu, this_rq,
@@ -7996,6 +8042,7 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 		}
 
 		if (time_after_eq(jiffies, sd->last_balance + interval)) {
+			trace_sched_lb(cpu, sd->level, idle);
 			if (load_balance(cpu, rq, sd, idle, &continue_balancing)) {
 				/*
 				 * The LBF_DST_PINNED logic could have changed
@@ -8079,6 +8126,7 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
 			this_rq->next_balance = rq->next_balance;
 	}
 	nohz.next_balance = this_rq->next_balance;
+	trace_sched_nohz(nohz.next_balance, atomic_read(&nohz.nr_cpus));
 end:
 	clear_bit(NOHZ_BALANCE_KICK, nohz_flags(this_cpu));
 }
@@ -8111,6 +8159,8 @@ static inline bool nohz_kick_needed(struct rq *rq)
 	*/
 	set_cpu_sd_state_busy();
 	nohz_balance_exit_idle(cpu);
+
+	trace_sched_nohz_kick(cpu, rq->nr_running, atomic_read(&nohz.nr_cpus));
 
 	/*
 	 * None are in tickless mode and hence no need for NOHZ idle load
