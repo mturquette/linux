@@ -1042,6 +1042,7 @@ bool cpus_share_cache(int this_cpu, int that_cpu);
 
 typedef const struct cpumask *(*sched_domain_mask_f)(int cpu);
 typedef int (*sched_domain_flags_f)(void);
+typedef int (*sched_domain_power_f)(int cpu, int index);
 
 #define SDTL_OVERLAP	0x01
 
@@ -1054,6 +1055,7 @@ struct sd_data {
 struct sched_domain_topology_level {
 	sched_domain_mask_f mask;
 	sched_domain_flags_f sd_flags;
+	sched_domain_power_f pwr_thr;
 	int		    flags;
 	int		    numa_level;
 	struct sd_data      data;
