@@ -2178,8 +2178,10 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 	policy->min = new_policy->min;
 	policy->max = new_policy->max;
 
-	for_each_cpu(cpu, policy->cpus)
+	for_each_cpu(cpu, policy->cpus) {
 		arch_scale_set_max_freq(cpu, policy->max);
+		arch_scale_set_curr_freq(cpu, policy->cur);
+	}
 
 	pr_debug("new min and max freqs are %u - %u kHz\n",
 		 policy->min, policy->max);
