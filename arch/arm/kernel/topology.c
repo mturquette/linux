@@ -286,14 +286,14 @@ static inline int cpu_corepower_flags(void)
  */
 static int core_pack_threshold[8][2] = {
      /* pack, perf */
-	{ 50, 100},
-	{ 50, 100},
-	{ 50, 100},
-	{ 50, 100},
-	{ 40, 100},
+	{ 30, 100},
+	{ 30, 100},
+	{ 30, 100},
+	{ 30, 100},
 	{ 20, 100},
 	{ 20, 100},
-	{ 10, 100},
+	{ 20, 100},
+	{ 20, 100},
 };
 
 static int cpu_core_th(int cpu, int index)
@@ -310,10 +310,10 @@ static int cluster_pack_threshold[8][2] = {
 	{ 0, 100},
 	{ 0, 100},
 	{ 0, 100},
-	{ 40, 60},
-	{ 40, 60},
-	{ 40, 60},
-	{ 40, 60},
+	{ 50, 70},
+	{ 50, 70},
+	{ 50, 70},
+	{ 50, 70},
 };
 
 static int cpu_cluster_th(int cpu, int index)
