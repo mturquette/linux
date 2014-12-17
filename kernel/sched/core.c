@@ -6198,9 +6198,9 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
 		sd_flags &= ~TOPOLOGY_SD_FLAGS;
 
 	*sd = (struct sched_domain){
-		.min_interval		= sd_weight,
-		.max_interval		= 2*sd_weight,
-		.busy_factor		= 32,
+		.min_interval		= 1,
+		.max_interval		= 1,
+		.busy_factor		= 2,
 		.imbalance_pct		= 125,
 
 		.cache_nice_tries	= 0,
@@ -6225,7 +6225,7 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
 					,
 
 		.last_balance		= jiffies,
-		.balance_interval	= sd_weight,
+		.balance_interval	= 1,
 		.smt_gain		= 0,
 		.max_newidle_lb_cost	= 0,
 		.next_decay_max_lb_cost	= jiffies,
