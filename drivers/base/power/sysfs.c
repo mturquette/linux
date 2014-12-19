@@ -528,6 +528,7 @@ static ssize_t wakeup_prevent_sleep_time_show(struct device *dev,
 static DEVICE_ATTR(wakeup_prevent_sleep_time_ms, 0444,
 		   wakeup_prevent_sleep_time_show, NULL);
 #endif /* CONFIG_PM_AUTOSLEEP */
+
 #endif /* CONFIG_PM_SLEEP */
 
 #ifdef CONFIG_PM_ADVANCED_DEBUG
