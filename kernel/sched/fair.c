@@ -5093,6 +5093,8 @@ static int get_cpu_usage(int cpu)
 
 	usage += cpu_rq(cpu)->cfs.utilization_blocked_avg;
 
+	trace_sched_cpu_usage(cpu, usage);
+
 	if (usage >= SCHED_LOAD_SCALE)
 		return capacity;
 
