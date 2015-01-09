@@ -613,6 +613,9 @@ static const struct bcmgenet_stats bcmgenet_gstrings_stats[] = {
 			UMAC_RBUF_OVFL_CNT),
 	STAT_GENET_MISC("rbuf_err_cnt", mib.rbuf_err_cnt, UMAC_RBUF_ERR_CNT),
 	STAT_GENET_MISC("mdf_err_cnt", mib.mdf_err_cnt, UMAC_MDF_ERR_CNT),
+	STAT_GENET_MIB_RX("alloc_rx_buff_failed", mib.alloc_rx_buff_failed),
+	STAT_GENET_MIB_RX("rx_dma_failed", mib.rx_dma_failed),
+	STAT_GENET_MIB_TX("tx_dma_failed", mib.tx_dma_failed),
 };
 
 #define BCMGENET_STATS_LEN	ARRAY_SIZE(bcmgenet_gstrings_stats)
@@ -989,6 +992,7 @@ static int bcmgenet_xmit_single(struct net_device *dev,
 	mapping = dma_map_single(kdev, skb->data, skb_len, DMA_TO_DEVICE);
 	ret = dma_mapping_error(kdev, mapping);
 	if (ret) {
+		priv->mib.tx_dma_failed++;
 		netif_err(priv, tx_err, dev, "Tx DMA map failed\n");
 		dev_kfree_skb(skb);
 		return ret;
@@ -1035,6 +1039,7 @@ static int bcmgenet_xmit_frag(struct net_device *dev,
 				   skb_frag_size(frag), DMA_TO_DEVICE);
 	ret = dma_mapping_error(kdev, mapping);
 	if (ret) {
+		priv->mib.tx_dma_failed++;
 		netif_err(priv, tx_err, dev, "%s: Tx DMA map failed\n",
 			  __func__);
 		return ret;
@@ -1231,6 +1236,7 @@ static int bcmgenet_rx_refill(struct bcmgenet_priv *priv, struct enet_cb *cb)
 				 priv->rx_buf_len, DMA_FROM_DEVICE);
 	ret = dma_mapping_error(kdev, mapping);
 	if (ret) {
+		priv->mib.rx_dma_failed++;
 		bcmgenet_free_cb(cb);
 		netif_err(priv, rx_err, priv->dev,
 			  "%s DMA map failed\n", __func__);
@@ -1397,8 +1403,10 @@ static unsigned int bcmgenet_desc_rx(struct bcmgenet_priv *priv,
 		/* refill RX path on the current control block */
 refill:
 		err = bcmgenet_rx_refill(priv, cb);
-		if (err)
+		if (err) {
+			priv->mib.alloc_rx_buff_failed++;
 			netif_err(priv, rx_err, dev, "Rx refill failed\n");
+		}
 
 		rxpktprocessed++;
 		priv->rx_read_ptr++;
@@ -2140,6 +2148,12 @@ static int bcmgenet_open(struct net_device *dev)
 		goto err_irq0;
 	}
 
+	/* Re-configure the port multiplexer towards the PHY device */
+	bcmgenet_mii_config(priv->dev, false);
+
+	phy_connect_direct(dev, priv->phydev, bcmgenet_mii_setup,
+			   priv->phy_interface);
+
 	bcmgenet_netif_start(dev);
 
 	return 0;
@@ -2183,6 +2197,9 @@ static int bcmgenet_close(struct net_device *dev)
 	netif_dbg(priv, ifdown, dev, "bcmgenet_close\n");
 
 	bcmgenet_netif_stop(dev);
+
+	/* Really kill the PHY state machine and disconnect from it */
+	phy_disconnect(priv->phydev);
 
 	/* Disable MAC receive */
 	umac_enable_set(priv, CMD_RX_EN, false);
@@ -2685,7 +2702,7 @@ static int bcmgenet_resume(struct device *d)
 
 	phy_init_hw(priv->phydev);
 	/* Speed settings must be restored */
-	bcmgenet_mii_config(priv->dev);
+	bcmgenet_mii_config(priv->dev, false);
 
 	/* disable ethernet MAC while updating its registers */
 	umac_enable_set(priv, CMD_TX_EN | CMD_RX_EN, false);
@@ -2735,7 +2752,6 @@ static struct platform_driver bcmgenet_driver = {
 	.remove	= bcmgenet_remove,
 	.driver	= {
 		.name	= "bcmgenet",
-		.owner	= THIS_MODULE,
 		.of_match_table = bcmgenet_match,
 		.pm	= &bcmgenet_pm_ops,
 	},

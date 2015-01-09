@@ -301,6 +301,12 @@ static const struct drm_ioctl_desc exynos_ioctls[] = {
 			exynos_drm_ipp_queue_buf, DRM_UNLOCKED | DRM_AUTH),
 	DRM_IOCTL_DEF_DRV(EXYNOS_IPP_CMD_CTRL,
 			exynos_drm_ipp_cmd_ctrl, DRM_UNLOCKED | DRM_AUTH),
+	DRM_IOCTL_DEF_DRV(EXYNOS_GEM_CPU_ACQUIRE,
+			exynos_drm_gem_cpu_acquire_ioctl,
+			DRM_UNLOCKED | DRM_AUTH),
+	DRM_IOCTL_DEF_DRV(EXYNOS_GEM_CPU_RELEASE,
+			exynos_drm_gem_cpu_release_ioctl,
+			DRM_UNLOCKED | DRM_AUTH),
 };
 
 static const struct file_operations exynos_drm_driver_fops = {
@@ -495,6 +501,12 @@ static struct component_match *exynos_drm_match_add(struct device *dev)
 
 	mutex_lock(&drm_component_lock);
 
+	/* Do not retry to probe if there is no any kms driver regitered. */
+	if (list_empty(&drm_component_list)) {
+		mutex_unlock(&drm_component_lock);
+		return ERR_PTR(-ENODEV);
+	}
+
 	list_for_each_entry(cdev, &drm_component_list, list) {
 		/*
 		 * Add components to master only in case that crtc and
@@ -553,15 +565,58 @@ static const struct component_master_ops exynos_drm_ops = {
 static int exynos_drm_platform_probe(struct platform_device *pdev)
 {
 	struct component_match *match;
-	int ret;
 
 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 	exynos_drm_driver.num_ioctls = ARRAY_SIZE(exynos_ioctls);
 
+	match = exynos_drm_match_add(&pdev->dev);
+	if (IS_ERR(match))
+		return PTR_ERR(match);
+
+	return component_master_add_with_match(&pdev->dev, &exynos_drm_ops,
+					       match);
+}
+
+static int exynos_drm_platform_remove(struct platform_device *pdev)
+{
+	component_master_del(&pdev->dev, &exynos_drm_ops);
+	return 0;
+}
+
+static struct platform_driver exynos_drm_platform_driver = {
+	.probe	= exynos_drm_platform_probe,
+	.remove	= exynos_drm_platform_remove,
+	.driver	= {
+		.name	= "exynos-drm",
+		.pm	= &exynos_drm_pm_ops,
+	},
+};
+
+static int exynos_drm_init(void)
+{
+	int ret;
+
+	/*
+	 * Register device object only in case of Exynos SoC.
+	 *
+	 * Below codes resolves temporarily infinite loop issue incurred
+	 * by Exynos drm driver when using multi-platform kernel.
+	 * So these codes will be replaced with more generic way later.
+	 */
+	if (!of_machine_is_compatible("samsung,exynos3") &&
+			!of_machine_is_compatible("samsung,exynos4") &&
+			!of_machine_is_compatible("samsung,exynos5"))
+		return -ENODEV;
+
+	exynos_drm_pdev = platform_device_register_simple("exynos-drm", -1,
+								NULL, 0);
+	if (IS_ERR(exynos_drm_pdev))
+		return PTR_ERR(exynos_drm_pdev);
+
 #ifdef CONFIG_DRM_EXYNOS_FIMD
 	ret = platform_driver_register(&fimd_driver);
 	if (ret < 0)
-		return ret;
+		goto err_unregister_pdev;
 #endif
 
 #ifdef CONFIG_DRM_EXYNOS_DP
@@ -619,22 +674,26 @@ static int exynos_drm_platform_probe(struct platform_device *pdev)
 		goto err_unregister_ipp_drv;
 #endif
 
-	match = exynos_drm_match_add(&pdev->dev);
-	if (IS_ERR(match)) {
-		ret = PTR_ERR(match);
-		goto err_unregister_resources;
-	}
-
-	ret = component_master_add_with_match(&pdev->dev, &exynos_drm_ops,
-						match);
+#ifdef CONFIG_DRM_EXYNOS_VIDI
+	ret = exynos_drm_probe_vidi();
 	if (ret < 0)
-		goto err_unregister_resources;
+		goto err_unregister_ipp_dev;
+#endif
 
-	return ret;
+	ret = platform_driver_register(&exynos_drm_platform_driver);
+	if (ret)
+		goto err_remove_vidi;
 
-err_unregister_resources:
+	return 0;
+
+err_remove_vidi:
+#ifdef CONFIG_DRM_EXYNOS_VIDI
+	exynos_drm_remove_vidi();
+err_unregister_pd:
+#endif
 
 #ifdef CONFIG_DRM_EXYNOS_IPP
+err_unregister_ipp_dev:
 	exynos_platform_device_ipp_unregister();
 err_unregister_ipp_drv:
 	platform_driver_unregister(&ipp_driver);
@@ -681,11 +740,21 @@ err_unregister_fimd_drv:
 #ifdef CONFIG_DRM_EXYNOS_FIMD
 	platform_driver_unregister(&fimd_driver);
 #endif
+
+err_unregister_pdev:
+	platform_device_unregister(exynos_drm_pdev);
+
 	return ret;
 }
 
-static int exynos_drm_platform_remove(struct platform_device *pdev)
+static void exynos_drm_exit(void)
 {
+	platform_driver_unregister(&exynos_drm_platform_driver);
+
+#ifdef CONFIG_DRM_EXYNOS_VIDI
+	exynos_drm_remove_vidi();
+#endif
+
 #ifdef CONFIG_DRM_EXYNOS_IPP
 	exynos_platform_device_ipp_unregister();
 	platform_driver_unregister(&ipp_driver);
@@ -716,64 +785,12 @@ static int exynos_drm_platform_remove(struct platform_device *pdev)
 	platform_driver_unregister(&fimd_driver);
 #endif
 
-#ifdef CONFIG_DRM_EXYNOS_DSI
-	platform_driver_unregister(&dsi_driver);
-#endif
-
 #ifdef CONFIG_DRM_EXYNOS_DP
 	platform_driver_unregister(&dp_driver);
 #endif
-	component_master_del(&pdev->dev, &exynos_drm_ops);
-	return 0;
-}
 
-static struct platform_driver exynos_drm_platform_driver = {
-	.probe	= exynos_drm_platform_probe,
-	.remove	= exynos_drm_platform_remove,
-	.driver	= {
-		.owner	= THIS_MODULE,
-		.name	= "exynos-drm",
-		.pm	= &exynos_drm_pm_ops,
-	},
-};
-
-static int exynos_drm_init(void)
-{
-	int ret;
-
-	exynos_drm_pdev = platform_device_register_simple("exynos-drm", -1,
-								NULL, 0);
-	if (IS_ERR(exynos_drm_pdev))
-		return PTR_ERR(exynos_drm_pdev);
-
-#ifdef CONFIG_DRM_EXYNOS_VIDI
-	ret = exynos_drm_probe_vidi();
-	if (ret < 0)
-		goto err_unregister_pd;
-#endif
-
-	ret = platform_driver_register(&exynos_drm_platform_driver);
-	if (ret)
-		goto err_remove_vidi;
-
-	return 0;
-
-err_remove_vidi:
-#ifdef CONFIG_DRM_EXYNOS_VIDI
-	exynos_drm_remove_vidi();
-
-err_unregister_pd:
-#endif
-	platform_device_unregister(exynos_drm_pdev);
-
-	return ret;
-}
-
-static void exynos_drm_exit(void)
-{
-	platform_driver_unregister(&exynos_drm_platform_driver);
-#ifdef CONFIG_DRM_EXYNOS_VIDI
-	exynos_drm_remove_vidi();
+#ifdef CONFIG_DRM_EXYNOS_DSI
+	platform_driver_unregister(&dsi_driver);
 #endif
 	platform_device_unregister(exynos_drm_pdev);
 }

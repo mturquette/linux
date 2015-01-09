@@ -21,7 +21,7 @@ endif
 
 obj-$(CONFIG_PROC_FS) += proc_namespace.o
 
-obj-y				+= notify/
+obj-$(CONFIG_FSNOTIFY)		+= notify/
 obj-$(CONFIG_EPOLL)		+= eventpoll.o
 obj-$(CONFIG_ANON_INODES)	+= anon_inodes.o
 obj-$(CONFIG_SIGNALFD)		+= signalfd.o
@@ -104,7 +104,7 @@ obj-$(CONFIG_QNX6FS_FS)		+= qnx6/
 obj-$(CONFIG_AUTOFS4_FS)	+= autofs4/
 obj-$(CONFIG_ADFS_FS)		+= adfs/
 obj-$(CONFIG_FUSE_FS)		+= fuse/
-obj-$(CONFIG_OVERLAYFS_FS)	+= overlayfs/
+obj-$(CONFIG_OVERLAY_FS)	+= overlayfs/
 obj-$(CONFIG_UDF_FS)		+= udf/
 obj-$(CONFIG_SUN_OPENPROMFS)	+= openpromfs/
 obj-$(CONFIG_OMFS_FS)		+= omfs/

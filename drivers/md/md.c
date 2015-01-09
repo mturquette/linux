@@ -247,7 +247,6 @@ static void md_make_request(struct request_queue *q, struct bio *bio)
 {
 	const int rw = bio_data_dir(bio);
 	struct mddev *mddev = q->queuedata;
-	int cpu;
 	unsigned int sectors;
 
 	if (mddev == NULL || mddev->pers == NULL
@@ -284,10 +283,7 @@ static void md_make_request(struct request_queue *q, struct bio *bio)
 	sectors = bio_sectors(bio);
 	mddev->pers->make_request(mddev, bio);
 
-	cpu = part_stat_lock();
-	part_stat_inc(cpu, &mddev->gendisk->part0, ios[rw]);
-	part_stat_add(cpu, &mddev->gendisk->part0, sectors[rw], sectors);
-	part_stat_unlock();
+	generic_start_io_acct(rw, sectors, &mddev->gendisk->part0);
 
 	if (atomic_dec_and_test(&mddev->active_io) && mddev->suspended)
 		wake_up(&mddev->sb_wait);
@@ -5121,6 +5117,7 @@ static int md_set_readonly(struct mddev *mddev, struct block_device *bdev)
 		printk("md: %s still in use.\n",mdname(mddev));
 		if (did_freeze) {
 			clear_bit(MD_RECOVERY_FROZEN, &mddev->recovery);
+			set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 			md_wakeup_thread(mddev->thread);
 		}
 		err = -EBUSY;
@@ -5135,6 +5132,8 @@ static int md_set_readonly(struct mddev *mddev, struct block_device *bdev)
 		mddev->ro = 1;
 		set_disk_ro(mddev->gendisk, 1);
 		clear_bit(MD_RECOVERY_FROZEN, &mddev->recovery);
+		set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+		md_wakeup_thread(mddev->thread);
 		sysfs_notify_dirent_safe(mddev->sysfs_state);
 		err = 0;
 	}
@@ -5178,6 +5177,7 @@ static int do_md_stop(struct mddev *mddev, int mode,
 		mutex_unlock(&mddev->open_mutex);
 		if (did_freeze) {
 			clear_bit(MD_RECOVERY_FROZEN, &mddev->recovery);
+			set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 			md_wakeup_thread(mddev->thread);
 		}
 		return -EBUSY;

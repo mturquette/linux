@@ -11,9 +11,6 @@ menuconfig NEW_LEDS
 	  Say Y to enable Linux LED support.  This allows control of supported
 	  LEDs from both userspace and optionally, by kernel events (triggers).
 
-	  This is not related to standard keyboard LEDs which are controlled
-	  via the input system.
-
 if NEW_LEDS
 
 config LEDS_CLASS
@@ -249,6 +246,16 @@ config LEDS_LP8788
 	depends on MFD_LP8788
 	help
 	  This option enables support for the Keyboard LEDs on the LP8788 PMIC.
+
+config LEDS_LP8860
+	tristate "LED support for the TI LP8860 4 channel LED driver"
+	depends on LEDS_CLASS && REGMAP_I2C
+	help
+	  If you say yes here you get support for the TI LP8860 4 channel
+	  LED driver.
+	  This option enables support for the display cluster LEDs
+	  on the LP8860 4 channel LED driver using the I2C communication
+	  bus.
 
 config LEDS_CLEVO_MAIL
 	tristate "Mail LED on Clevo notebook"

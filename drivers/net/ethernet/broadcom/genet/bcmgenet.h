@@ -143,6 +143,9 @@ struct bcmgenet_mib_counters {
 	u32	rbuf_ovflow_cnt;
 	u32	rbuf_err_cnt;
 	u32	mdf_err_cnt;
+	u32	alloc_rx_buff_failed;
+	u32	rx_dma_failed;
+	u32	tx_dma_failed;
 };
 
 #define UMAC_HD_BKP_CTRL		0x004
@@ -617,9 +620,10 @@ GENET_IO_MACRO(rbuf, GENET_RBUF_OFF);
 
 /* MDIO routines */
 int bcmgenet_mii_init(struct net_device *dev);
-int bcmgenet_mii_config(struct net_device *dev);
+int bcmgenet_mii_config(struct net_device *dev, bool init);
 void bcmgenet_mii_exit(struct net_device *dev);
 void bcmgenet_mii_reset(struct net_device *dev);
+void bcmgenet_mii_setup(struct net_device *dev);
 
 /* Wake-on-LAN routines */
 void bcmgenet_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol);

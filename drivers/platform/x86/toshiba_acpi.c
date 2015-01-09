@@ -240,6 +240,12 @@ static const struct dmi_system_id toshiba_alt_keymap_dmi[] = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "Qosmio X75-A"),
 		},
 	},
+	{
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "TECRA A50-A"),
+		},
+	},
 	{}
 };
 
@@ -1583,7 +1589,7 @@ static umode_t toshiba_sysfs_is_visible(struct kobject *kobj,
 static bool toshiba_acpi_i8042_filter(unsigned char data, unsigned char str,
 				      struct serio *port)
 {
-	if (str & 0x20)
+	if (str & I8042_STR_AUXDATA)
 		return false;
 
 	if (unlikely(data == 0xe0))

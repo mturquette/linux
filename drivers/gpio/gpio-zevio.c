@@ -18,6 +18,10 @@
 #include <linux/slab.h>
 #include <linux/gpio.h>
 
+#ifndef IOMEM
+#define IOMEM(x)    ((void __force __iomem *)(x))
+#endif
+
 /*
  * Memory layout:
  * This chip has four gpio sections, each controls 8 GPIOs.
@@ -212,7 +216,6 @@ MODULE_DEVICE_TABLE(of, zevio_gpio_of_match);
 static struct platform_driver zevio_gpio_driver = {
 	.driver		= {
 		.name	= "gpio-zevio",
-		.owner	= THIS_MODULE,
 		.of_match_table = zevio_gpio_of_match,
 	},
 	.probe		= zevio_gpio_probe,
