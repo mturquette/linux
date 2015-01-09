@@ -800,8 +800,11 @@ struct sched_group_capacity {
 	 * CPU capacity of this group, SCHED_LOAD_SCALE being max capacity
 	 * for a single CPU.
 	 */
-	unsigned int capacity;
+	unsigned int capacity, capacity_orig;
 	unsigned long next_update;
+#ifdef CONFIG_SCHED_PACKING_TASKS
+	unsigned long pack_thres, perf_thres;
+#endif
 	int imbalance; /* XXX unrelated to capacity but shared group state */
 	/*
 	 * Number of busy cpus in this group.
@@ -1216,6 +1219,12 @@ extern const struct sched_class idle_sched_class;
 extern void update_group_capacity(struct sched_domain *sd, int cpu);
 
 extern void trigger_load_balance(struct rq *rq);
+
+#ifdef CONFIG_SCHED_PACKING_TASKS
+extern void update_packing_domain(int cpu);
+#else
+static inline void update_packing_domain(int cpu) {};
+#endif
 
 extern void idle_enter_fair(struct rq *this_rq);
 extern void idle_exit_fair(struct rq *this_rq);

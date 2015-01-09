@@ -313,12 +313,56 @@ static inline int cpu_corepower_flags(void)
 	return SD_SHARE_PKG_RESOURCES  | SD_SHARE_POWERDOMAIN;
 }
 
+/*
+ * power threshold should be filled according to platform info that can come
+ * from DT as an example. For now use default table
+ */
+static int core_pack_threshold[8][2] = {
+     /* pack, perf */
+	{ 30, 100},
+	{ 30, 100},
+	{ 30, 100},
+	{ 30, 100},
+	{ 20, 100},
+	{ 20, 100},
+	{ 20, 100},
+	{ 20, 100},
+};
+
+static int cpu_core_th(int cpu, int index)
+{
+	if (cpu < 8)
+		return (core_pack_threshold[cpu][index] * 1024) / 100 ;
+
+	return 0;
+}
+
+static int cluster_pack_threshold[8][2] = {
+     /* pack, perf */
+	{ 0, 100},
+	{ 0, 100},
+	{ 0, 100},
+	{ 0, 100},
+	{ 50, 70},
+	{ 50, 70},
+	{ 50, 70},
+	{ 50, 70},
+};
+
+static int cpu_cluster_th(int cpu, int index)
+{
+	if (cpu < 8)
+		return (cluster_pack_threshold[cpu][index] * 1024) / 100;
+
+	return 0;
+}
+
 static struct sched_domain_topology_level arm_topology[] = {
 #ifdef CONFIG_SCHED_MC
-	{ cpu_corepower_mask, cpu_corepower_flags, SD_INIT_NAME(GMC) },
-	{ cpu_coregroup_mask, cpu_core_flags, SD_INIT_NAME(MC) },
+	{ cpu_corepower_mask, cpu_corepower_flags, cpu_core_th, SD_INIT_NAME(GMC) },
+	{ cpu_coregroup_mask, cpu_core_flags, cpu_core_th, SD_INIT_NAME(MC) },
 #endif
-	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
+	{ cpu_cpu_mask, NULL, cpu_cluster_th, SD_INIT_NAME(DIE) },
 	{ NULL, },
 };
 

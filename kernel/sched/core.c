@@ -5801,6 +5801,7 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
 	rcu_assign_pointer(rq->sd, sd);
 	destroy_sched_domains(tmp, cpu);
 
+	update_packing_domain(cpu);
 	update_top_cache_domain(cpu);
 }
 
@@ -5915,6 +5916,7 @@ build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 		 * die on a /0 trap.
 		 */
 		sg->sgc->capacity = SCHED_CAPACITY_SCALE * cpumask_weight(sg_span);
+		sg->sgc->capacity_orig = sg->sgc->capacity;
 
 		/*
 		 * Make sure the first group of this domain contains the
@@ -6028,6 +6030,9 @@ build_sched_groups(struct sched_domain *sd, int cpu)
 static void init_sched_groups_capacity(int cpu, struct sched_domain *sd)
 {
 	struct sched_group *sg = sd->groups;
+	struct sd_data *sdd = sd->private;
+	struct sched_domain_topology_level *tl =
+		container_of(sdd, struct sched_domain_topology_level, data);
 
 	WARN_ON(!sg);
 
@@ -6041,6 +6046,15 @@ static void init_sched_groups_capacity(int cpu, struct sched_domain *sd)
 
 	update_group_capacity(sd, cpu);
 	atomic_set(&sg->sgc->nr_busy_cpus, sg->group_weight);
+#ifdef CONFIG_SCHED_PACKING_TASKS
+	if (tl->pwr_thr) {
+		sg->sgc->pack_thres = (*tl->pwr_thr)(cpu, 0);
+		sg->sgc->perf_thres = ((*tl->pwr_thr)(cpu, 1) * cpu_rq(cpu)->cpu_capacity_orig) / sg->sgc->capacity_orig;
+	} else {
+		sg->sgc->pack_thres = 0;
+		sg->sgc->perf_thres = 1024;
+	}
+#endif
 }
 
 /*
@@ -6184,9 +6198,9 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
 		sd_flags &= ~TOPOLOGY_SD_FLAGS;
 
 	*sd = (struct sched_domain){
-		.min_interval		= sd_weight,
-		.max_interval		= 2*sd_weight,
-		.busy_factor		= 32,
+		.min_interval		= 1,
+		.max_interval		= 1,
+		.busy_factor		= 2,
 		.imbalance_pct		= 125,
 
 		.cache_nice_tries	= 0,
@@ -6211,7 +6225,7 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
 					,
 
 		.last_balance		= jiffies,
-		.balance_interval	= sd_weight,
+		.balance_interval	= 1,
 		.smt_gain		= 0,
 		.max_newidle_lb_cost	= 0,
 		.next_decay_max_lb_cost	= jiffies,
