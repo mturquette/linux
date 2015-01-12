@@ -28,6 +28,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/thermal.h>
+#include <linux/topology.h>
 
 struct private_data {
 	struct device *cpu_dev;
@@ -298,8 +299,10 @@ static int cpufreq_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = transition_latency;
 
 	pd = cpufreq_get_driver_data();
+
 	if (!pd || !pd->independent_clocks)
-		cpumask_setall(policy->cpus);
+		cpumask_or(policy->cpus, policy->cpus, cpu_coregroup_mask(policy->cpu));
+
 
 	of_node_put(np);
 
