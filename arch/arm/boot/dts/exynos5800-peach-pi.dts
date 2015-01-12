@@ -845,6 +845,14 @@
 	vbus-supply = <&usb301_vbus_reg>;
 };
 
+&cpu0 {
+	cpu0-supply = <&buck2_reg>;
+};
+
+&cpu4 {
+	cpu-supply = <&buck6_reg>;
+};
+
 /*
  * Use longest HW watchdog in SoC (32 seconds) since the hardware
  * watchdog provides no debugging information (compared to soft/hard
