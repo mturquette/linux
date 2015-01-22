@@ -1,0 +1,6 @@
+config COMMON_CLK_TEST
+	tristate "Unit tests for the Common Clock Framework"
+	default n
+	---help---
+	  This driver runs several tests on the Common Clock Framework.
+
