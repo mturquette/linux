@@ -960,7 +960,21 @@ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
 						&parent_hw);
 	} else if (clk->ops->round_rate)
 		return clk->ops->round_rate(clk->hw, rate, &parent_rate);
-	else if (clk->flags & CLK_SET_RATE_PARENT)
+#if 0
+	else if (clk->ops->ccr_find_rate) {
+		return clk->ops->ccr_find_rate(clk->hw, rate);
+#endif
+	else if (clk->ops->ccr_find_state) {
+		/*
+		 * DO NOT FIXME would be nice to call:
+		 * return clk->ops->ccr_round_rate(...)
+		 * but should we have dedicated clk_ops? what about helper functions that are generic and can do this?
+		 */
+		cs = clk->ops->ccr_find_state(clk, rate, clk->parent);
+		if (IS_ERR(cs))
+			return 0;
+		return cs->rate;
+	} else if (clk->flags & CLK_SET_RATE_PARENT)
 		return __clk_round_rate(clk->parent, rate);
 	else
 		return clk->rate;
@@ -1338,6 +1352,11 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
 	}
 }
 
+static struct clk *ccr_parallel_function(struct clk *clk, unsigned long rate)
+{
+	// 1 find best state for given clock & rate
+	// 2 find root clock(s) for this ccr group
+	//
 /*
  * calculate the new rates returning the topmost clock that has to be
  * changed.
@@ -1355,6 +1374,8 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
 	if (IS_ERR_OR_NULL(clk))
 		return NULL;
 
+	if (clk->ops->ccr_find_state)
+		return clk
 	/* save parent rate, if it exists */
 	parent = old_parent = clk->parent;
 	if (parent)
@@ -1370,6 +1391,20 @@ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
 	} else if (clk->ops->round_rate) {
 		new_rate = clk->ops->round_rate(clk->hw, rate,
 						&best_parent_rate);
+	} else if (clk->ops->ccr_find_state) {
+		/*
+		 * DO NOT FIXME would be nice to call:
+		 * return clk->ops->ccr_round_rate(...)
+		 * but should we have dedicated clk_ops? what about helper functions that are generic and can do this?
+		 */
+		cs = clk->ops->ccr_find_state(clk, rate, clk->parent);
+		if (IS_ERR(cs))
+			return 0;
+		return cs->rate;
+#if 0
+	} else if (clk->ops->ccr_find_state) {
+		/* lets do the easy case first */
+#endif
 	} else if (!parent || !(clk->flags & CLK_SET_RATE_PARENT)) {
 		/* pass-through clock without adjustable parent */
 		clk->new_rate = clk->rate;
@@ -1547,6 +1582,20 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 		goto out;
 	}
 
+	/* shit, this should probably be nested iin clk_calc_new_rates or something */
+	/* handled coordinated clock rates */
+	if (clk->ops->ccr_find_state) {
+		cs = clk->ops->ccr_find_state(clk, clk->parent, rate);
+		if (!cs) {
+			ret = -EINVAL;
+			goto out;
+		}
+	}
+
+	if (clk->ops->ccr_set_rates) {
+		ret
+
+	/* handle non-coordinated clock rates */
 	/* calculate new rates and get the topmost changed clock */
 	top = clk_calc_new_rates(clk, rate);
 	if (!top) {

@@ -55,6 +55,7 @@ struct clk {
 	struct dentry		*dentry;
 #endif
 	struct kref		ref;
+	struct ccr_state	*cs;
 };
 
 /*
