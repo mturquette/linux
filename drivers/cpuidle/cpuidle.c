@@ -191,6 +191,7 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 
 	/* Take note of the planned idle state. */
 	sched_idle_set_state(target_state);
+	sched_idle_set_state_idx(index);
 
 	trace_cpu_idle_rcuidle(index, dev->cpu);
 	time_start = ktime_get();
@@ -202,6 +203,7 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 
 	/* The cpu is no longer idle or about to enter idle. */
 	sched_idle_set_state(NULL);
+	sched_idle_set_state_idx(-1);
 
 	if (broadcast) {
 		if (WARN_ON_ONCE(!irqs_disabled()))

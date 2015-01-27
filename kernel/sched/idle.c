@@ -24,6 +24,15 @@ void sched_idle_set_state(struct cpuidle_state *idle_state)
 	idle_set_state(this_rq(), idle_state);
 }
 
+/**
+ * sched_idle_set_state_idx - Record index of idle state for the current CPU.
+ * @idx: Index of state to record.
+ */
+void sched_idle_set_state_idx(int idx)
+{
+	idle_set_state_idx(this_rq(), idx);
+}
+
 static int __read_mostly cpu_idle_force_poll;
 
 void cpu_idle_poll_ctrl(bool enable)
