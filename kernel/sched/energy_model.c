@@ -239,6 +239,18 @@ bail:
 	return;
 }
 
+void cpufreq_scale_busiest_rq(struct rq *rq)
+{
+	int cpu = cpu_of(rq);
+
+	capacity = capacity_of(i);
+
+	wl = weighted_cpuload(i);
+
+
+	return;
+}
+
 static void em_start(struct cpufreq_policy *policy)
 {
 	int index = 0, count = 0;

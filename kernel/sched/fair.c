@@ -7254,6 +7254,12 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 			continue;
 		}
 
+		/*
+		 * FIXME magical code here.
+		 * we applied the perf threshold here from arch code which
+		 * gives us a TUNABLE threshold for stating that a queue is
+		 * over-loaded
+		 */
 		if (check_cpu_perf(rq, group) && !check_cpu_perf(busiest, group)) {
 			busiest_load = wl;
 			busiest_capacity = capacity;
@@ -7431,6 +7437,20 @@ redo:
 	}
 
 	BUG_ON(busiest == env.dst_rq);
+
+	/*
+	 * FIXME we know that we have a busiest CPU now. Note that Vincent's
+	 * task packing patches guarantee that we will always have one, but the
+	 * old code pre-task packing could return NULL (as validated by the
+	 * check above)
+	 *
+	 * Let's check this cpu's busyness against a threshold and then select
+	 * a frequency
+	 *
+	 * TODO: Scaling frequency of the businest cpu is not yet coordinated
+	 * with pulling tasks off the busiest cpu in load_balance
+	 */
+	cpufreq_scale_busiest_rq(cpu_of(rq));
 
 	schedstat_add(sd, lb_imbalance[idle], env.imbalance);
 
