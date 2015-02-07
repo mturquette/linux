@@ -7227,6 +7227,16 @@ static struct rq *find_busiest_queue(struct lb_env *env,
 
 		wl = weighted_cpuload(i);
 
+		/* FIXME why not just fire off the new freq request here? */
+		/* TODO ON THE PLANE: implement the function below and
+		 * trace_printk the frequency it would have picked. If it looks
+		 * reasonable then actually scale cpu frequency.
+		 * Re-use the em->up_threshold code to build a mapping table
+		 * between NORMALIZED utilization and OPP. See lab notebook for
+		 * relevant notes
+		 */
+		cpufreq_scale_busiest_cpu(i, wl, capacity);
+
 		/*
 		 * When comparing with imbalance, use weighted_cpuload()
 		 * which is not scaled with the cpu capacity.
