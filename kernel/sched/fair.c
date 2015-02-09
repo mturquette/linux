@@ -257,6 +257,9 @@ void update_packing_domain(int cpu)
 		}
 	}
 
+	/*
+	 * FIXME walk up the parent chain of sched_domains
+	 */
 	while (sd && (sd->flags & SD_LOAD_BALANCE)
 		&& !(sd->flags & SD_SHARE_POWERDOMAIN)) {
 		struct sched_group *tmp;
@@ -7435,6 +7438,17 @@ redo:
 	trace_sched_fbg(env.sd->level, this_cpu,
 			cpumask_first(sched_group_cpus(group)), idle);
 
+	/*
+	 * GOOD IDEA:
+	 * if this sched_domain shares a clock then don't scale cpu frequency
+	 * at this level. Instead try to load balance. When we walk up the
+	 * parent domain then we'll have another chance to scale clock speed
+	 * (assuming that the parent domain does NOT set SD_SHARE_CLKDOMAIN
+	 *
+	 * One thing that is missing: when do we scale down?
+	 */
+	if (group && !SD_SHARE_CLKDOMAIN)
+		cpufreq_scale_dvf();
 
 	busiest = find_busiest_queue(&env, group);
 	trace_sched_fbq(this_cpu,
@@ -7447,6 +7461,22 @@ redo:
 	}
 
 	BUG_ON(busiest == env.dst_rq);
+
+	/*
+	 * FIXME at this point we have the busiest cpu in the busiest group.
+	 * Now if we're balancing the SD that represents the whole chip (DIE?)
+	 * then we have 8 cores on exynos octa and 5 on tc2. Thus the big is a
+	 * sched_group and the LITTLE is a sched_group.
+	 *
+	 * Lets forget packing tasks for a minute (if we can). We want to see
+	 * if a very busy group/cpu can be frequency scaled. If it is very busy
+	 * and can scale frequency up then we can do that INSTEAD of migrating
+	 * tasks away from it and onto THIS cpu/group.
+	 *
+	 * load_balance bails out if we're not imbalanced, right? Let's try to
+	 * scale freq (if possible) and re-use that same not-imbalanced
+	 * bail-out logic to exit load_balance early.
+	 */
 
 	/*
 	 * FIXME we know that we have a busiest CPU now. Note that Vincent's
