@@ -2780,6 +2780,7 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
 	long contrib_delta, utilization_delta;
 	int cpu = cpu_of(rq_of(cfs_rq));
+	//int cap;
 	u64 now;
 
 	/*
@@ -4269,6 +4270,14 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		update_rq_runnable_avg(rq, rq->nr_running);
 		add_nr_running(rq, 1);
 	}
+
+	if(sched_energy_freq())
+		cap_gov_update_cpu(cpu_of(rq));
+	/*
+		set_capacity(cpu_of(rq), fair_sched_class,
+				get_cpu_usage(rq_of(cpu)));
+				*/
+
 	hrtick_update(rq);
 }
 
@@ -4330,6 +4339,11 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		sub_nr_running(rq, 1);
 		update_rq_runnable_avg(rq, 1);
 	}
+
+	if(sched_energy_freq())
+		cap_gov_update_cpu(cpu_of(rq));
+		//set_capacity(int cpu, enum sched_class, capacity constraint);
+
 	hrtick_update(rq);
 }
 
@@ -6061,6 +6075,7 @@ unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
 	return default_scale_cpu_capacity(sd, cpu);
 }
 
+#if 0
 void __weak arch_eval_cpu_freq(struct cpumask *cpus)
 {
 	return;
@@ -6070,6 +6085,7 @@ void __weak arch_scale_cpu_freq(void)
 {
 	return;
 }
+#endif
 
 static unsigned long scale_rt_capacity(int cpu)
 {
@@ -6960,11 +6976,11 @@ static int load_balance(int this_cpu, struct rq *this_rq,
 			struct sched_domain *sd, enum cpu_idle_type idle,
 			int *continue_balancing)
 {
-	int ld_moved, cur_ld_moved, active_balance = 0;
+	int ld_moved, cur_ld_moved, active_balance = 0; //, i;
 	struct sched_domain *sd_parent = sd->parent;
 	struct sched_group *group;
-	struct rq *busiest;
-	unsigned long flags;
+	struct rq *busiest; //, *rq;
+	unsigned long flags; //, capacity, wl;
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(load_balance_mask);
 
 	struct lb_env env = {
@@ -7166,8 +7182,41 @@ more_balance:
 			 */
 			sd->nr_balance_failed = sd->cache_nice_tries+1;
 		}
-	} else
+	} else {
 		sd->nr_balance_failed = 0;
+
+#if 0
+		/*
+		 * find the new busiest cpu and scale capacity to it.
+		 * shamelessly stolen from find_busiest_queue.
+		 */
+		for_each_cpu_and(i, sched_group_cpus(group), env->cpus) {
+			rq = cpu_rq(i);
+			capacity = capacity_of(i);
+			wl = weighted_cpuload(i);
+
+			/*
+			 * For the load comparisons with the other cpu's, consider
+			 * the weighted_cpuload() scaled with the cpu capacity, so
+			 * that the load can be moved away from the cpu that is
+			 * potentially running at a lower capacity.
+			 *
+			 * Thus we're looking for max(wl_i / capacity_i), crosswise
+			 * multiplication to rid ourselves of the division works out
+			 * to: wl_i * capacity_j > wl_j * capacity_i;  where j is
+			 * our previous maximum.
+			 */
+			if (wl * busiest_capacity > busiest_load * capacity) {
+				busiest_load = wl;
+				busiest_capacity = capacity;
+				busiest = rq;
+			}
+		}
+
+		//cpufreq_scale_busiest_cpu(i, wl, capacity);
+		cpufreq_cap_gov_request(i, wl, capacity);
+#endif
+	}
 
 	if (likely(!active_balance)) {
 		/* We were unbalanced, so reset the balancing interval */
@@ -7816,6 +7865,14 @@ static void run_rebalance_domains(struct softirq_action *h)
 	 * stopped.
 	 */
 	nohz_idle_balance(this_rq, idle);
+
+	/*
+	 * FIXME some hardware does not require this, but current CPUfreq
+	 * locking prevents us from changing cpu frequency with rq locks held
+	 * and interrupts disabled
+	 */
+	if (sched_energy_freq())
+		cap_gov_kick_thread(cpu_of(this_rq));
 }
 
 /*
@@ -7869,6 +7926,9 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 		task_tick_numa(rq, curr);
 
 	update_rq_runnable_avg(rq, 1);
+
+	if(sched_energy_freq())
+		cap_gov_update_cpu(cpu_of(rq));
 }
 
 /*
