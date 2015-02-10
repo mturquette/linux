@@ -7450,6 +7450,15 @@ redo:
 	if (group && !SD_SHARE_CLKDOMAIN)
 		cpufreq_scale_dvf();
 
+	/*
+	 * BETTER IDEA:
+	 */
+	if (sd->flags & SD_SHARE_CLKDOMAIN)
+		spread_tasks_like_normal(); // basically this is a "continue;"
+	else
+		cpufreq_scale_dvfs(cpu, cpu_capacity);
+
+
 	busiest = find_busiest_queue(&env, group);
 	trace_sched_fbq(this_cpu,
 			busiest ? cpu_of(busiest) : -1,
