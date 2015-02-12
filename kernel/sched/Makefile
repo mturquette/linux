@@ -20,3 +20,4 @@ obj-$(CONFIG_SCHEDSTATS) += stats.o
 obj-$(CONFIG_SCHED_DEBUG) += debug.o
 obj-$(CONFIG_CGROUP_CPUACCT) += cpuacct.o
 obj-$(CONFIG_CPU_FREQ_GOV_CAP_GOV) += cap_gov.o
+CFLAGS_cap_gov.o := -DDEBUG
