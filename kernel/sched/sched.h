@@ -1362,6 +1362,8 @@ static inline int hrtick_enabled(struct rq *rq)
 #ifdef CONFIG_SMP
 extern void sched_avg_update(struct rq *rq);
 extern unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu);
+int get_cpu_usage(int cpu);
+unsigned long capacity_of(int cpu);
 
 static inline void sched_rt_avg_update(struct rq *rq, u64 rt_delta)
 {
