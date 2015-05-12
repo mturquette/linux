@@ -19,7 +19,7 @@
 				700000  1200000
 				920000  1313000
 			>;
-			clock-latency = <300000>; /* From legacy driver */
+			clock-latency = <10000000>; /* From legacy driver */
 
 			/* cooling options */
 			cooling-min-level = <0>;
