@@ -1140,6 +1140,7 @@ extern const u32 sched_prio_to_wmult[40];
 #endif
 #define ENQUEUE_REPLENISH	0x08
 #define ENQUEUE_RESTORE	0x10
+#define ENQUEUE_WAKEUP_NEW	0x20
 
 #define DEQUEUE_SLEEP		0x01
 #define DEQUEUE_SAVE		0x02
