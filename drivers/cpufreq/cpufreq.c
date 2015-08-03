@@ -667,7 +667,12 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 		return -EINVAL;
 
 	ret = cpufreq_set_policy(policy, &new_policy);
-	return ret ? ret : count;
+	if (ret)
+		return ret;
+
+	policy->user_policy.policy = policy->policy;
+	policy->user_policy.governor = policy->governor;
+	return count;
 }
 
 /**
