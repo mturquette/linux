@@ -800,8 +800,8 @@ static int _opp_add(struct device *dev, struct dev_pm_opp *new_opp,
  * The opp is made available by default and it can be controlled using
  * dev_pm_opp_enable/disable functions and may be removed by dev_pm_opp_remove.
  *
- * NOTE: "dynamic" parameter impacts OPPs added by the of_add_opp_table and
- * freed by of_remove_opp_table.
+ * NOTE: "dynamic" parameter impacts OPPs added by the dev_pm_opp_of_add_table
+ * and freed by dev_pm_opp_of_remove_table.
  *
  * Locking: The internal device_opp and opp structures are RCU protected.
  * Hence this function internally uses RCU updater strategy with mutex locks
@@ -1185,7 +1185,8 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_get_notifier);
 
 #ifdef CONFIG_OF
 /**
- * of_remove_opp_table() - Free OPP table entries created from static DT entries
+ * dev_pm_opp_of_remove_table() - Free OPP table entries created from static DT
+ *				  entries
  * @dev:	device pointer used to lookup device OPPs.
  *
  * Free OPPs created using static entries present in DT.
@@ -1196,7 +1197,7 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_get_notifier);
  * that this function is *NOT* called under RCU protection or in contexts where
  * mutex cannot be locked.
  */
-void of_remove_opp_table(struct device *dev)
+void dev_pm_opp_of_remove_table(struct device *dev)
 {
 	struct device_opp *dev_opp;
 	struct dev_pm_opp *opp, *tmp;
@@ -1231,9 +1232,9 @@ void of_remove_opp_table(struct device *dev)
 unlock:
 	mutex_unlock(&dev_opp_list_lock);
 }
-EXPORT_SYMBOL_GPL(of_remove_opp_table);
+EXPORT_SYMBOL_GPL(dev_pm_opp_of_remove_table);
 
-void of_cpumask_remove_opp_table(cpumask_var_t cpumask)
+void dev_pm_opp_of_cpumask_remove_table(cpumask_var_t cpumask)
 {
 	struct device *cpu_dev;
 	int cpu;
@@ -1248,10 +1249,10 @@ void of_cpumask_remove_opp_table(cpumask_var_t cpumask)
 			continue;
 		}
 
-		of_remove_opp_table(cpu_dev);
+		dev_pm_opp_of_remove_table(cpu_dev);
 	}
 }
-EXPORT_SYMBOL_GPL(of_cpumask_remove_opp_table);
+EXPORT_SYMBOL_GPL(dev_pm_opp_of_cpumask_remove_table);
 
 /* Returns opp descriptor node from its phandle. Caller must do of_node_put() */
 static struct device_node *
@@ -1394,7 +1395,7 @@ static int _of_add_opp_table_v1(struct device *dev)
 }
 
 /**
- * of_add_opp_table() - Initialize opp table from device tree
+ * dev_pm_opp_of_add_table() - Initialize opp table from device tree
  * @dev:	device pointer used to lookup device OPPs.
  *
  * Register the initial OPP table with the OPP library for given device.
@@ -1416,7 +1417,7 @@ static int _of_add_opp_table_v1(struct device *dev)
  * -ENODATA	when empty 'operating-points' property is found
  * -EINVAL	when invalid entries are found in opp-v2 table
  */
-int of_add_opp_table(struct device *dev)
+int dev_pm_opp_of_add_table(struct device *dev)
 {
 	const struct property *prop;
 
@@ -1435,9 +1436,9 @@ int of_add_opp_table(struct device *dev)
 
 	return _of_init_opp_table_v2(dev, prop);
 }
-EXPORT_SYMBOL_GPL(of_add_opp_table);
+EXPORT_SYMBOL_GPL(dev_pm_opp_of_add_table);
 
-int of_cpumask_add_opp_table(cpumask_var_t cpumask)
+int dev_pm_opp_of_cpumask_add_table(cpumask_var_t cpumask)
 {
 	struct device *cpu_dev;
 	int cpu, ret = 0;
@@ -1452,23 +1453,23 @@ int of_cpumask_add_opp_table(cpumask_var_t cpumask)
 			continue;
 		}
 
-		ret = of_add_opp_table(cpu_dev);
+		ret = dev_pm_opp_of_add_table(cpu_dev);
 		if (ret) {
 			pr_err("%s: couldn't find opp table for cpu:%d, %d\n",
 			       __func__, cpu, ret);
 
 			/* Free all other OPPs */
-			of_cpumask_remove_opp_table(cpumask);
+			dev_pm_opp_of_cpumask_remove_table(cpumask);
 			break;
 		}
 	}
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(of_cpumask_add_opp_table);
+EXPORT_SYMBOL_GPL(dev_pm_opp_of_cpumask_add_table);
 
 /* Required only for V1 bindings, as v2 can manage it from DT itself */
-int set_cpus_sharing_opps(struct device *cpu_dev, cpumask_var_t cpumask)
+int dev_pm_opp_set_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask)
 {
 	struct device_list_opp *list_dev;
 	struct device_opp *dev_opp;
@@ -1506,7 +1507,7 @@ out_rcu_read_unlock:
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(set_cpus_sharing_opps);
+EXPORT_SYMBOL_GPL(dev_pm_opp_set_sharing_cpus);
 
 /*
  * Works only for OPP v2 bindings.
@@ -1514,7 +1515,7 @@ EXPORT_SYMBOL_GPL(set_cpus_sharing_opps);
  * cpumask should be already set to mask of cpu_dev->id.
  * Returns -ENOENT if operating-points-v2 bindings aren't supported.
  */
-int of_get_cpus_sharing_opps(struct device *cpu_dev, cpumask_var_t cpumask)
+int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, cpumask_var_t cpumask)
 {
 	struct device_node *np, *tmp_np;
 	struct device *tcpu_dev;
@@ -1564,5 +1565,5 @@ put_cpu_node:
 	of_node_put(np);
 	return ret;
 }
-EXPORT_SYMBOL_GPL(of_get_cpus_sharing_opps);
+EXPORT_SYMBOL_GPL(dev_pm_opp_of_get_sharing_cpus);
 #endif
