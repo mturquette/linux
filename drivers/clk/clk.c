@@ -1268,7 +1268,29 @@ static void clk_calc_subtree(struct clk_core *core, unsigned long new_rate,
 			     struct clk_core *new_parent, u8 p_index)
 {
 	struct clk_core *child;
+	struct clk_core *np = new_parent;
+	struct coord_hw *chw = core->hw->coord_hw;
 
+	/*
+	 * FIXME add a core.needs_calc boolean so we can bail out of subtrees that have already been walked
+	 * FIXME actually we already re-walk the tree a bunch anyways (see clk_calc_new_rate), so don't worry about it
+	 */
+
+#if 0
+	if (core->hw->coord_in_transition);
+#endif
+#if 0
+	if (core->hw->coord_hw->coord_domain->coord_target >= 0) {};
+#endif
+
+	if (chw && chw->coord_domain->rate_index >= 0) {
+		new_rate = chw->coord_domain->coord_table[chw->hw_index][chw->coord_domain->rate_index]->rate;
+		new_parent = chw->coord_domain->coord_table[chw->hw_index][chw->coord_domain->rate_index]->parent;
+		/*
+		 * FIXME
+		 * don't bother with p_index/new_parent_index, because coord
+		 * clks never use .set_rate_and_parent
+		 */
 	core->new_rate = new_rate;
 	core->new_parent = new_parent;
 	core->new_parent_index = p_index;
@@ -1310,6 +1332,28 @@ static int clk_calc_new_rates(struct clk_core *core,
 
 	clk_core_get_boundaries(core, &min_rate, &max_rate);
 
+#if 0
+	/*
+	 * trap any coordinated clock rates users here. If this is a ccr clk
+	 * then we branch into an entirely different set_rate logic
+	 */
+	if (core->ops->get_coord_rates) {
+		struct coord_rate *cr = calc_that_shit(core->hw, req_rate);
+		if (IS_ERR (cr))
+			return PTR_ERR(cr);
+	} else if (core->ops->get_coord_rates) {
+		struct coord_rate *cr =
+			core->ops->select_cood_rates(core->hw, req_rate);
+		if (IS_ERR (cr))
+			return PTR_ERR(cr);
+	}
+
+	if (cr) {
+		breadth-wise/breadth_first_search to fire off pre-rate-change notifiers
+	}
+
+	/* ok with BFS propagation of parent rates, maybe we can keep the same flow? */
+#endif
 	/* find the closest rate and parent clk/rate */
 	if (core->ops->determine_rate) {
 		struct clk_rate_request req;
@@ -1430,6 +1474,8 @@ static void clk_change_rate(struct clk_core *core)
 	unsigned long best_parent_rate = 0;
 	bool skip_set_rate = false;
 	struct clk_core *old_parent;
+	struct coord_rate_hw *chw = core->hw->coord_rate_hw;
+	int ret;
 
 	old_rate = core->rate;
 
@@ -1460,6 +1506,14 @@ static void clk_change_rate(struct clk_core *core)
 	if (!skip_set_rate && core->ops->set_rate)
 		core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
 
+	/* program changes to all clks in a coordinated rate domain at once */
+	if (chw && chw->coord_domain->rate_index >= 0) {
+		ret = core->ops->coordinate_rates(hw, ...);
+		pr_err("%s: %s %lu %lu %d\n", __func__, core->name, core->new_rate,
+				chw->coord_domain-FREQUENCY GOES HERE
+		chw->coord_domain->rate_index = -1;
+	}
+		
 	trace_clk_set_rate_complete(core, core->new_rate);
 
 	core->rate = clk_recalc(core, best_parent_rate);
@@ -1489,6 +1543,118 @@ static void clk_change_rate(struct clk_core *core)
 		clk_change_rate(core->new_child);
 }
 
+struct coord_rates example_cr[] = {
+	/* foo_clk */
+	{rate, parent, parent_rate},
+	{rate, parent, parent_rate},
+	{ /* sentinel */ },
+
+	/* bar_clk */
+	{rate, parent, parent_rate},
+	{rate, parent, parent_rate},
+	{ /* sentienel */ },
+};
+
+struct coord_rates example_cr[][] = {
+	/* foo_clk */
+	{
+		{foo_hw, rate, parent, parent_rate},
+		{foo_hw, rate, parent, parent_rate},
+		//{ /* sentinel */ },
+	},
+
+	/* bar_clk */
+	{
+		{bar_hw, rate, parent, parent_rate},
+		{bar_hw, rate, parent, parent_rate},
+		//{ /* sentienel */ },
+	},
+};
+
+struct clk_hw foo = {
+	.coord_rate = example_cr;
+};
+
+/*
+ * generic_select_coord_rates - returns index to first matching rate
+ * @hw: clock hardware whose rate is being changed
+ * @rate: requested rate
+ *
+ * This generic implementation of the clk_ops.select_coord_rates callback may
+ * be used for simple cases where picking the first matching entry in the
+ * coord_rate table is sufficient. Drivers with more complicated rate selection
+ * criteria should implement their own .select_coord_rates callback. Returns
+ * -ENOENT if an exact matching rate is not found (it does no rounding).
+ */
+int generic_select_coord_rates(struct clk_hw *hw, unsigned long rate)
+{
+	//struct coord_rate *cr = hw->coord_rate_entry;
+	struct coord_rate_entry *cr = hw->cr_domain->table[hw->cr_index];
+	//int index = 0;
+	int i;
+	bool match = false;
+
+	/* XXX this matches a one-dimensional table with a NULL sentinel */
+	//while (cr) {
+	for (i = 0; i < hw->cr_domain->nr_rates; i++) {
+		pr_err("%s: %p, %p, %lu, %lu, %u\n", cr->hw, cr->parent_hw,
+				cr->rate, cr->parent_rate, cr->flags);
+		if (cr->rate == rate) {
+			match = true;
+			break;
+		}
+		cr++;
+		//index++;
+	}
+
+	if (match)
+		return index;
+
+	return -ENOENT;
+}
+
+/*
+ * clk_select_coord_rates - helper that returns index to matching rate
+ * @core: clock whose rate is being changed
+ * @rate: requested rate
+ *
+ * Helper function that wraps the clk_ops.select_coord_rate callback. Notably
+ * it fills in clk_hw.coord_rate_entry if it missing (always hits this
+ * condition on the first run) and then calls the callback, which expects that
+ * variable to be filled. Returns -ENOENT if data is missing. Implements no
+ * policy of its (e.g. rounding logic).
+ */
+int clk_select_coord_rates(struct clk_core *core, unsigned long rate)
+{
+#if 0
+	struct coord_rate *cr;
+	int index = 0;
+
+	/* FIXME drivers should never duplicate this code. move it out */
+	if (!core->hw->coord_rate_entry) {
+		cr = core->hw->coord_rates;
+		while (cr) {
+			if (cr[index]->hw == hw) {
+				core->hw->coord_rate_entry = cr[index];
+				break;
+			}
+			index++;
+		}
+	}
+
+	if (!hw->coord_rate_entry)
+		return -ENOENT;
+#endif
+
+	return core->ops->select_coord_rates(core->hw, rate);
+}
+
+#if 0
+struct clk_hw {
+	.coord_rate = foo_coord_rate;
+};
+#endif
+
 static int clk_core_set_rate_nolock(struct clk_core *core,
 				    unsigned long req_rate)
 {
@@ -1497,6 +1663,8 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	int ret;
 	HLIST_HEAD(top_list);
 	struct hlist_node *tmp;
+	int i;
+	struct coord_rate_entry *cr;
 
 	if (!core)
 		return 0;
@@ -1508,6 +1676,37 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
 		return -EBUSY;
 
+#if 0
+	/*
+	 * FIXME
+	 *
+	 * We branch from the usual path if this rate change is coordinated by
+	 * the clock driver. This is a temporary limitation. Coordinated and
+	 * non-coordinated rate changes should be able to mix and match by
+	 * integrating coordinated clock changes into clk_calc_new_rates and
+	 * clk_change_rate
+	 */
+#if 0
+	if (clk->hw->coord_rates) {
+		if (clk->ops->select_coord_rates)
+			cr = clk->ops->select_coord_rates(clk->hw, req_rate);
+		else
+			cr = clk_select_coord_rates(clk->hw, req_rate);
+#endif
+	if (core->hw->cr_domain) {
+		rate_index = clk_select_coord_rates(core, req_rate);
+
+		/* FIXME below method looks better */
+		for (i = 0; i < core->hw->cr_domain.nr_clks; i++) {
+			cr = core->hw->cr_domain[i][rate_index];
+			pr_err("%s: %s, %p, %p, %lu, %lu, %d\n",
+					hw->cr_domain[i]
+			hw->coord_table.
+
+		...
+	} else {
+#endif
+	/* FIXME use list_head to ADD top clocks to top_clks_list */
 	/* calculate new rates and get the topmost changed clock */
 	ret = clk_calc_new_rates(core, rate, &top_list);
 	if (ret)
@@ -1542,6 +1741,28 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	return 0;
 }
 
+	/* we'll need to implement our own clk_calc_new_rate that is inclusive of ccr.
+	 * for each ccr clock we can do the following:
+	 * 	check that parent rate currently gives us what we need
+	 * 		if so, then nothing to do
+	 * 		if not, then check for CLK_SET_RATE_PARENT
+	 * 			ugh this is fucked.
+	 *
+	 * 			It's not entirely fucked if we make `unsigned int parent_hw_rate` very very optional:
+	 * 				it should only be used when we need to affect the rate of a parent clock that is OUTSIDE of the current ccr group
+	 * 				confusing, i know. parent should (almost) always be specified (unless clk_hw is ROOT), regardless of whether parent is inside this group or out
+	 *
+	 * 				LIGHTING BOLT
+	 * 					put all of the above new code inside of clk_calc_new_rates!
+	 * 					no more layering violation!
+	 */
+#if 0
+	struct coord_rates **
+			(*get_coord_rates_tables)(struct clk_hw *hw);
+	struct coord_rates *
+			(*select_coord_rates)(struct clk_hw *hw,
+
+#endif
 /**
  * clk_set_rate - specify a new rate for clk
  * @clk: the clk whose rate is being changed

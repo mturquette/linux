@@ -35,6 +35,7 @@
 struct clk;
 struct clk_hw;
 struct clk_core;
+struct ccr;
 struct dentry;
 
 /**
@@ -173,6 +174,27 @@ struct clk_rate_request {
  *		directory is provided as an argument.  Called with
  *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
  *
+ * @get_coord_rates_tables:	Returns a pointer to an array of struct
+ *				clk_coord_rates arrays. Use this for
+ *				coordinated rates tables that are simple enough
+ *				to have the framework choose the best one.
+ *				Mutually exclusive with @select_coord_rates.
+ *				Returns -ENODATA if table does not exist.
+ *
+ * @select_coord_rates:	Returns a pointer to an array of struct
+ *			clk_coordinated_rates that satisfies a rate-change
+ *			request from clk_set_rate() or clk_set_parent(). Use
+ *			this for complex coordinated rate-tables, or other
+ *			circumstances where the clock provider driver knows
+ *			best.  Mutually exclusive with @get_coord_rates_tables.
+ *			Returns -ENODATA if the table does not exist or -EINVAL
+ *			if the request cannot be satisfied.
+ *
+ * @coordinate_rates:	Programs the hardware to satisify the rate-change or
+ *			parent-change request. This may involve adjust the
+ *			rates coming out of multiple clock nodes as well as
+ *			changing multiple parent muxes. Returns 0 on success,
+ *			otherwise an error code.
  *
  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
  * implementations to split any work between atomic (enable) and sleepable
@@ -213,6 +235,14 @@ struct clk_ops {
 	int		(*set_phase)(struct clk_hw *hw, int degrees);
 	void		(*init)(struct clk_hw *hw);
 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
+	struct coord_rates **
+			(*get_coord_rates_tables)(struct clk_hw *hw);
+	struct coord_rates *
+			(*select_coordinated_rates)(struct clk_hw *hw,
+					struct clk_hw *parent_hw,
+					unsigned long rate);
+	int		(*coordinate_rates)(struct clk_hw *hw,
+					struct coord_rates *rates);
 };
 
 /**
@@ -233,6 +263,27 @@ struct clk_init_data {
 	unsigned long		flags;
 };
 
+/* FIXME provide macros for the domain and for the entries? */
+
+struct coord_rate_entry {
+	struct clk_hw *hw;
+	struct clk_hw *parent_hw;
+	unsigned long rate;
+	unsigned long parent_rate;
+	unsigned int flags;
+};
+
+struct coord_rate_domain {
+	int nr_clks;
+	int nr_rates;
+	struct coord_rate_entry[][] table;
+};
+
+struct coord_rate_hw {
+	struct coord_rate_domain *cr_domain;
+	unsigned int flags; /* e.g. COORD_RATE_ROOT */
+};
+
 /**
  * struct clk_hw - handle for traversing from a struct clk to its corresponding
  * hardware-specific structure.  struct clk_hw should be declared within struct
@@ -247,11 +298,20 @@ struct clk_init_data {
  *
  * @init: pointer to struct clk_init_data that contains the init data shared
  * with the common clock framework.
+ *
+ * @cr_table: pointer to a struct coord_rate_table instance containing rate
+ * entries for every clk_hw is the coordinated group. Shared with the clk
+ * framework core and the clk provider driver
+ *
+ * @cr_index: position in struct cr_table.table where the first
+ * coord_rate_entry for this clk_hw is located
  */
 struct clk_hw {
 	struct clk_core *core;
 	struct clk *clk;
 	const struct clk_init_data *init;
+	const struct coord_rate_domain *cr_domain;
+	int cr_index;
 };
 
 /*
