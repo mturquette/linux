@@ -1338,9 +1338,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 		return NULL;
 	} else {
 		/* pass-through clock with adjustable parent */
-		top = clk_calc_new_rates(parent, rate);
-		new_rate = parent->new_rate;
-		goto out;
+		best_parent_rate = new_rate = rate;
 	}
 
 	/* some clocks must be gated to change parent */
