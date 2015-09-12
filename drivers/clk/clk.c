@@ -67,6 +67,7 @@ struct clk_core {
 	struct hlist_head	children;
 	struct hlist_node	child_node;
 	struct hlist_head	clks;
+	struct hlist_node	top_node;
 	unsigned int		notifier_count;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry		*dentry;
@@ -1278,10 +1279,10 @@ static void clk_calc_subtree(struct clk_core *core, unsigned long new_rate,
  * calculate the new rates returning the topmost clock that has to be
  * changed.
  */
-static struct clk_core *clk_calc_new_rates(struct clk_core *core,
-					   unsigned long rate)
+static int clk_calc_new_rates(struct clk_core *core,
+					   unsigned long rate,
+					   struct hlist_head *top_list)
 {
-	struct clk_core *top = core;
 	struct clk_core *old_parent, *parent;
 	unsigned long best_parent_rate = 0;
 	unsigned long new_rate;
@@ -1292,7 +1293,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 
 	/* sanity */
 	if (IS_ERR_OR_NULL(core))
-		return NULL;
+		return PTR_ERR(core);
 
 	/* save parent rate, if it exists */
 	parent = old_parent = core->parent;
@@ -1318,7 +1319,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 
 		ret = core->ops->determine_rate(core->hw, &req);
 		if (ret < 0)
-			return NULL;
+			return ret;
 
 		best_parent_rate = req.best_parent_rate;
 		new_rate = req.rate;
@@ -1327,15 +1328,15 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 		ret = core->ops->round_rate(core->hw, rate,
 					    &best_parent_rate);
 		if (ret < 0)
-			return NULL;
+			return ret;
 
 		new_rate = ret;
 		if (new_rate < min_rate || new_rate > max_rate)
-			return NULL;
+			return -ERANGE;
 	} else if (!parent || !(core->flags & CLK_SET_RATE_PARENT)) {
 		/* pass-through clock without adjustable parent */
 		core->new_rate = core->rate;
-		return NULL;
+		return -EINVAL;
 	} else {
 		/* pass-through clock with adjustable parent */
 		best_parent_rate = new_rate = rate;
@@ -1346,7 +1347,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 	    (core->flags & CLK_SET_PARENT_GATE) && core->prepare_count) {
 		pr_debug("%s: %s not gated but wants to reparent\n",
 			 __func__, core->name);
-		return NULL;
+		return -EINVAL;
 	}
 
 	/* try finding the new parent index */
@@ -1355,18 +1356,19 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 		if (p_index < 0) {
 			pr_debug("%s: clk %s can not be parent of clk %s\n",
 				 __func__, parent->name, core->name);
-			return NULL;
+			return -EINVAL;
 		}
 	}
 
 	if ((core->flags & CLK_SET_RATE_PARENT) && parent &&
 	    best_parent_rate != parent->rate)
-		top = clk_calc_new_rates(parent, best_parent_rate);
+		ret = clk_calc_new_rates(parent, best_parent_rate, top_list);
+	else
+		hlist_add_head(&core->top_node, top_list);
 
-out:
 	clk_calc_subtree(core, new_rate, parent, p_index);
 
-	return top;
+	return 0;
 }
 
 /*
@@ -1475,8 +1477,11 @@ static void clk_change_rate(struct clk_core *core)
 	if (core->notifier_count && old_rate != core->rate)
 		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
 
-	if (core->flags & CLK_RECALC_NEW_RATES)
-		(void)clk_calc_new_rates(core, core->new_rate);
+	if (core->flags & CLK_RECALC_NEW_RATES) {
+		HLIST_HEAD(dummy);
+		(void)clk_calc_new_rates(core, core->new_rate, &dummy);
+		hlist_del_init(&core->top_node);
+	}
 
 	/*
 	 * Use safe iteration, as change_rate can actually swap parents
@@ -1499,7 +1504,9 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 {
 	struct clk_core *top, *fail_clk;
 	unsigned long rate = req_rate;
-	int ret = 0;
+	int ret;
+	HLIST_HEAD(top_list);
+	struct hlist_node *tmp;
 
 	if (!core)
 		return 0;
@@ -1512,25 +1519,37 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 		return -EBUSY;
 
 	/* calculate new rates and get the topmost changed clock */
-	top = clk_calc_new_rates(core, rate);
-	if (!top)
-		return -EINVAL;
+	ret = clk_calc_new_rates(core, rate, &top_list);
+	if (ret)
+		return ret;
 
 	/* notify that we are about to change rates */
-	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
-	if (fail_clk) {
-		pr_debug("%s: failed to set %s rate\n", __func__,
-				fail_clk->name);
-		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
-		return -EBUSY;
+	hlist_for_each_entry(top, &top_list, top_node) {
+		fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
+		if (fail_clk) {
+			pr_debug("%s: failed to set %s rate\n", __func__,
+					fail_clk->name);
+
+			/* fire off ABORT_RATE_CHANGE notifiers, delete list */
+			hlist_for_each_entry_safe(top, tmp, &top_list,
+					top_node) {
+				clk_propagate_rate_change(top,
+						ABORT_RATE_CHANGE);
+				hlist_del_init(&top->top_node);
+			}
+			return -EBUSY;
+		}
 	}
 
-	/* change the rates */
-	clk_change_rate(top);
+	/* change the rates, delete list */
+	hlist_for_each_entry_safe(top, tmp, &top_list, top_node) {
+		clk_change_rate(top);
+		hlist_del_init(&top->top_node);
+	}
 
 	core->req_rate = req_rate;
 
-	return ret;
+	return 0;
 }
 
 /**
