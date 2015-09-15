@@ -2832,7 +2832,6 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 	core->hw = hw;
 	core->flags = hw->init->flags;
 	core->num_parents = hw->init->num_parents;
-	core->cr_rate_index = -1;
 	core->min_rate = 0;
 	core->max_rate = ULONG_MAX;
 	core->cr_rate_index = -1;
