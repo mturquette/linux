@@ -1318,7 +1318,6 @@ static int clk_calc_new_rates(struct clk_core *core,
 
 	clk_core_get_boundaries(core, &min_rate, &max_rate);
 
-#if 0
 	/*
 	 * match rate to a coordinated clk rate table or,
 	 * find the closest rate and parent clk/rate
@@ -1383,9 +1382,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 			parent = tbl[clk_idx][rate_idx].parent_hw->core;
 			best_parent_rate = tbl[clk_idx][rate_idx].parent_rate;
 		}
-	} else 
-#endif
-	if (core->ops->determine_rate) {
+	} else if (core->ops->determine_rate) {
 		struct clk_rate_request req;
 
 		req.rate = rate;
@@ -1506,7 +1503,7 @@ static void clk_change_rate(struct clk_core *core)
 	bool skip_set_rate = false;
 	struct clk_core *old_parent;
 	const struct coord_rate_domain *crd = core->hw->cr_domain;
-	pr_err("%s: core %s crd %p\n", __func__, core->name, crd);
+	//pr_err("%s: core %s crd %p\n", __func__, core->name, crd);
 
 	old_rate = core->rate;
 
@@ -1541,9 +1538,11 @@ static void clk_change_rate(struct clk_core *core)
 	if (crd && core->cr_rate_index >= 0) {
 		struct coord_rate_entry **tbl = crd->table;
 		int i;
+#if 0
 		pr_err("%s: crd %p cr_rate_index %d\n",
 				__func__, crd, core->cr_rate_index);
 		pr_err("%s: %s %lu\n", __func__, core->name, core->new_rate);
+#endif
 		core->ops->coordinate_rates(crd, core->cr_rate_index);
 		/*
 		 * we're done with this coordinated rate group.
@@ -1552,11 +1551,13 @@ static void clk_change_rate(struct clk_core *core)
 		for (i = 0; i < crd->nr_clks; i++) {
 			// assigning coord_core below causes boot to fail
 			coord_core = tbl[i][core->cr_rate_index].hw->core;
+#if 0
 			pr_err("%s: tbl %p\n", __func__, &tbl[i][core->cr_rate_index]);
 			pr_err("%s: hw %p\n", __func__, tbl[i][core->cr_rate_index].hw);
 			pr_err("%s: core %p\n", __func__, tbl[i][core->cr_rate_index].hw->core);
 			pr_err("%s: coord_core %p\n", __func__, coord_core);
 			pr_err("%s: cr_rate_index %d\n", __func__, coord_core->cr_rate_index);
+#endif
 			coord_core->cr_rate_index = -1;
 		}
 #if 0
