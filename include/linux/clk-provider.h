@@ -61,6 +61,20 @@ struct clk_rate_request {
 	struct clk_hw *best_parent_hw;
 };
 
+struct coord_rate_entry {
+	struct clk_hw *hw;
+	struct clk_hw *parent_hw;
+	unsigned long rate;
+	unsigned long parent_rate;
+};
+
+struct coord_rate_domain {
+	int nr_clks;
+	int nr_rates;
+	struct coord_rate_entry **table;
+	void *priv;
+};
+
 /**
  * struct clk_ops -  Callback operations for hardware clocks; these are to
  * be provided by the clock implementation, and will be called by drivers
@@ -175,6 +189,17 @@ struct clk_rate_request {
  *		directory is provided as an argument.  Called with
  *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
  *
+ * @select_coord_rates:	Returns an index to an entry in the coordinated rate
+ *			table that satisfies a rate-change request from
+ *			clk_set_rate() or clk_set_parent().  Returns -ENODATA
+ *			if the table does not exist or -EINVAL if the request
+ *			cannot be satisfied.
+ *
+ * @coordinate_rates:	Programs the hardware to satisify the rate-change or
+ *			parent-change request. This may involve adjusting the
+ *			rates coming out of multiple clock nodes as well as
+ *			changing multiple parent muxes. Returns 0 on success,
+ *			otherwise an error code.
  *
  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
  * implementations to split any work between atomic (enable) and sleepable
@@ -215,6 +240,11 @@ struct clk_ops {
 	int		(*set_phase)(struct clk_hw *hw, int degrees);
 	void		(*init)(struct clk_hw *hw);
 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
+	int		(*select_coord_rates)(struct clk_hw *hw,
+					//struct clk_hw *parent_hw,
+					unsigned long rate);
+	int		(*coordinate_rates)(const struct coord_rate_domain *,
+					int index);
 };
 
 /**
@@ -249,11 +279,21 @@ struct clk_init_data {
  *
  * @init: pointer to struct clk_init_data that contains the init data shared
  * with the common clock framework.
+ *
+ * @cr_domain: pointer to a struct coord_rate_domain instance containing the
+ * rate entries for every clk_hw in the coordinated group. Shared with the clk
+ * framework core and the clk provider driver
+ *
+ * @cr_clk_index: position in struct cr_domain.table where the first
+ * coord_rate_entry for this clk_hw is located. Shared with the clk framework
+ * core and the clk provider driver
  */
 struct clk_hw {
 	struct clk_core *core;
 	struct clk *clk;
 	const struct clk_init_data *init;
+	const struct coord_rate_domain *cr_domain;
+	const int cr_clk_index;
 };
 
 /*

@@ -51,6 +51,7 @@ struct clk_core {
 	struct clk_core		**parents;
 	u8			num_parents;
 	u8			new_parent_index;
+	int			cr_rate_index;
 	unsigned long		rate;
 	unsigned long		req_rate;
 	unsigned long		new_rate;
@@ -2297,6 +2298,25 @@ static int __clk_core_init(struct clk_core *core)
 	}
 
 	/* check that clk_ops are sane.  See Documentation/clk.txt */
+
+	/* FIXME if (core->ops->select_coord_rates && !core->ops->coordinate_rates) ??? */
+	if (!!core->ops->select_coord_rates != !!core->ops->coordinate_rates) {
+		pr_warning("%s: %s must implement both .select_coord_rates and .coordinated_rates\n",
+				__func__, core->name);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (core->ops->select_coord_rates && (core->ops->round_rate
+				|| core->ops->determine_rate
+				|| core->ops->set_rate
+				|| core->ops->set_parent)) {
+		pr_warning("%s: %s coordinated rate clks must not implement .round_rate, .determine_rate, .set_rate or .set_parent\n",
+				__func__, core->name);
+		ret = -EINVAL;
+		goto out;
+	}
+
 	if (core->ops->set_rate &&
 	    !((core->ops->round_rate || core->ops->determine_rate) &&
 	      core->ops->recalc_rate)) {
@@ -2509,6 +2529,7 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 	core->num_parents = hw->init->num_parents;
 	core->min_rate = 0;
 	core->max_rate = ULONG_MAX;
+	core->cr_rate_index = -1;
 	hw->core = core;
 
 	/* allocate local copy in case parent_names is __initdata */
