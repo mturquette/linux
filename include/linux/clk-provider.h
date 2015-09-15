@@ -307,6 +307,20 @@ struct clk_hw {
 	const struct clk_init_data *init;
 };
 
+/**
+ * generic_select_coord_rates - returns index to first matching rate
+ * @hw: clock hardware whose rate is being changed
+ * @rate: requested rate
+ *
+ * This generic implementation of the clk_ops.select_coord_rates callback may
+ * be used for simple cases where picking the first matching entry in the
+ * coord_rate table is sufficient. Drivers with more complicated rate selection
+ * criteria should implement their own .select_coord_rates callback. Returns
+ * -ENOENT if an exact matching rate is not found (it does no rounding).
+ */
+struct cr_state *clk_get_cr_state_from_domain(struct clk_hw *hw,
+		struct cr_domain *cr_domain, unsigned long rate);
+
 /*
  * DOC: Basic clock implementations common to many platforms
  *

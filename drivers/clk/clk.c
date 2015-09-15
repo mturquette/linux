@@ -1712,6 +1712,74 @@ static void clk_change_rate(struct clk_core *core)
 #define for_each_top_clk() \
 	hlist_for_each_entry_safe(top, tmp, &top_list, top_node)
 
+/* XXX FIXME is this dangerous? Can clk provider drivers use it? */
+#define generic_to_cr_domain(_x) _x->cr_domain
+
+/*
+ * FIXME should this pick the highest rate that is less than or equal to the
+ * requested rate? We cannot tolerate failures in clk_calc_new_rates
+ */
+static bool _cr_state_match_rate(struct clk_hw *hw, struct cr_state *cr_state,
+		unsigned long rate)
+{
+	int nr_clk = cr_state->nr_clk;
+	int i;
+
+	for (i = 0; i < nr_clk; i++) {
+		if (cr_state->clks[i]->hw == hw &&
+				cr_state->clks[i]->rate == rate) {
+			return true;
+		}
+	}
+
+#if 0
+	if (match)
+		return i;
+
+	return -ENOENT;
+#endif
+	return false;
+}
+
+/*
+ * clk_get_cr_state_from_domain - return cr_state from domain w/ matching rate
+ * @hw: clock hardware whose rate is being changed
+ * @cr_domain: pointer to table of all cr_states for this clock
+ * @rate: requested rate
+ *
+ * Both clk_get_cr_state_from_domain() and struct cr_domain are optional
+ * helpers for clock providers that statically initialize discrete frequency
+ * tables. These helpers are not relevant for clock provider drivers that
+ * dynamically allocate a struct cr_state for every .round_rate or
+ * .get_cr_state callback.
+ *
+ * How to use this helper:
+ * A machine-specific .get_cr_state callback will fetch the struct cr_domain,
+ * which is most likely a member of a machine-specific struct clk_foo, and then
+ * pass struct cr_domain into simple_get_cr_state where we walk the table.
+ *
+ * This helper may be used for simple cases where picking the first matching
+ * entry in the cr_rate table is sufficient. Drivers with more complicated rate
+ * selection criteria should implement their own methods in .get_cr_state and
+ * avoid using clk_get_cr_state_from_domain.
+ */
+struct cr_state *clk_get_cr_state_from_domain(struct clk_hw *hw,
+		struct cr_domain *cr_domain, unsigned long rate)
+{
+	int nr_state = cr_domain->nr_state;
+	struct cr_state *cr_state;
+	int i;
+
+	for (i = 0; i < nr_state; i++) {
+		cr_state = cr_domain->states[i];
+		if (_cr_state_match_rate(hw, cr_state, rate))
+			return cr_state;
+	}
+
+	return ERR_PTR(-ENOENT);
+}
+EXPORT_SYMBOL_GPL(clk_get_cr_state_from_domain);
+
 static int clk_core_set_rate_nolock(struct clk_core *core,
 				    unsigned long req_rate)
 {
