@@ -1318,6 +1318,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 
 	clk_core_get_boundaries(core, &min_rate, &max_rate);
 
+#if 0
 	/*
 	 * match rate to a coordinated clk rate table or,
 	 * find the closest rate and parent clk/rate
@@ -1382,7 +1383,9 @@ static int clk_calc_new_rates(struct clk_core *core,
 			parent = tbl[clk_idx][rate_idx].parent_hw->core;
 			best_parent_rate = tbl[clk_idx][rate_idx].parent_rate;
 		}
-	} else if (core->ops->determine_rate) {
+	} else 
+#endif
+	if (core->ops->determine_rate) {
 		struct clk_rate_request req;
 
 		req.rate = rate;
@@ -1538,6 +1541,8 @@ static void clk_change_rate(struct clk_core *core)
 	/* program changes to all clks in a coordinated rate domain at once */
 	if (crd && core->cr_rate_index >= 0) {
 		int i;
+		pr_err("%s: crd %p cr_rate_index %d\n",
+				__func__, crd, core->cr_rate_index);
 		pr_err("%s: %s %lu\n", __func__, core->name, core->new_rate);
 		core->ops->coordinate_rates(crd, core->cr_rate_index);
 		/*
@@ -1545,9 +1550,11 @@ static void clk_change_rate(struct clk_core *core)
 		 * reset cr_rate_index
 		 */
 		for (i = 0; i < crd->nr_clks; i++) {
-			coord_core = tbl[i][core->cr_rate_index].hw->core;
+			//coord_core = tbl[i][core->cr_rate_index].hw->core;
 			coord_core->cr_rate_index = -1;
 		}
+#if 0
+#endif
 	}
 
 	trace_clk_set_rate_complete(core, core->new_rate);
