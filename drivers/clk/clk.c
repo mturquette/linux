@@ -54,6 +54,7 @@ struct clk_core {
 	unsigned long		rate;
 	unsigned long		req_rate;
 	unsigned long		new_rate;
+	struct cr_state		*new_cr_state;
 	struct clk_core		*new_parent;
 	struct clk_core		*new_child;
 	unsigned long		flags;
@@ -2360,6 +2361,24 @@ static int __clk_core_init(struct clk_core *core)
 	}
 
 	/* check that clk_ops are sane.  See Documentation/clk.txt */
+	if (!!core->ops->get_cr_state ^ !!core->ops->set_cr_state) {
+		pr_warning("%s: %s must implement both .get_cr_state and .set_cr_state\n",
+				__func__, core->name);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (core->ops->set_cr_state &&
+			(core->ops->round_rate ||
+			 core->ops->determine_rate ||
+			 core->ops->set_rate ||
+			 core->ops->set_parent)) {
+		pr_warning("%s: %s coordinated rate clks must not implement .round_rate, .determine_rate, .set_rate or .set_parent\n",
+				__func__, core->name);
+		ret = -EINVAL;
+		goto out;
+	}
+
 	if (core->ops->set_rate &&
 	    !((core->ops->round_rate || core->ops->determine_rate) &&
 	      core->ops->recalc_rate)) {
