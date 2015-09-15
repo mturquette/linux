@@ -31,6 +31,7 @@
 #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
 #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
 #define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after notifications */
+//#define CLK_COORD_RATES_ROOT	BIT(10) /* root within coord rates domain */
 
 struct clk;
 struct clk_hw;
@@ -58,6 +59,21 @@ struct clk_rate_request {
 	unsigned long max_rate;
 	unsigned long best_parent_rate;
 	struct clk_hw *best_parent_hw;
+};
+
+struct coord_rate_entry {
+	struct clk_hw *hw;
+	struct clk_hw *parent_hw;
+	unsigned long rate;
+	unsigned long parent_rate;
+	//unsigned int flags;
+};
+
+struct coord_rate_domain {
+	int nr_clks;
+	int nr_rates;
+	//struct coord_rate_entry[][] table;
+	struct coord_rate_entry **table;
 };
 
 /**
@@ -237,12 +253,14 @@ struct clk_ops {
 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
 	struct coord_rates **
 			(*get_coord_rates_tables)(struct clk_hw *hw);
-	struct coord_rates *
-			(*select_coordinated_rates)(struct clk_hw *hw,
-					struct clk_hw *parent_hw,
+	//struct coord_rates *
+	int		(*select_coord_rates)(struct clk_hw *hw,
+					//struct clk_hw *parent_hw,
 					unsigned long rate);
-	int		(*coordinate_rates)(struct clk_hw *hw,
-					struct coord_rates *rates);
+//	int		(*coordinate_rates)(struct clk_hw *hw,
+//					struct coord_rates *rates);
+	int		(*coordinate_rates)(const struct coord_rate_domain *,
+					int index);
 };
 
 /**
@@ -261,28 +279,15 @@ struct clk_init_data {
 	const char		* const *parent_names;
 	u8			num_parents;
 	unsigned long		flags;
+	//int			cr_index;
 };
 
-/* FIXME provide macros for the domain and for the entries? */
-
-struct coord_rate_entry {
-	struct clk_hw *hw;
-	struct clk_hw *parent_hw;
-	unsigned long rate;
-	unsigned long parent_rate;
-	unsigned int flags;
-};
-
-struct coord_rate_domain {
-	int nr_clks;
-	int nr_rates;
-	struct coord_rate_entry[][] table;
-};
-
+#if 0
 struct coord_rate_hw {
 	struct coord_rate_domain *cr_domain;
 	unsigned int flags; /* e.g. COORD_RATE_ROOT */
 };
+#endif
 
 /**
  * struct clk_hw - handle for traversing from a struct clk to its corresponding
@@ -303,7 +308,7 @@ struct coord_rate_hw {
  * entries for every clk_hw is the coordinated group. Shared with the clk
  * framework core and the clk provider driver
  *
- * @cr_index: position in struct cr_table.table where the first
+ * @cr_clk_index: position in struct cr_table.table where the first
  * coord_rate_entry for this clk_hw is located
  */
 struct clk_hw {
@@ -311,7 +316,7 @@ struct clk_hw {
 	struct clk *clk;
 	const struct clk_init_data *init;
 	const struct coord_rate_domain *cr_domain;
-	int cr_index;
+	const int cr_clk_index;
 };
 
 /*
