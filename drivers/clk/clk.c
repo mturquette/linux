@@ -835,11 +835,29 @@ static int clk_disable_unused(void)
 }
 late_initcall_sync(clk_disable_unused);
 
+static int cr_get_index_by_hw(struct clk_hw *hw, struct cr_state *state)
+{
+	int i;
+	for (i = 0; i < state->nr_clk; i++)
+		if (hw == state->clks[i]->hw)
+			return i;
+	return -ENOENT;
+}
+
+static int cr_get_rate_by_hw(struct clk_hw *hw, struct cr_state *state)
+{
+	int index = cr_get_index_by_hw(hw, state);
+	if (index < 0)
+		return index;
+	return state->clks[index]->rate;
+}
+
 static int clk_core_round_rate_nolock(struct clk_core *core,
 				      struct clk_rate_request *req)
 {
 	struct clk_core *parent;
 	long rate;
+	struct cr_state *new_cr_state;
 
 	lockdep_assert_held(&prepare_lock);
 
@@ -855,7 +873,13 @@ static int clk_core_round_rate_nolock(struct clk_core *core,
 		req->best_parent_rate = 0;
 	}
 
-	if (core->ops->determine_rate) {
+	if (core->ops->get_cr_state) {
+		new_cr_state = core->ops->get_cr_state(core->hw, req->rate);
+		if (IS_ERR(new_cr_state))
+			return PTR_ERR(new_cr_state);
+
+		req->rate = cr_get_rate_by_hw(core->hw, new_cr_state);
+	} else if (core->ops->determine_rate) {
 		return core->ops->determine_rate(core->hw, req);
 	} else if (core->ops->round_rate) {
 		rate = core->ops->round_rate(core->hw, req->rate,
@@ -1328,6 +1352,19 @@ static void clk_calc_subtree(struct clk_core *core, unsigned long new_rate,
 	}
 }
 
+struct cr_clk *clk_get_cr_clk_from_state(struct clk_hw *hw, struct cr_state *state)
+{
+	struct cr_clk *cr_clk;
+	int i;
+
+	for (i = 0; i < state->nr_clk; i++) {
+		cr_clk = state->clks[i];
+		if (hw == cr_clk->hw)
+			return cr_clk;
+	}
+	return ERR_PTR(-ENOENT);
+}
+
 /*
  * calculate the new rates returning the topmost clock that has to be
  * changed.
@@ -1343,6 +1380,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 	unsigned long max_rate;
 	int p_index = 0;
 	long ret;
+	bool is_cr_root = false;
 
 	/* sanity */
 	if (IS_ERR_OR_NULL(core))
@@ -1355,8 +1393,80 @@ static int clk_calc_new_rates(struct clk_core *core,
 
 	clk_core_get_boundaries(core, &min_rate, &max_rate);
 
-	/* find the closest rate and parent clk/rate */
-	if (core->ops->determine_rate) {
+	/* FIXME consider rate range boundaries? */
+	if (core->ops->get_cr_state && core->new_cr_state == NULL) {
+		int i;
+		struct clk_core *core_tmp;
+		struct cr_clk *cr_clk;
+		struct cr_state *state =
+			core->ops->get_cr_state(core->hw, rate);
+
+		/*
+		 * this is the first pass for the set of clocks coordinating
+		 * rates. Populate new_rate and new_parent and new_cr_state for
+		 * all coordinated clk_core objects. See else statement below
+		 *
+		 * clk provider driver authors:
+		 * parent_rate is only useful when crossing the boundary from a
+		 * coordinated clock to a parent clock that is uncoordinated.
+		 */
+		/* XXX test if this works. If so, then delete all of this block */
+#if 0
+		for (i = 0; i < state->nr_clk; i++) {
+			cr_clk = state->clks[i];
+			core_tmp = cr_clk->hw->core;
+			core_tmp->new_cr_state = state;
+		}
+#endif
+
+		/*
+		 * handling coordinated rate clocks in clk_calc_new_rates is a
+		 * bit tricky; on the first call to clk_calc_new_rates for a
+		 * coordinated rate clock, we find the appropriate cr_state and
+		 * set the core->new_cr_state pointer for every clock in that
+		 * cr_state. Then we recurse into clk_calc_new_rates for every
+		 * clock in that cr_state for the second pass. See comment
+		 * block below for more details on the second pass.
+		 */
+		for (i = 0; i < state->nr_clk; i++) {
+			cr_clk = state->clks[i];
+			core_tmp = cr_clk->hw->core;
+			core_tmp->new_cr_state = state;
+			clk_calc_new_rates(core_tmp, cr_clk->rate, top_list);
+		}
+		goto out;
+	} else if (core->ops->get_cr_state && core->new_cr_state != NULL) {
+		/*
+		 * this is the second pass through clk_calc_new_rates for this
+		 * cr_state. See comment block above for context.
+		 *
+		 * In the second pass through clk_calc_new_rates, we set the
+		 * local variables used in this function: new_rate, parent &
+		 * best_parent_rate.  The rest of the logic in this function is
+		 * used as-is with the exception of &top_list. The only clocks
+		 * we want to add to &top_list are sub-root clocks in this
+		 * cr_state or potentially the parents of these sub-root clocks
+		 * in the case of CLK_SET_RATE_PARENT. Either way we rely on
+		 * cr_clk.is_root for this check.
+		 */
+		struct cr_clk *cr_clk = clk_get_cr_clk_from_state(core->hw,
+				core->new_cr_state);
+
+		/*
+		 * set parent, new_rate and best_parent_rate based on the
+		 * values in cr_state. Note that best_parent_rate doesn't
+		 * matter unless the clk is both a subroot of the cr_state and
+		 * also has the CLK_SET_RATE_PARENT flag set. We check for
+		 * CLK_SET_PARENT_RATE at the end of clk_calc_new_rates, so we
+		 * only bother checking for .is_root here
+		 */
+		parent = cr_clk->parent_hw->core;
+		new_rate = cr_clk->rate;
+		if (cr_clk->is_root) {
+			is_cr_root = true;
+			best_parent_rate = cr_clk->parent_rate;
+		}
+	} else if (core->ops->determine_rate) {
 		struct clk_rate_request req;
 
 		req.rate = rate;
@@ -1416,11 +1526,12 @@ static int clk_calc_new_rates(struct clk_core *core,
 	if ((core->flags & CLK_SET_RATE_PARENT) && parent &&
 	    best_parent_rate != parent->rate)
 		ret = clk_calc_new_rates(parent, best_parent_rate, top_list);
-	else
+	else if (!core->ops->get_cr_state || is_cr_root)
 		hlist_add_head(&core->top_node, top_list);
 
 	clk_calc_subtree(core, new_rate, parent, p_index);
 
+out:
 	return 0;
 }
 
@@ -1469,20 +1580,24 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *core,
  */
 static void clk_change_rate(struct clk_core *core)
 {
-	struct clk_core *child;
+	struct clk_core *child; //, *cr_core;
 	struct hlist_node *tmp;
 	unsigned long old_rate;
 	unsigned long best_parent_rate = 0;
 	bool skip_set_rate = false;
 	struct clk_core *old_parent;
 	struct clk_core *parent = NULL;
+	const struct cr_state *cr_state = core->new_cr_state;
 
 	old_rate = core->rate;
 
+	pr_err("%s: here0 core %s\n", __func__, core->name);
 	if (core->new_parent) {
+		pr_err("%s: here1 core %s\n", __func__, core->name);
 		parent = core->new_parent;
 		best_parent_rate = core->new_parent->rate;
 	} else if (core->parent) {
+		pr_err("%s: here2 core %s\n", __func__, core->name);
 		parent = core->parent;
 		best_parent_rate = core->parent->rate;
 	}
@@ -1520,6 +1635,38 @@ static void clk_change_rate(struct clk_core *core)
 
 	if (!skip_set_rate && core->ops->set_rate)
 		core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
+
+	/* coordinate rate change for all clocks in cr_state */
+	if (cr_state && core->ops->set_cr_state) {
+		int i;
+		struct clk_core *core_tmp;
+
+		/*
+		 * FIXME we do not handle errors gracefully
+		 * This is a bigger problem with clk_calc_new_rates, where we
+		 * expect to pick a rate no matter what. In the mean time,
+		 * should we select the highest rate that is less than or equal
+		 * to the requested rate?
+		 */
+		if (core->ops->set_cr_state(cr_state))
+			pr_err("%s: coordinated rate change failed for clk %s\n",
+					__func__, core->name);
+
+		for (i = 0; i < cr_state->nr_clk; i++) {
+			core_tmp = cr_state->clks[i]->hw->core;
+			// FIXME should I reparent here?
+			core_tmp->new_cr_state = NULL;
+		}
+
+		/*
+		 * needs_free is only set when cr_state_state is dynamically
+		 * allocated and there is no associated cr_state_group. Clock
+		 * providers that use static tables and cr_state_group can
+		 * ignore this flag.
+		 */
+		if (cr_state->needs_free)
+			kfree(cr_state);
+	}
 
 	trace_clk_set_rate_complete(core, core->new_rate);
 
@@ -1562,6 +1709,9 @@ static void clk_change_rate(struct clk_core *core)
 		clk_change_rate(core->new_child);
 }
 
+#define for_each_top_clk() \
+	hlist_for_each_entry_safe(top, tmp, &top_list, top_node)
+
 static int clk_core_set_rate_nolock(struct clk_core *core,
 				    unsigned long req_rate)
 {
@@ -1581,26 +1731,18 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
 		return -EBUSY;
 
-	/* calculate new rates and get the topmost changed clock */
+	/* calculate new rates and get the topmost changed clocks */
 	ret = clk_calc_new_rates(core, rate, &top_list);
 	if (ret)
 		return ret;
 
 	/* notify that we are about to change rates */
-	hlist_for_each_entry(top, &top_list, top_node) {
+	for_each_top_clk() {
 		fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
 		if (fail_clk) {
 			pr_debug("%s: failed to set %s rate\n", __func__,
 					fail_clk->name);
-
-			/* fire off ABORT_RATE_CHANGE notifiers, delete list */
-			hlist_for_each_entry_safe(top, tmp, &top_list,
-					top_node) {
-				clk_propagate_rate_change(top,
-						ABORT_RATE_CHANGE);
-				hlist_del_init(&top->top_node);
-			}
-			return -EBUSY;
+			goto fail_clk;
 		}
 	}
 
@@ -1613,6 +1755,14 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	core->req_rate = req_rate;
 
 	return 0;
+
+fail_clk:
+	for_each_top_clk() {
+		clk_propagate_rate_change(top,
+				ABORT_RATE_CHANGE);
+		hlist_del_init(&top->top_node);
+	}
+	return -EBUSY;
 }
 
 /**
