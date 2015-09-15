@@ -51,6 +51,7 @@ struct clk_core {
 	struct clk_core		**parents;
 	u8			num_parents;
 	u8			new_parent_index;
+	int			cr_rate_index;
 	unsigned long		rate;
 	unsigned long		req_rate;
 	unsigned long		new_rate;
@@ -1284,6 +1285,11 @@ static void clk_calc_subtree(struct clk_core *core, unsigned long new_rate,
 }
 
 /*
+#define for_each_coord_clk(hw, crd) \
+	for (int i = 0; i < x->nr_clks; hw = x->table[++i])
+*/
+
+/*
  * calculate the new rates returning the topmost clock that has to be
  * changed.
  */
@@ -1298,6 +1304,8 @@ static int clk_calc_new_rates(struct clk_core *core,
 	unsigned long max_rate;
 	int p_index = 0;
 	long ret;
+	const struct coord_rate_domain *crd;
+	//struct clk_hw *hw;
 
 	/* sanity */
 	if (IS_ERR_OR_NULL(core))
@@ -1314,20 +1322,65 @@ static int clk_calc_new_rates(struct clk_core *core,
 	 * match rate to a coordinated clk rate table or,
 	 * find the closest rate and parent clk/rate
 	 */
-	if (core->hw->cr_domain) {
-		if (!core->hw->cr_domain->in_transition) {
-			/* this is the first pass for this cr_domain */
-			core->hw->cr_domain->in_transition = true;
+	crd = core->hw->cr_domain;
+	if (crd) {
+		int rate_idx = core->cr_rate_index;
+		//struct coord_rate_table **tbl = crd->table;
+		struct coord_rate_entry **tbl = crd->table;
+		if (rate_idx < 0) {
+			int i;
 			/* FIXME consider rate range boundaries */
-			select_coord_rate_index();
-			for_each_coord_clk() {
-				clk_calc_new_rates(clk, coord_table->rate);
+			/*
+			 * this IS the first pass for this cr_domain. Find the
+			 * matching cr_rate_index for this clk and calc new
+			 * rates for all clks in this coordinated rate group.
+			 * Bail if we encounter an error
+			 */
+			struct clk_core *coord_core;
+			unsigned long coord_rate;
+
+			//core->coord_rate_index = select_coord_rate_index();
+			rate_idx = core->cr_rate_index =
+				core->ops->select_coord_rates(core->hw, rate);
+			//rate_idx = core->cr_rate_index;
+			if (rate_idx < 0)
+				return rate_idx;
+
+#if 0
+			for_each_coord_clk_index(hw, core->coord_rate_index crd) {
+				clk_calc_new_rates(hw->core, crd->rate);
 			}
+#endif
+
+			/*
+			 * recurse into clk_calc_new_rates for each clk in the
+			 * coordinated rate group
+			 */
+			for (i = 0; i < crd->nr_clks; i++) {
+				coord_core = tbl[i][rate_idx].hw->core;
+				coord_rate = tbl[i][rate_idx].rate;
+				coord_core->cr_rate_index = rate_idx;
+				clk_calc_new_rates(coord_core, coord_rate,
+						top_list);
+			}
+
+			/*
+			 * this clk calc'd its new rate in the loop above. See
+			 * else statement below. Return success.
+			 */
+			goto out;
 		} else {
-			/* this is NOT the first pass for this cr_domain */
-			new_rate = coord_table[clk][rate_index]->rate;
-			parent =  coord_table[clk][rate_index]->parent_hw->core;
-			best_parent_rate =  coord_table[clk][rate_index]->parent_rate;
+			/*
+			 * this is NOT the first pass for this cr_domain. Copy
+			 * the coordinated rate table data over for each clk in
+			 * the coordinated rate domain
+			 */
+			int clk_idx = core->hw->cr_clk_index;
+			rate_idx = core->cr_rate_index;
+
+			new_rate = tbl[clk_idx][rate_idx].rate;
+			parent = tbl[clk_idx][rate_idx].parent_hw->core;
+			best_parent_rate = tbl[clk_idx][rate_idx].parent_rate;
 		}
 	} else if (core->ops->determine_rate) {
 		struct clk_rate_request req;
@@ -1394,6 +1447,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 
 	clk_calc_subtree(core, new_rate, parent, p_index);
 
+out:
 	return 0;
 }
 
@@ -1442,13 +1496,15 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *core,
  */
 static void clk_change_rate(struct clk_core *core)
 {
-	struct clk_core *child;
+	struct clk_core *child, *coord_core;
 	struct hlist_node *tmp;
 	unsigned long old_rate;
 	unsigned long best_parent_rate = 0;
 	bool skip_set_rate = false;
 	struct clk_core *old_parent;
-	struct coord_rate_hw *chw = core->hw->coord_rate_hw;
+	//struct coord_rate_hw *chw = core->hw->coord_rate_hw;
+	const struct coord_rate_domain *crd = core->hw->cr_domain;
+	struct coord_rate_entry **tbl = crd->table;
 
 	old_rate = core->rate;
 
@@ -1480,11 +1536,18 @@ static void clk_change_rate(struct clk_core *core)
 		core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
 
 	/* program changes to all clks in a coordinated rate domain at once */
-	if (chw && chw->coord_domain->rate_index >= 0) {
-		core->ops->coordinate_rates(hw, ...);
-		pr_err("%s: %s %lu %lu %d\n", __func__, core->name, core->new_rate,
-				chw->coord_domain-FREQUENCY GOES HERE
-		chw->coord_domain->rate_index = -1;
+	if (crd && core->cr_rate_index >= 0) {
+		int i;
+		pr_err("%s: %s %lu\n", __func__, core->name, core->new_rate);
+		core->ops->coordinate_rates(crd, core->cr_rate_index);
+		/*
+		 * we're done with this coordinated rate group.
+		 * reset cr_rate_index
+		 */
+		for (i = 0; i < crd->nr_clks; i++) {
+			coord_core = tbl[i][core->cr_rate_index].hw->core;
+			coord_core->cr_rate_index = -1;
+		}
 	}
 
 	trace_clk_set_rate_complete(core, core->new_rate);
@@ -1516,6 +1579,7 @@ static void clk_change_rate(struct clk_core *core)
 		clk_change_rate(core->new_child);
 }
 
+#if 0
 struct coord_rates example_cr[] = {
 	/* foo_clk */
 	{rate, parent, parent_rate},
@@ -1547,6 +1611,7 @@ struct coord_rates example_cr[][] = {
 struct clk_hw foo = {
 	.coord_rate = example_cr;
 };
+#endif
 
 /*
  * generic_select_coord_rates - returns index to first matching rate
@@ -1562,11 +1627,14 @@ struct clk_hw foo = {
 int generic_select_coord_rates(struct clk_hw *hw, unsigned long rate)
 {
 	//struct coord_rate *cr = hw->coord_rate_entry;
-	struct coord_rate_entry *cr = hw->cr_domain->table[hw->cr_index];
+	//struct coord_rate_entry *cr = hw->cr_domain->table[hw->cr_clk_index];
+	struct coord_rate_entry *cre = hw->cr_domain->table[hw->cr_clk_index];
+	int nr_rates = hw->cr_domain->nr_rates;
 	//int index = 0;
 	int i;
 	bool match = false;
 
+#if 0
 	/* XXX this matches a one-dimensional table with a NULL sentinel */
 	//while (cr) {
 	for (i = 0; i < hw->cr_domain->nr_rates; i++) {
@@ -1579,13 +1647,24 @@ int generic_select_coord_rates(struct clk_hw *hw, unsigned long rate)
 		cr++;
 		//index++;
 	}
+#endif
+	for (i = 0; i < nr_rates; i++) {
+		pr_err("%s: %p, %p, %lu, %lu\n", __func__, cre[i].hw,
+				cre[i].parent_hw, cre[i].rate,
+				cre[i].parent_rate);
+		if (cre[i].rate == rate) {
+			match = true;
+			break;
+		}
+	}
 
 	if (match)
-		return index;
+		return i;
 
 	return -ENOENT;
 }
 
+#if 0
 /*
  * clk_select_coord_rates - helper that returns index to matching rate
  * @core: clock whose rate is being changed
@@ -1621,6 +1700,10 @@ int clk_select_coord_rates(struct clk_core *core, unsigned long rate)
 
 	return core->ops->select_coord_rates(core->hw, rate);
 }
+#endif
+
+#define for_each_top_clk() \
+	hlist_for_each_entry_safe(top, tmp, &top_list, top_node)
 
 static int clk_core_set_rate_nolock(struct clk_core *core,
 				    unsigned long req_rate)
@@ -1632,8 +1715,8 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	struct hlist_node *tmp;
 
 	/* FIXME debug only */
-	int i;
-	struct coord_rate_entry *cr;
+	//int i;
+	//struct coord_rate_entry *cr;
 
 	if (!core)
 		return 0;
@@ -1645,6 +1728,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
 		return -EBUSY;
 
+#if 0
 	/* FIXME debug print code only */
 	if (core->hw->cr_domain) {
 		rate_index = clk_select_coord_rates(core, req_rate);
@@ -1657,6 +1741,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 					hw->coord_table.whatever);
 		}
 	}
+#endif
 
 	/* calculate new rates and get the topmost changed clocks */
 	ret = clk_calc_new_rates(core, rate, &top_list);
@@ -1664,20 +1749,13 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 		return ret;
 
 	/* notify that we are about to change rates */
-	hlist_for_each_entry(top, &top_list, top_node) {
+	//hlist_for_each_entry_safe(top, tmp, &top_list, top_node) {
+	for_each_top_clk() {
 		fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
 		if (fail_clk) {
 			pr_debug("%s: failed to set %s rate\n", __func__,
 					fail_clk->name);
-
-			/* fire off ABORT_RATE_CHANGE notifiers, delete list */
-			hlist_for_each_entry_safe(top, tmp, &top_list,
-					top_node) {
-				clk_propagate_rate_change(top,
-						ABORT_RATE_CHANGE);
-				hlist_del_init(&top->top_node);
-			}
-			return -EBUSY;
+			goto fail_clk;
 		}
 	}
 
@@ -1690,6 +1768,14 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	core->req_rate = req_rate;
 
 	return 0;
+
+fail_clk:
+	for_each_top_clk() {
+		clk_propagate_rate_change(top,
+				ABORT_RATE_CHANGE);
+		hlist_del_init(&top->top_node);
+	}
+	return -EBUSY;
 }
 
 /**
@@ -2478,6 +2564,33 @@ static int __clk_init(struct device *dev, struct clk *clk_user)
 	}
 
 	/* check that clk_ops are sane.  See Documentation/clk.txt */
+
+	if (!!core->ops->select_coord_rates != !!core->ops->coordinate_rates) {
+		pr_warning("%s: %s must implement both .select_coord_rates and .coordinated_rates\n",
+				__func__, core->name);
+		ret = -EINVAL;
+		goto out;
+	}
+
+#if 0
+	if (core->ops->select_coord_rates && !core->ops->recalc_rate) {
+		pr_warning("%s: %s coordinated rate clks must implement .recalc_rates\n",
+				__func__, core->name);
+		ret = -EINVAL;
+		goto out;
+	}
+#endif
+
+	if (core->ops->select_coord_rates && (core->ops->round_rate
+				|| core->ops->determine_rate
+				|| core->ops->set_rate
+				|| core->ops->set_parent)) {
+		pr_warning("%s: %s coordinated rate clks must not implement .round_rate, .determine_rate, .set_rate or .set_parent\n",
+				__func__, core->name);
+		ret = -EINVAL;
+		goto out;
+	}
+
 	if (core->ops->set_rate &&
 	    !((core->ops->round_rate || core->ops->determine_rate) &&
 	      core->ops->recalc_rate)) {
@@ -2704,8 +2817,10 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 	core->hw = hw;
 	core->flags = hw->init->flags;
 	core->num_parents = hw->init->num_parents;
+	core->cr_rate_index = -1;
 	core->min_rate = 0;
 	core->max_rate = ULONG_MAX;
+	core->cr_rate_index = -1;
 	hw->core = core;
 
 	/* allocate local copy in case parent_names is __initdata */
