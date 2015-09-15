@@ -1505,9 +1505,8 @@ static void clk_change_rate(struct clk_core *core)
 	unsigned long best_parent_rate = 0;
 	bool skip_set_rate = false;
 	struct clk_core *old_parent;
-	//struct coord_rate_hw *chw = core->hw->coord_rate_hw;
 	const struct coord_rate_domain *crd = core->hw->cr_domain;
-	struct coord_rate_entry **tbl = crd->table;
+	pr_err("%s: core %s crd %p\n", __func__, core->name, crd);
 
 	old_rate = core->rate;
 
@@ -1540,6 +1539,7 @@ static void clk_change_rate(struct clk_core *core)
 
 	/* program changes to all clks in a coordinated rate domain at once */
 	if (crd && core->cr_rate_index >= 0) {
+		struct coord_rate_entry **tbl = crd->table;
 		int i;
 		pr_err("%s: crd %p cr_rate_index %d\n",
 				__func__, crd, core->cr_rate_index);
@@ -1550,7 +1550,13 @@ static void clk_change_rate(struct clk_core *core)
 		 * reset cr_rate_index
 		 */
 		for (i = 0; i < crd->nr_clks; i++) {
-			//coord_core = tbl[i][core->cr_rate_index].hw->core;
+			// assigning coord_core below causes boot to fail
+			coord_core = tbl[i][core->cr_rate_index].hw->core;
+			pr_err("%s: tbl %p\n", __func__, &tbl[i][core->cr_rate_index]);
+			pr_err("%s: hw %p\n", __func__, tbl[i][core->cr_rate_index].hw);
+			pr_err("%s: core %p\n", __func__, tbl[i][core->cr_rate_index].hw->core);
+			pr_err("%s: coord_core %p\n", __func__, coord_core);
+			pr_err("%s: cr_rate_index %d\n", __func__, coord_core->cr_rate_index);
 			coord_core->cr_rate_index = -1;
 		}
 #if 0
@@ -2235,11 +2241,12 @@ static void clk_summary_show_one(struct seq_file *s, struct clk_core *c,
 	if (!c)
 		return;
 
-	seq_printf(s, "%*s%-*s %11d %12d %11lu %10lu %-3d\n",
+	seq_printf(s, "%*s%-*s %11d %12d %11lu %10lu %-3d cr_rate_index %d c->hw->cr_domain %p\n",
 		   level * 3 + 1, "",
 		   30 - level * 3, c->name,
 		   c->enable_count, c->prepare_count, clk_core_get_rate(c),
-		   clk_core_get_accuracy(c), clk_core_get_phase(c));
+		   clk_core_get_accuracy(c), clk_core_get_phase(c),
+		   c->cr_rate_index, c->hw->cr_domain);
 }
 
 static void clk_summary_show_subtree(struct seq_file *s, struct clk_core *c,
