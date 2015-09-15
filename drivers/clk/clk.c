@@ -1587,6 +1587,37 @@ static void clk_change_rate(struct clk_core *core)
 #define for_each_top_clk() \
 	hlist_for_each_entry_safe(top, tmp, &top_list, top_node)
 
+/*
+ * generic_select_coord_rates - returns index to first matching rate
+ * @hw: clock hardware whose rate is being changed
+ * @rate: requested rate
+ *
+ * This generic implementation of the clk_ops.select_coord_rates callback may
+ * be used for simple cases where picking the first matching entry in the
+ * coord_rate table is sufficient. Drivers with more complicated rate selection
+ * criteria should implement their own .select_coord_rates callback. Returns
+ * -ENOENT if an exact matching rate is not found (it does no rounding).
+ */
+int generic_select_coord_rates(struct clk_hw *hw, unsigned long rate)
+{
+	struct coord_rate_entry *cre = hw->cr_domain->table[hw->cr_clk_index];
+	int nr_rates = hw->cr_domain->nr_rates;
+	int i;
+	bool match = false;
+
+	for (i = 0; i < nr_rates; i++) {
+		if (cre[i].rate == rate) {
+			match = true;
+			break;
+		}
+	}
+
+	if (match)
+		return i;
+
+	return -ENOENT;
+}
+
 static int clk_core_set_rate_nolock(struct clk_core *core,
 				    unsigned long req_rate)
 {
