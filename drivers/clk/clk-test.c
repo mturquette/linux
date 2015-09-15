@@ -9,6 +9,7 @@
  */
 
 #include <linux/clk-provider.h>
+#include <linux/clk.h>
 #include <linux/clkdev.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -170,7 +171,7 @@ static struct clk *init_test_clk(const char *name, const char *parent_name)
 static int __init clk_test_init(void)
 {
 	struct clk *parent, *child;
-	int i;
+	int i, ret;
 
 	printk("---------- Common Clock Framework test results ----------\n");
 
@@ -183,6 +184,7 @@ static int __init clk_test_init(void)
 		//child->hw.cr_domain->table[clk_child.hw.cr_clk_index][i].hw = child.hw;
 		test_parent.hw.cr_domain->table[test_parent.hw.cr_clk_index][i].hw = &test_parent.hw;
 		test_child.hw.cr_domain->table[test_child.hw.cr_clk_index][i].hw = &test_child.hw;
+		test_child.hw.cr_domain->table[test_child.hw.cr_clk_index][i].parent_hw = &test_parent.hw;
 	}
 
 	/* assign cr_clk_index */
@@ -190,6 +192,15 @@ static int __init clk_test_init(void)
 
 	parent = clk_register(NULL, &test_parent.hw);
 	child = clk_register(NULL, &test_child.hw);
+
+	ret = clk_set_rate(child, 11);
+	pr_err("ret is %d\n", ret);
+
+	ret = clk_set_rate(child, 66);
+	pr_err("ret is %d\n", ret);
+
+	ret = clk_set_rate(child, 33);
+	pr_err("ret is %d\n", ret);
 
 #if 0
 	parent = init_test_clk("parent", NULL);
