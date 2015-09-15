@@ -16,18 +16,149 @@
 #include <linux/printk.h>
 #include <linux/slab.h>
 
-/* Assumed to be sorted */
-static const unsigned long allowed_rates[] = { 0, 100, 200, 300, 400, 500 };
-
 struct test_clk {
 	struct clk_hw hw;
 	unsigned long rate;
+	int div;
 };
+
+#define NR_CLK  2
+#define NR_RATE 3
+
+static struct coord_rate_entry *foo_tbl[] = {
+	(struct coord_rate_entry []){       /* clk_0 */
+		{ .rate = 100, .parent_rate = 200, },
+		{ .rate = 50,  .parent_rate = 200, },
+		{ .rate = 25,  .parent_rate = 100, },
+	},
+	(struct coord_rate_entry []){       /* clk_1 */
+		{ .rate = 66, .parent_rate = 200, },
+		{ .rate = 33, .parent_rate = 100, },
+		{ .rate = 11, .parent_rate = 50,  },
+	},
+};
+
+static struct coord_rate_domain foo = {
+	.nr_clks = NR_CLK,
+	.nr_rates = NR_RATE,
+	.table = foo_tbl,
+};
+
 
 static inline struct test_clk *to_test_clk(struct clk_hw *hw)
 {
 	return container_of(hw, struct test_clk, hw);
 }
+
+static unsigned long test_clk_recalc_rate(struct clk_hw *hw,
+					  unsigned long parent_rate)
+{
+	struct test_clk *test_clk = to_test_clk(hw);
+
+	return test_clk->rate;
+}
+
+static int test_coordinate_rates(const struct coord_rate_domain *crd,
+		int rate_idx) {
+	int clk_idx;
+
+	for (clk_idx = 0; clk_idx < crd->nr_clks; clk_idx++) {
+		pr_err("%s: clk %s rate %lu\n", __func__,
+				crd->table[clk_idx][rate_idx].hw->core->name,
+				crd->table[clk_idx][rate_idx].rate);
+	}
+
+	return 0;
+}
+
+static const struct clk_ops test_clk_ops = {
+	.recalc_rate = test_clk_recalc_rate,
+	.select_coord_rates = generic_select_coord_rates,
+	.coordinate_rates = test_coordinate_rates,
+};
+
+static struct clk *init_test_clk(const char *name, const char *parent_name)
+{
+	struct test_clk *test_clk;
+	struct clk *clk;
+	struct clk_init_data init;
+	int err;
+
+	test_clk = kzalloc(sizeof(*test_clk), GFP_KERNEL);
+	if (!test_clk)
+		return ERR_PTR(-ENOMEM);
+
+	test_clk->rate = 0;
+
+	init.name = name;
+	init.ops = &test_clk_ops;
+
+	if (parent_name) {
+		init.parent_names = &parent_name;
+		init.num_parents = 1;
+		init.flags = CLK_SET_RATE_PARENT;
+	} else {
+		init.parent_names = NULL;
+		init.num_parents = 0;
+		init.flags = CLK_IS_ROOT;
+	}
+
+	test_clk->hw.init = &init;
+
+	clk = clk_register(NULL, &test_clk->hw);
+	if (IS_ERR(clk)) {
+		printk("%s: error registering clk: %ld\n", __func__,
+		       PTR_ERR(clk));
+		return clk;
+	}
+
+	err = clk_register_clkdev(clk, name, NULL);
+	if (err)
+		printk("%s: error registering alias: %d\n", __func__, err);
+
+	return clk;
+}
+
+static int __init clk_test_init(void)
+{
+	struct clk *parent, *clk;
+
+	printk("---------- Common Clock Framework test results ----------\n");
+
+	parent = init_test_clk("parent", NULL);
+	if (IS_ERR(parent)) {
+		printk("%s: error registering parent: %ld\n", __func__,
+		       PTR_ERR(parent));
+		return PTR_ERR(parent);
+	}
+
+	clk = init_test_clk("clk", "parent");
+	if (IS_ERR(clk)) {
+		printk("%s: error registering clk: %ld\n", __func__,
+		       PTR_ERR(clk));
+		return PTR_ERR(clk);
+	}
+
+#if 0
+	test_ceiling(clk);
+	test_floor(clk);
+	test_unsatisfiable(clk);
+	test_constrained_parent(clk, parent);
+	test_constraint_with_parent(clk, parent);
+#endif
+
+	printk("---------------------------------------------------------\n");
+
+	return 0;
+}
+
+module_init(clk_test_init);
+
+MODULE_LICENSE("GPL");
+
+#if 0
+/* Assumed to be sorted */
+static const unsigned long allowed_rates[] = { 0, 100, 200, 300, 400, 500 };
 
 static long test_clk_determine_rate(struct clk_hw *hw,
 				    unsigned long rate,
@@ -71,14 +202,6 @@ static long test_clk_determine_rate(struct clk_hw *hw,
 	return target_rate;
 }
 
-static unsigned long test_clk_recalc_rate(struct clk_hw *hw,
-					  unsigned long parent_rate)
-{
-	struct test_clk *test_clk = to_test_clk(hw);
-
-	return test_clk->rate;
-}
-
 static int test_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 			     unsigned long parent_rate)
 {
@@ -87,54 +210,6 @@ static int test_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	test_clk->rate = rate;
 
 	return 0;
-}
-
-static const struct clk_ops test_clk_ops = {
-	.determine_rate = test_clk_determine_rate,
-	.recalc_rate = test_clk_recalc_rate,
-	.set_rate = test_clk_set_rate,
-};
-
-static struct clk *init_test_clk(const char *name, const char *parent_name)
-{
-	struct test_clk *test_clk;
-	struct clk *clk;
-	struct clk_init_data init;
-	int err;
-
-	test_clk = kzalloc(sizeof(*test_clk), GFP_KERNEL);
-	if (!test_clk)
-		return ERR_PTR(-ENOMEM);
-
-	test_clk->rate = 0;
-
-	init.name = name;
-	init.ops = &test_clk_ops;
-
-	if (parent_name) {
-		init.parent_names = &parent_name;
-		init.num_parents = 1;
-		init.flags = CLK_SET_RATE_PARENT;
-	} else {
-		init.parent_names = NULL;
-		init.num_parents = 0;
-		init.flags = CLK_IS_ROOT;
-	}
-
-	test_clk->hw.init = &init;
-
-	clk = clk_register(NULL, &test_clk->hw);
-	if (IS_ERR(clk)) {
-		printk("%s: error registering clk: %ld\n", __func__,
-		       PTR_ERR(clk));
-		return clk;
-	}
-
-	err = clk_register_clkdev(clk, name, NULL);
-	if (err)
-		printk("%s: error registering alias: %d\n", __func__, err);
-
-	return clk;
 }
 
 static void test_ceiling(struct clk *clk)
@@ -289,38 +364,4 @@ static void test_constraint_with_parent(struct clk *clk, struct clk *parent)
 	if (ret)
 		printk("%s: error setting ceiling: %d\n", __func__, ret);
 }
-
-static int __init clk_test_init(void)
-{
-	struct clk *parent, *clk;
-
-	printk("---------- Common Clock Framework test results ----------\n");
-
-	parent = init_test_clk("parent", NULL);
-	if (IS_ERR(parent)) {
-		printk("%s: error registering parent: %ld\n", __func__,
-		       PTR_ERR(parent));
-		return PTR_ERR(parent);
-	}
-
-	clk = init_test_clk("clk", "parent");
-	if (IS_ERR(clk)) {
-		printk("%s: error registering clk: %ld\n", __func__,
-		       PTR_ERR(clk));
-		return PTR_ERR(clk);
-	}
-
-	test_ceiling(clk);
-	test_floor(clk);
-	test_unsatisfiable(clk);
-	test_constrained_parent(clk, parent);
-	test_constraint_with_parent(clk, parent);
-
-	printk("---------------------------------------------------------\n");
-
-	return 0;
-}
-
-module_init(clk_test_init);
-
-MODULE_LICENSE("GPL");
+#endif
