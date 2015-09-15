@@ -25,25 +25,7 @@ struct test_clk {
 #define NR_CLK  2
 #define NR_RATE 3
 
-static struct coord_rate_entry *foo_tbl[] = {
-	(struct coord_rate_entry []){       /* clk_0 */
-		{ .rate = 100, .parent_rate = 200, },
-		{ .rate = 50,  .parent_rate = 200, },
-		{ .rate = 25,  .parent_rate = 100, },
-	},
-	(struct coord_rate_entry []){       /* clk_1 */
-		{ .rate = 66, .parent_rate = 200, },
-		{ .rate = 33, .parent_rate = 100, },
-		{ .rate = 11, .parent_rate = 50,  },
-	},
-};
-
-static struct coord_rate_domain foo = {
-	.nr_clks = NR_CLK,
-	.nr_rates = NR_RATE,
-	.table = foo_tbl,
-};
-
+/* clk_ops */
 
 static inline struct test_clk *to_test_clk(struct clk_hw *hw)
 {
@@ -63,8 +45,8 @@ static int test_coordinate_rates(const struct coord_rate_domain *crd,
 	int clk_idx;
 
 	for (clk_idx = 0; clk_idx < crd->nr_clks; clk_idx++) {
-		pr_err("%s: clk %s rate %lu\n", __func__,
-				crd->table[clk_idx][rate_idx].hw->core->name,
+		pr_err("%s: clk rate %lu\n", __func__,
+				//crd->table[clk_idx][rate_idx].hw.core->name,
 				crd->table[clk_idx][rate_idx].rate);
 	}
 
@@ -77,6 +59,71 @@ static const struct clk_ops test_clk_ops = {
 	.coordinate_rates = test_coordinate_rates,
 };
 
+/* coordinated rates static data, shared by test_parent & test_child */
+
+static struct coord_rate_entry *test_tbl[] = {
+	(struct coord_rate_entry []){	/* test_parent */
+		{ .rate = 100, },
+		{ .rate = 50,  },
+		{ .rate = 25,  },
+	},
+	(struct coord_rate_entry []){	/* test_child */
+		{ .rate = 66, .parent_rate = 100, },
+		{ .rate = 33, .parent_rate = 500, },
+		{ .rate = 11, .parent_rate = 25,  },
+	},
+};
+
+static struct coord_rate_domain test_coord_domain = {
+	.nr_clks = NR_CLK,
+	.nr_rates = NR_RATE,
+	.table = test_tbl,
+};
+
+/* individual clk static data */
+
+static struct test_clk test_parent = {
+	.hw.init = &(struct clk_init_data){
+		.name = "test_parent",
+		.parent_names = NULL,
+		.num_parents = 0,
+		.ops = &test_clk_ops,
+		.flags = CLK_IS_ROOT,
+	},
+	//.hw.cr_domain = &(struct coord_rate_domain){
+	.hw.cr_domain = &test_coord_domain,
+	.hw.cr_clk_index = 0,
+};
+
+static struct test_clk test_child = {
+	.hw.init = &(struct clk_init_data){
+		.name = "test_child",
+		.parent_names = (const char *[]){ "test_parent" },
+		.num_parents = 1,
+		.ops = &test_clk_ops,
+	},
+	//.hw.cr_domain = &(struct coord_rate_domain){
+	.hw.cr_domain = &test_coord_domain,
+	.hw.cr_clk_index = 1,
+};
+
+#if 0
+static struct clk_rcg2 blsp1_qup1_spi_apps_clk_src = {
+	.cmd_rcgr = 0x064c,
+	.mnd_width = 8,
+	.hid_width = 5,
+	.parent_map = gcc_xo_gpll0_map,
+	.freq_tbl = ftbl_gcc_blsp1_2_qup1_6_spi_apps_clk,
+	.clkr.hw.init = &(struct clk_init_data){
+		.name = "blsp1_qup1_spi_apps_clk_src",
+		.parent_names = gcc_xo_gpll0,
+		.num_parents = 2,
+		.ops = &clk_rcg2_ops,
+	},
+};
+#endif
+
+#if 0
 static struct clk *init_test_clk(const char *name, const char *parent_name)
 {
 	struct test_clk *test_clk;
@@ -118,13 +165,33 @@ static struct clk *init_test_clk(const char *name, const char *parent_name)
 
 	return clk;
 }
+#endif
 
 static int __init clk_test_init(void)
 {
-	struct clk *parent, *clk;
+	struct clk *parent, *child;
+	int i;
 
 	printk("---------- Common Clock Framework test results ----------\n");
 
+	/* FIXME convert to platform_device & devm_clk_register */
+	//struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
+
+	/* assign clk_hw pointers now that we know them */
+	for (i = 0; i < NR_RATE; i++) {
+		//parent->hw.cr_domain->table[clk_parent.hw.cr_clk_index][i].hw = parent.hw;
+		//child->hw.cr_domain->table[clk_child.hw.cr_clk_index][i].hw = child.hw;
+		test_parent.hw.cr_domain->table[test_parent.hw.cr_clk_index][i].hw = &test_parent.hw;
+		test_child.hw.cr_domain->table[test_child.hw.cr_clk_index][i].hw = &test_child.hw;
+	}
+
+	/* assign cr_clk_index */
+	//parent = clk_register(NULL, test_parent
+
+	parent = clk_register(NULL, &test_parent.hw);
+	child = clk_register(NULL, &test_child.hw);
+
+#if 0
 	parent = init_test_clk("parent", NULL);
 	if (IS_ERR(parent)) {
 		printk("%s: error registering parent: %ld\n", __func__,
@@ -138,6 +205,7 @@ static int __init clk_test_init(void)
 		       PTR_ERR(clk));
 		return PTR_ERR(clk);
 	}
+#endif
 
 #if 0
 	test_ceiling(clk);
