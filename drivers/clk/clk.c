@@ -1343,6 +1343,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 			rate_idx = core->cr_rate_index =
 				core->ops->select_coord_rates(core->hw, rate);
 			//rate_idx = core->cr_rate_index;
+			pr_err("%s: rate_idx %d\n", __func__, rate_idx);
 			if (rate_idx < 0)
 				return rate_idx;
 
@@ -1357,12 +1358,16 @@ static int clk_calc_new_rates(struct clk_core *core,
 			 * coordinated rate group
 			 */
 			for (i = 0; i < crd->nr_clks; i++) {
+				pr_err("%s: for loop %d\n", __func__, i);
 				coord_core = tbl[i][rate_idx].hw->core;
+				pr_err("%s: %s\n", __func__, coord_core->name);
 				coord_rate = tbl[i][rate_idx].rate;
+				pr_err("%s: %lu\n", __func__, coord_rate);
 				coord_core->cr_rate_index = rate_idx;
 				clk_calc_new_rates(coord_core, coord_rate,
 						top_list);
 			}
+			pr_err("%s: finished for loop\n", __func__);
 
 			/*
 			 * this clk calc'd its new rate in the loop above. See
@@ -1370,17 +1375,26 @@ static int clk_calc_new_rates(struct clk_core *core,
 			 */
 			goto out;
 		} else {
+			pr_err("%s: here %s\n", __func__, core->name);
 			/*
 			 * this is NOT the first pass for this cr_domain. Copy
 			 * the coordinated rate table data over for each clk in
 			 * the coordinated rate domain
 			 */
 			int clk_idx = core->hw->cr_clk_index;
-			rate_idx = core->cr_rate_index;
+			struct clk_hw *parent_hw;
 
+			pr_err("%s: clk_idx = %d\n", __func__, clk_idx);
+			rate_idx = core->cr_rate_index;
+			pr_err("%s: rate_idx = %d\n", __func__, rate_idx);
 			new_rate = tbl[clk_idx][rate_idx].rate;
-			parent = tbl[clk_idx][rate_idx].parent_hw->core;
+			pr_err("%s: new_rate = %lu\n", __func__, new_rate);
+			parent_hw = tbl[clk_idx][rate_idx].parent_hw;
+			if (parent_hw)
+				parent = parent_hw->core;
+			pr_err("%s: parent = %p\n", __func__, parent);
 			best_parent_rate = tbl[clk_idx][rate_idx].parent_rate;
+			pr_err("%s: best_parent_rate = %lu\n", __func__, best_parent_rate);
 		}
 	} else if (core->ops->determine_rate) {
 		struct clk_rate_request req;
@@ -1667,6 +1681,8 @@ int generic_select_coord_rates(struct clk_hw *hw, unsigned long rate)
 				cre[i].parent_hw, cre[i].rate,
 				cre[i].parent_rate);
 		if (cre[i].rate == rate) {
+			pr_err("%s: match rate %lu index %d\n", __func__,
+					rate, i);
 			match = true;
 			break;
 		}
