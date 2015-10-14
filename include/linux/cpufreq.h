@@ -16,7 +16,6 @@
 #include <linux/completion.h>
 #include <linux/kobject.h>
 #include <linux/notifier.h>
-#include <linux/spinlock.h>
 #include <linux/sysfs.h>
 
 /*********************************************************************
@@ -94,18 +93,18 @@ struct cpufreq_policy {
 	struct completion	kobj_unregister;
 
 	/*
-	 * The rules for this semaphore:
+	 * The rules for this mutex:
 	 * - Any routine that wants to read from the policy structure will
-	 *   do a down_read on this semaphore.
-	 * - Any routine that will write to the policy structure and/or may take away
-	 *   the policy altogether (eg. CPU hotplug), will hold this lock in write
-	 *   mode before doing so.
-	 *
+	 *   do so under rcu_read_lock();
+	 * - Any routine that will write to the policy structure will hold this
+	 *   mutex before doing so.
+	 * - Any routine that may take away the policy altogether (eg. CPU
+	 *   hotplug) will do so after synchronize_rcu() completes
 	 * Additional rules:
-	 * - Lock should not be held across
+	 * - Mutex should not be held across
 	 *     __cpufreq_governor(data, CPUFREQ_GOV_POLICY_EXIT);
 	 */
-	struct rw_semaphore	rwsem;
+	struct mutex mutex;
 
 	/* Synchronization for frequency transitions */
 	bool			transition_ongoing; /* Tracks transition status */
