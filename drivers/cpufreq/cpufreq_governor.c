@@ -170,9 +170,11 @@ void gov_queue_work(struct dbs_data *dbs_data, struct cpufreq_policy *policy,
 		unsigned int delay, bool all_cpus)
 {
 	int i;
+	bool en;
 
-	mutex_lock(&cpufreq_governor_lock);
-	if (!policy->governor_enabled)
+	rcu_read_lock();
+	en = policy->governor_enabled;
+	if (!en)
 		goto out_unlock;
 
 	if (!all_cpus) {
@@ -190,7 +192,7 @@ void gov_queue_work(struct dbs_data *dbs_data, struct cpufreq_policy *policy,
 	}
 
 out_unlock:
-	mutex_unlock(&cpufreq_governor_lock);
+	rcu_read_unlock();
 }
 EXPORT_SYMBOL_GPL(gov_queue_work);
 
