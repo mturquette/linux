@@ -433,17 +433,11 @@ void cpufreq_freq_transition_begin(struct cpufreq_policy *policy,
 wait:
 	wait_event(policy->transition_wait, !policy->transition_ongoing);
 
-	spin_lock(&policy->transition_lock);
-
-	if (unlikely(policy->transition_ongoing)) {
-		spin_unlock(&policy->transition_lock);
+	if (unlikely(policy->transition_ongoing))
 		goto wait;
-	}
 
 	policy->transition_ongoing = true;
 	policy->transition_task = current;
-
-	spin_unlock(&policy->transition_lock);
 
 	cpufreq_notify_transition(policy, freqs, CPUFREQ_PRECHANGE);
 }
@@ -1103,7 +1097,6 @@ static struct cpufreq_policy *cpufreq_policy_alloc(unsigned int cpu)
 
 	INIT_LIST_HEAD(&policy->policy_list);
 	mutex_init(&policy->mutex);
-	spin_lock_init(&policy->transition_lock);
 	init_waitqueue_head(&policy->transition_wait);
 	init_completion(&policy->kobj_unregister);
 	INIT_WORK(&policy->update, handle_update);
