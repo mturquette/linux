@@ -2834,6 +2834,7 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 					  int update_cfs_rq)
 {
 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
+	struct rq *rq = rq_of(cfs_rq);
 	long contrib_delta, utilization_delta;
 	int cpu = cpu_of(rq_of(cfs_rq));
 	u64 now;
@@ -2864,6 +2865,30 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 		subtract_blocked_load_contrib(cfs_rq, -contrib_delta);
 		subtract_utilization_blocked_contrib(cfs_rq,
 							-utilization_delta);
+	}
+
+	if (cpu == smp_processor_id() && &rq->cfs == cfs_rq) {
+		unsigned long max = rq->cpu_capacity_orig;
+
+		/*
+		 * There are a few boundary cases this might miss but it should
+		 * get called often enough that that should (hopefully) not be
+		 * a real problem -- added to that it only calls on the local
+		 * CPU, so if we enqueue remotely we'll miss an update, but
+		 * the next tick/schedule should update.
+		 *
+		 * It will not get called when we go idle, because the idle
+		 * thread is a different class (!fair), nor will the utilization
+		 * number include things like RT tasks.
+		 *
+		 * As is, the util number is not freq-invariant (we'd have to
+		 * implement arch_scale_freq_capacity() for that).
+		 *
+		 * See cpu_util().
+		 */
+		cpufreq_update_util(rq_clock(rq),
+				    min(cfs_rq->utilization_load_avg, max),
+				    max);
 	}
 }
 
