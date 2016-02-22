@@ -284,7 +284,7 @@ static inline void update_turbo_state(void)
 		 cpu->pstate.max_pstate == cpu->pstate.turbo_pstate);
 }
 
-static void intel_pstate_hwp_set(void)
+static void intel_pstate_hwp_set(const struct cpumask *cpumask)
 {
 	int min, hw_min, max, hw_max, cpu, range, adj_range;
 	u64 value, cap;
@@ -294,9 +294,7 @@ static void intel_pstate_hwp_set(void)
 	hw_max = HWP_HIGHEST_PERF(cap);
 	range = hw_max - hw_min;
 
-	get_online_cpus();
-
-	for_each_online_cpu(cpu) {
+	for_each_cpu(cpu, cpumask) {
 		rdmsrl_on_cpu(cpu, MSR_HWP_REQUEST, &value);
 		adj_range = limits->min_perf_pct * range / 100;
 		min = hw_min + adj_range;
@@ -315,7 +313,12 @@ static void intel_pstate_hwp_set(void)
 		value |= HWP_MAX_PERF(max);
 		wrmsrl_on_cpu(cpu, MSR_HWP_REQUEST, value);
 	}
+}
 
+static void intel_pstate_hwp_set_online_cpus(void)
+{
+	get_online_cpus();
+	intel_pstate_hwp_set(cpu_online_mask);
 	put_online_cpus();
 }
 
@@ -437,7 +440,7 @@ static ssize_t store_no_turbo(struct kobject *a, struct attribute *b,
 	limits->no_turbo = clamp_t(int, input, 0, 1);
 
 	if (hwp_active)
-		intel_pstate_hwp_set();
+		intel_pstate_hwp_set_online_cpus();
 
 	return count;
 }
@@ -463,7 +466,7 @@ static ssize_t store_max_perf_pct(struct kobject *a, struct attribute *b,
 				  int_tofp(100));
 
 	if (hwp_active)
-		intel_pstate_hwp_set();
+		intel_pstate_hwp_set_online_cpus();
 	return count;
 }
 
@@ -488,7 +491,7 @@ static ssize_t store_min_perf_pct(struct kobject *a, struct attribute *b,
 				  int_tofp(100));
 
 	if (hwp_active)
-		intel_pstate_hwp_set();
+		intel_pstate_hwp_set_online_cpus();
 	return count;
 }
 
@@ -1099,7 +1102,7 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 		pr_debug("intel_pstate: set performance\n");
 		limits = &performance_limits;
 		if (hwp_active)
-			intel_pstate_hwp_set();
+			intel_pstate_hwp_set(policy->cpus);
 		return 0;
 	}
 
@@ -1131,7 +1134,7 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 				  int_tofp(100));
 
 	if (hwp_active)
-		intel_pstate_hwp_set();
+		intel_pstate_hwp_set(policy->cpus);
 
 	return 0;
 }
