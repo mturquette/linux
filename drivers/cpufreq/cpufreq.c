@@ -1763,6 +1763,37 @@ EXPORT_SYMBOL(cpufreq_unregister_notifier);
  *                              GOVERNORS                            *
  *********************************************************************/
 
+/**
+ * cpufreq_driver_fast_switch - Carry out a fast CPU frequency switch.
+ * @policy: cpufreq policy to switch the frequency for.
+ * @target_freq: New frequency to set (may be approximate).
+ *
+ * Carry out a fast frequency switch from interrupt context.
+ *
+ * This function must not be called if policy->fast_switch_possible is unset.
+ *
+ * Governors calling this function must guarantee that it will never be invoked
+ * twice in parallel for the same policy and that it will never be called in
+ * parallel with either ->target() or ->target_index() for the same policy.
+ *
+ * If CPUFREQ_ENTRY_INVALID is returned by the driver's ->fast_switch()
+ * callback, the hardware configuration must be preserved.
+ */
+void cpufreq_driver_fast_switch(struct cpufreq_policy *policy,
+				unsigned int target_freq)
+{
+	unsigned int freq;
+
+	if (target_freq == policy->cur)
+		return;
+
+	freq = cpufreq_driver->fast_switch(policy, target_freq);
+	if (freq != CPUFREQ_ENTRY_INVALID) {
+		policy->cur = freq;
+		trace_cpu_frequency(freq, smp_processor_id());
+	}
+}
+
 /* Must set freqs->new to intermediate frequency */
 static int __target_intermediate(struct cpufreq_policy *policy,
 				 struct cpufreq_freqs *freqs, int index)

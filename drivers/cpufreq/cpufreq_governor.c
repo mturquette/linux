@@ -609,15 +609,18 @@ static int cpufreq_governor_limits(struct cpufreq_policy *policy)
 
 	mutex_lock(&policy_dbs->timer_mutex);
 
-	if (policy->max < policy->cur)
-		__cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
-	else if (policy->min > policy->cur)
-		__cpufreq_driver_target(policy, policy->min, CPUFREQ_RELATION_L);
+	if (!policy_dbs->fast_switch_enabled) {
+		if (policy->max < policy->cur)
+			__cpufreq_driver_target(policy, policy->max,
+						CPUFREQ_RELATION_H);
+		else if (policy->min > policy->cur)
+			__cpufreq_driver_target(policy, policy->min,
+						CPUFREQ_RELATION_L);
+	}
 
 	gov_update_sample_delay(policy_dbs, 0);
 
 	mutex_unlock(&policy_dbs->timer_mutex);
-
 	return 0;
 }
 

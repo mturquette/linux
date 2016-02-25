@@ -124,6 +124,7 @@ struct policy_dbs_info {
 	/* Status indicators */
 	bool is_shared;		/* This object is used by multiple CPUs */
 	bool work_in_progress;	/* Work is being queued up or in progress */
+	bool fast_switch_enabled;	/* Switch frequencies from interrup context */
 };
 
 static inline void gov_update_sample_delay(struct policy_dbs_info *policy_dbs,
