@@ -402,12 +402,13 @@ static void od_exit(struct dbs_data *dbs_data, bool notify)
 	kfree(dbs_data->tuners);
 }
 
-static void od_start(struct cpufreq_policy *policy)
+static bool od_start(struct cpufreq_policy *policy)
 {
 	struct od_policy_dbs_info *dbs_info = to_dbs_info(policy->governor_data);
 
 	dbs_info->sample_type = OD_NORMAL_SAMPLE;
 	ondemand_powersave_bias_init(policy);
+	return true;
 }
 
 static struct od_ops od_ops = {

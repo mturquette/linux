@@ -468,9 +468,11 @@ static int cpufreq_governor_init(struct cpufreq_policy *policy)
 	INIT_LIST_HEAD(&dbs_data->policy_dbs_list);
 	mutex_init(&dbs_data->mutex);
 
-	ret = gov->init(dbs_data, !policy->governor->initialized);
-	if (ret)
-		goto free_policy_dbs_info;
+	if (gov->init) {
+		ret = gov->init(dbs_data, !policy->governor->initialized);
+		if (ret)
+			goto free_policy_dbs_info;
+	}
 
 	/* policy latency is in ns. Convert it to us first */
 	latency = policy->cpuinfo.transition_latency / 1000;
@@ -506,7 +508,10 @@ static int cpufreq_governor_init(struct cpufreq_policy *policy)
 
 	if (!have_governor_per_policy())
 		gov->gdbs_data = NULL;
-	gov->exit(dbs_data, !policy->governor->initialized);
+
+	if (gov->exit)
+		gov->exit(dbs_data, !policy->governor->initialized);
+
 	kfree(dbs_data);
 
 free_policy_dbs_info:
@@ -540,7 +545,9 @@ static int cpufreq_governor_exit(struct cpufreq_policy *policy)
 		if (!have_governor_per_policy())
 			gov->gdbs_data = NULL;
 
-		gov->exit(dbs_data, policy->governor->initialized == 1);
+		if (gov->exit)
+			gov->exit(dbs_data, policy->governor->initialized == 1);
+
 		mutex_destroy(&dbs_data->mutex);
 		kfree(dbs_data);
 	} else {
@@ -584,9 +591,9 @@ static int cpufreq_governor_start(struct cpufreq_policy *policy)
 			j_cdbs->prev_cpu_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE];
 	}
 
-	gov->start(policy);
+	if (gov->start(policy))
+		gov_set_update_util(policy_dbs, sampling_rate);
 
-	gov_set_update_util(policy_dbs, sampling_rate);
 	return 0;
 }
 

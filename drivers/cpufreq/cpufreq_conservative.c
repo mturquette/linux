@@ -299,12 +299,13 @@ static void cs_exit(struct dbs_data *dbs_data, bool notify)
 	kfree(dbs_data->tuners);
 }
 
-static void cs_start(struct cpufreq_policy *policy)
+static bool cs_start(struct cpufreq_policy *policy)
 {
 	struct cs_policy_dbs_info *dbs_info = to_dbs_info(policy->governor_data);
 
 	dbs_info->down_skip = 0;
 	dbs_info->requested_freq = policy->cur;
+	return true;
 }
 
 static struct dbs_governor cs_dbs_gov = {
