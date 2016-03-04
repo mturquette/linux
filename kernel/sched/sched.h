@@ -1739,3 +1739,19 @@ static inline u64 irq_time_read(int cpu)
 }
 #endif /* CONFIG_64BIT */
 #endif /* CONFIG_IRQ_TIME_ACCOUNTING */
+
+#ifdef CONFIG_CPU_FREQ
+void cpufreq_update_util(u64 time, unsigned long util, unsigned long max);
+void cpufreq_trigger_update(u64 time);
+void cpufreq_set_update_util_hook(int cpu, struct freq_update_hook *hook,
+		void (*update_util)(struct freq_update_hook *hook, u64 time,
+				    unsigned long util, unsigned long max));
+static inline void cpufreq_clear_update_util_hook(int cpu)
+{
+	cpufreq_clear_freq_update_hook(cpu);
+}
+#else
+static inline void cpufreq_update_util(u64 time, unsigned long util,
+				       unsigned long max) {}
+static inline void cpufreq_trigger_update(u64 time) {}
+#endif /* CONFIG_CPU_FREQ */
