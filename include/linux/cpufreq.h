@@ -468,6 +468,9 @@ void cpufreq_unregister_governor(struct cpufreq_governor *governor);
 struct cpufreq_governor *cpufreq_default_governor(void);
 struct cpufreq_governor *cpufreq_fallback_governor(void);
 
+/* Coefficient for computing default sampling rate/rate limit in governors */
+#define LATENCY_MULTIPLIER	(1000)
+
 /* Governor attribute set */
 struct gov_attr_set {
 	struct kobject kobj;
