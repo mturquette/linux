@@ -1160,7 +1160,9 @@ static void intel_pstate_stop_cpu(struct cpufreq_policy *policy)
 
 	pr_debug("intel_pstate: CPU %d exiting\n", cpu_num);
 
-	del_timer_sync(&all_cpu_data[cpu_num]->timer);
+	cpufreq_set_update_util_data(cpu_num, NULL);
+	synchronize_sched();
+
 	if (hwp_active)
 		return;
 
@@ -1425,7 +1427,8 @@ out:
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
 		if (all_cpu_data[cpu]) {
-			del_timer_sync(&all_cpu_data[cpu]->timer);
+			cpufreq_set_update_util_data(cpu, NULL);
+			synchronize_sched();
 			kfree(all_cpu_data[cpu]);
 		}
 	}
