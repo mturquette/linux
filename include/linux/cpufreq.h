@@ -147,14 +147,6 @@ static inline bool policy_is_shared(struct cpufreq_policy *policy)
 extern struct kobject *cpufreq_global_kobject;
 
 #ifdef CONFIG_CPU_FREQ
-void cpufreq_trigger_update(u64 time);
-
-struct freq_update_hook {
-	void (*func)(struct freq_update_hook *hook, u64 time);
-};
-
-void cpufreq_set_freq_update_hook(int cpu, struct freq_update_hook *hook);
-
 unsigned int cpufreq_get(unsigned int cpu);
 unsigned int cpufreq_quick_get(unsigned int cpu);
 unsigned int cpufreq_quick_get_max(unsigned int cpu);
@@ -166,8 +158,6 @@ int cpufreq_update_policy(unsigned int cpu);
 bool have_governor_per_policy(void);
 struct kobject *get_governor_parent_kobj(struct cpufreq_policy *policy);
 #else
-static inline void cpufreq_trigger_update(u64 time) {}
-
 static inline unsigned int cpufreq_get(unsigned int cpu)
 {
 	return 0;

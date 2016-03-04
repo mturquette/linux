@@ -21,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
+#include <linux/sched.h>
 #include <linux/sysfs.h>
 #include <linux/types.h>
 #include <linux/fs.h>
