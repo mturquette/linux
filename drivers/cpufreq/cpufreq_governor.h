@@ -134,7 +134,7 @@ struct cpu_dbs_info {
 	 * wake-up from idle.
 	 */
 	unsigned int prev_load;
-	struct update_util_data update_util;
+	struct freq_update_hook update_hook;
 	struct policy_dbs_info *policy_dbs;
 };
 
