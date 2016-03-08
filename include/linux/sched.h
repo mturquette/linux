@@ -2336,6 +2336,18 @@ extern u64 scheduler_tick_max_deferment(void);
 static inline bool sched_can_stop_tick(void) { return false; }
 #endif
 
+#ifdef CONFIG_CPU_FREQ
+void cpufreq_trigger_update(u64 time);
+
+struct freq_update_hook {
+	void (*func)(struct freq_update_hook *hook, u64 time);
+};
+
+void cpufreq_set_freq_update_hook(int cpu, struct freq_update_hook *hook);
+#else
+static inline void cpufreq_trigger_update(u64 time) {}
+#endif
+
 #ifdef CONFIG_SCHED_AUTOGROUP
 extern void sched_autogroup_create_attach(struct task_struct *p);
 extern void sched_autogroup_detach(struct task_struct *p);
