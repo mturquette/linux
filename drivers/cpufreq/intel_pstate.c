@@ -103,7 +103,7 @@ struct _pid {
 struct cpudata {
 	int cpu;
 
-	struct update_util_data update_util;
+	struct freq_update_hook update_hook;
 
 	struct pstate_data pstate;
 	struct vid_data vid;
@@ -1019,10 +1019,9 @@ static inline void intel_pstate_adjust_busy_pstate(struct cpudata *cpu)
 		sample->freq);
 }
 
-static void intel_pstate_update_util(struct update_util_data *data, u64 time,
-				     unsigned long util, unsigned long max)
+static void intel_pstate_freq_update(struct freq_update_hook *hook, u64 time)
 {
-	struct cpudata *cpu = container_of(data, struct cpudata, update_util);
+	struct cpudata *cpu = container_of(hook, struct cpudata, update_hook);
 	u64 delta_ns = time - cpu->sample.time;
 
 	if ((s64)delta_ns >= pid_params.sample_rate_ns) {
@@ -1088,8 +1087,8 @@ static int intel_pstate_init_cpu(unsigned int cpunum)
 	intel_pstate_busy_pid_reset(cpu);
 	intel_pstate_sample(cpu, 0);
 
-	cpu->update_util.func = intel_pstate_update_util;
-	cpufreq_set_update_util_data(cpunum, &cpu->update_util);
+	cpu->update_hook.func = intel_pstate_freq_update;
+	cpufreq_set_freq_update_hook(cpunum, &cpu->update_hook);
 
 	pr_debug("intel_pstate: controlling: cpu %d\n", cpunum);
 
@@ -1173,7 +1172,7 @@ static void intel_pstate_stop_cpu(struct cpufreq_policy *policy)
 
 	pr_debug("intel_pstate: CPU %d exiting\n", cpu_num);
 
-	cpufreq_set_update_util_data(cpu_num, NULL);
+	cpufreq_set_freq_update_hook(cpu_num, NULL);
 	synchronize_sched();
 
 	if (hwp_active)
@@ -1441,7 +1440,7 @@ out:
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
 		if (all_cpu_data[cpu]) {
-			cpufreq_set_update_util_data(cpu, NULL);
+			cpufreq_set_freq_update_hook(cpu, NULL);
 			synchronize_sched();
 			kfree(all_cpu_data[cpu]);
 		}
