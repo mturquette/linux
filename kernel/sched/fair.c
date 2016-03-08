@@ -2868,6 +2868,8 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 	}
 
 	if (cpu == smp_processor_id() && &rq->cfs == cfs_rq) {
+		unsigned long max = rq->cpu_capacity_orig;
+
 		/*
 		 * There are a few boundary cases this might miss but it should
 		 * get called often enough that that should (hopefully) not be
@@ -2876,7 +2878,8 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 		 * the next tick/schedule should update.
 		 *
 		 * It will not get called when we go idle, because the idle
-		 * thread is a different class (!fair).
+		 * thread is a different class (!fair), nor will the utilization
+		 * number include things like RT tasks.
 		 */
 		cpufreq_update_util(rq_clock(rq),
 				    min(cfs_rq->utilization_load_avg, max),

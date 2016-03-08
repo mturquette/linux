@@ -9,12 +9,12 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/sched.h>
+#include "sched.h"
 
 static DEFINE_PER_CPU(struct freq_update_hook *, cpufreq_freq_update_hook);
 
 /**
- * cpufreq_set_freq_update_hook - Populate the CPU's freq_update_hook pointer.
+ * set_freq_update_hook - Populate the CPU's freq_update_hook pointer.
  * @cpu: The CPU to set the pointer for.
  * @hook: New pointer value.
  *
@@ -27,35 +27,51 @@ static DEFINE_PER_CPU(struct freq_update_hook *, cpufreq_freq_update_hook);
  * accessed via the old update_util_data pointer or invoke synchronize_sched()
  * right after this function to avoid use-after-free.
  */
-void cpufreq_set_freq_update_hook(int cpu, struct freq_update_hook *hook)
+static void set_freq_update_hook(int cpu, struct freq_update_hook *hook)
 {
-	if (WARN_ON(hook && !hook->func))
+	rcu_assign_pointer(per_cpu(cpufreq_freq_update_hook, cpu), hook);
+}
+
+/**
+ * cpufreq_set_freq_update_hook - Set the CPU's frequency update callback.
+ * @cpu: The CPU to set the callback for.
+ * @hook: New freq_update_hook pointer value.
+ * @func: Callback function to use with the new hook.
+ */
+void cpufreq_set_freq_update_hook(int cpu, struct freq_update_hook *hook,
+			void (*func)(struct freq_update_hook *hook, u64 time,
+				     unsigned long util, unsigned long max))
+{
+	if (WARN_ON(!hook || !func))
 		return;
 
-	rcu_assign_pointer(per_cpu(cpufreq_freq_update_hook, cpu), hook);
+	hook->func = func;
+	set_freq_update_hook(cpu, hook);
 }
 EXPORT_SYMBOL_GPL(cpufreq_set_freq_update_hook);
 
 /**
- * cpufreq_trigger_update - Trigger CPU performance state evaluation if needed.
- * @time: Current time.
- *
- * The way cpufreq is currently arranged requires it to evaluate the CPU
- * performance state (frequency/voltage) on a regular basis.  To facilitate
- * that, this function is called by update_load_avg() in CFS when executed for
- * the current CPU's runqueue.
- *
- * However, this isn't sufficient to prevent the CPU from being stuck in a
- * completely inadequate performance level for too long, because the calls
- * from CFS will not be made if RT or deadline tasks are active all the time
- * (or there are RT and DL tasks only).
- *
- * As a workaround for that issue, this function is called by the RT and DL
- * sched classes to trigger extra cpufreq updates to prevent it from stalling,
- * but that really is a band-aid.  Going forward it should be replaced with
- * solutions targeted more specifically at RT and DL tasks.
+ * cpufreq_set_update_util_hook - Clear the CPU's freq_update_hook pointer.
+ * @cpu: The CPU to clear the pointer for.
  */
-void cpufreq_trigger_update(u64 time)
+void cpufreq_clear_freq_update_hook(int cpu)
+{
+	set_freq_update_hook(cpu, NULL);
+}
+EXPORT_SYMBOL_GPL(cpufreq_clear_freq_update_hook);
+
+/**
+ * cpufreq_update_util - Take a note about CPU utilization changes.
+ * @time: Current time.
+ * @util: CPU utilization.
+ * @max: CPU capacity.
+ *
+ * This function is called on every invocation of update_load_avg() on the CPU
+ * whose utilization is being updated.
+ *
+ * It can only be called from RCU-sched read-side critical sections.
+ */
+void cpufreq_update_util(u64 time, unsigned long util, unsigned long max)
 {
 	struct freq_update_hook *hook;
 
@@ -69,5 +85,29 @@ void cpufreq_trigger_update(u64 time)
 	 * may become NULL after the check below.
 	 */
 	if (hook)
-		hook->func(hook, time);
+		hook->func(hook, time, util, max);
+}
+
+/**
+ * cpufreq_trigger_update - Trigger CPU performance state evaluation if needed.
+ * @time: Current time.
+ *
+ * The way cpufreq is currently arranged requires it to evaluate the CPU
+ * performance state (frequency/voltage) on a regular basis.  To facilitate
+ * that, cpufreq_update_util() is called by update_load_avg() in CFS when
+ * executed for the current CPU's runqueue.
+ *
+ * However, this isn't sufficient to prevent the CPU from being stuck in a
+ * completely inadequate performance level for too long, because the calls
+ * from CFS will not be made if RT or deadline tasks are active all the time
+ * (or there are RT and DL tasks only).
+ *
+ * As a workaround for that issue, this function is called by the RT and DL
+ * sched classes to trigger extra cpufreq updates to prevent it from stalling,
+ * but that really is a band-aid.  Going forward it should be replaced with
+ * solutions targeted more specifically at RT and DL tasks.
+ */
+void cpufreq_trigger_update(u64 time)
+{
+	cpufreq_update_util(time, ULONG_MAX, 0);
 }
