@@ -1020,7 +1020,9 @@ static inline void intel_pstate_adjust_busy_pstate(struct cpudata *cpu)
 		sample->freq);
 }
 
-static void intel_pstate_freq_update(struct freq_update_hook *hook, u64 time)
+static void intel_pstate_freq_update(struct freq_update_hook *hook, u64 time,
+				     unsigned long util_not_used,
+				     unsigned long max_not_used)
 {
 	struct cpudata *cpu = container_of(hook, struct cpudata, update_hook);
 	u64 delta_ns = time - cpu->sample.time;
@@ -1088,8 +1090,8 @@ static int intel_pstate_init_cpu(unsigned int cpunum)
 	intel_pstate_busy_pid_reset(cpu);
 	intel_pstate_sample(cpu, 0);
 
-	cpu->update_hook.func = intel_pstate_freq_update;
-	cpufreq_set_freq_update_hook(cpunum, &cpu->update_hook);
+	cpufreq_set_freq_update_hook(cpunum, &cpu->update_hook,
+				     intel_pstate_freq_update);
 
 	pr_debug("intel_pstate: controlling: cpu %d\n", cpunum);
 
@@ -1173,7 +1175,7 @@ static void intel_pstate_stop_cpu(struct cpufreq_policy *policy)
 
 	pr_debug("intel_pstate: CPU %d exiting\n", cpu_num);
 
-	cpufreq_set_freq_update_hook(cpu_num, NULL);
+	cpufreq_clear_freq_update_hook(cpu_num);
 	synchronize_sched();
 
 	if (hwp_active)
@@ -1441,7 +1443,7 @@ out:
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
 		if (all_cpu_data[cpu]) {
-			cpufreq_set_freq_update_hook(cpu, NULL);
+			cpufreq_clear_freq_update_hook(cpu);
 			synchronize_sched();
 			kfree(all_cpu_data[cpu]);
 		}
