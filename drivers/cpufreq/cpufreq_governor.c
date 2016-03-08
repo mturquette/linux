@@ -62,10 +62,10 @@ ssize_t store_sampling_rate(struct dbs_data *dbs_data, const char *buf,
 		mutex_lock(&policy_dbs->timer_mutex);
 		/*
 		 * On 32-bit architectures this may race with the
-		 * sample_delay_ns read in dbs_update_util_handler(), but that
+		 * sample_delay_ns read in dbs_freq_update_handler(), but that
 		 * really doesn't matter.  If the read returns a value that's
 		 * too big, the sample will be skipped, but the next invocation
-		 * of dbs_update_util_handler() (when the update has been
+		 * of dbs_freq_update_handler() (when the update has been
 		 * completed) will take a sample.
 		 *
 		 * If this runs in parallel with dbs_work_handler(), we may end
@@ -257,7 +257,7 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 }
 EXPORT_SYMBOL_GPL(dbs_update);
 
-static void gov_set_update_util(struct policy_dbs_info *policy_dbs,
+static void gov_set_freq_update_hooks(struct policy_dbs_info *policy_dbs,
 				unsigned int delay_us)
 {
 	struct cpufreq_policy *policy = policy_dbs->policy;
@@ -269,16 +269,16 @@ static void gov_set_update_util(struct policy_dbs_info *policy_dbs,
 	for_each_cpu(cpu, policy->cpus) {
 		struct cpu_dbs_info *cdbs = &per_cpu(cpu_dbs, cpu);
 
-		cpufreq_set_update_util_data(cpu, &cdbs->update_util);
+		cpufreq_set_freq_update_hook(cpu, &cdbs->update_hook);
 	}
 }
 
-static inline void gov_clear_update_util(struct cpufreq_policy *policy)
+static inline void gov_clear_freq_update_hooks(struct cpufreq_policy *policy)
 {
 	int i;
 
 	for_each_cpu(i, policy->cpus)
-		cpufreq_set_update_util_data(i, NULL);
+		cpufreq_set_freq_update_hook(i, NULL);
 
 	synchronize_sched();
 }
@@ -287,7 +287,7 @@ static void gov_cancel_work(struct cpufreq_policy *policy)
 {
 	struct policy_dbs_info *policy_dbs = policy->governor_data;
 
-	gov_clear_update_util(policy_dbs->policy);
+	gov_clear_freq_update_hooks(policy_dbs->policy);
 	irq_work_sync(&policy_dbs->irq_work);
 	cancel_work_sync(&policy_dbs->work);
 	atomic_set(&policy_dbs->work_count, 0);
@@ -331,10 +331,9 @@ static void dbs_irq_work(struct irq_work *irq_work)
 	schedule_work(&policy_dbs->work);
 }
 
-static void dbs_update_util_handler(struct update_util_data *data, u64 time,
-				    unsigned long util, unsigned long max)
+static void dbs_freq_update_handler(struct freq_update_hook *hook, u64 time)
 {
-	struct cpu_dbs_info *cdbs = container_of(data, struct cpu_dbs_info, update_util);
+	struct cpu_dbs_info *cdbs = container_of(hook, struct cpu_dbs_info, update_hook);
 	struct policy_dbs_info *policy_dbs = cdbs->policy_dbs;
 	u64 delta_ns, lst;
 
@@ -403,7 +402,7 @@ static struct policy_dbs_info *alloc_policy_dbs_info(struct cpufreq_policy *poli
 		struct cpu_dbs_info *j_cdbs = &per_cpu(cpu_dbs, j);
 
 		j_cdbs->policy_dbs = policy_dbs;
-		j_cdbs->update_util.func = dbs_update_util_handler;
+		j_cdbs->update_hook.func = dbs_freq_update_handler;
 	}
 	return policy_dbs;
 }
@@ -419,7 +418,7 @@ static void free_policy_dbs_info(struct policy_dbs_info *policy_dbs,
 		struct cpu_dbs_info *j_cdbs = &per_cpu(cpu_dbs, j);
 
 		j_cdbs->policy_dbs = NULL;
-		j_cdbs->update_util.func = NULL;
+		j_cdbs->update_hook.func = NULL;
 	}
 	gov->free(policy_dbs);
 }
@@ -586,7 +585,7 @@ static int cpufreq_governor_start(struct cpufreq_policy *policy)
 
 	gov->start(policy);
 
-	gov_set_update_util(policy_dbs, sampling_rate);
+	gov_set_freq_update_hooks(policy_dbs, sampling_rate);
 	return 0;
 }
 

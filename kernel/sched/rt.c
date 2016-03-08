@@ -955,7 +955,7 @@ static void update_curr_rt(struct rq *rq)
 	if (curr->sched_class != &rt_sched_class)
 		return;
 
-	/* Kick cpufreq (see the comment in linux/cpufreq.h). */
+	/* Kick cpufreq (see the comment in drivers/cpufreq/cpufreq.c). */
 	if (cpu_of(rq) == smp_processor_id())
 		cpufreq_trigger_update(rq_clock(rq));
 

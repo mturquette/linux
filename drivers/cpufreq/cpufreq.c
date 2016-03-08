@@ -65,57 +65,65 @@ static struct cpufreq_driver *cpufreq_driver;
 static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
 static DEFINE_RWLOCK(cpufreq_driver_lock);
 
-static DEFINE_PER_CPU(struct update_util_data *, cpufreq_update_util_data);
+static DEFINE_PER_CPU(struct freq_update_hook *, cpufreq_freq_update_hook);
 
 /**
- * cpufreq_set_update_util_data - Populate the CPU's update_util_data pointer.
+ * cpufreq_set_freq_update_hook - Populate the CPU's freq_update_hook pointer.
  * @cpu: The CPU to set the pointer for.
- * @data: New pointer value.
+ * @hook: New pointer value.
  *
- * Set and publish the update_util_data pointer for the given CPU.  That pointer
- * points to a struct update_util_data object containing a callback function
- * to call from cpufreq_update_util().  That function will be called from an RCU
- * read-side critical section, so it must not sleep.
+ * Set and publish the freq_update_hook pointer for the given CPU.  That pointer
+ * points to a struct freq_update_hook object containing a callback function
+ * to call from cpufreq_trigger_update().  That function will be called from
+ * an RCU read-side critical section, so it must not sleep.
  *
  * Callers must use RCU-sched callbacks to free any memory that might be
  * accessed via the old update_util_data pointer or invoke synchronize_sched()
  * right after this function to avoid use-after-free.
  */
-void cpufreq_set_update_util_data(int cpu, struct update_util_data *data)
+void cpufreq_set_freq_update_hook(int cpu, struct freq_update_hook *hook)
 {
-	if (WARN_ON(data && !data->func))
+	if (WARN_ON(hook && !hook->func))
 		return;
 
-	rcu_assign_pointer(per_cpu(cpufreq_update_util_data, cpu), data);
+	rcu_assign_pointer(per_cpu(cpufreq_freq_update_hook, cpu), hook);
 }
-EXPORT_SYMBOL_GPL(cpufreq_set_update_util_data);
+EXPORT_SYMBOL_GPL(cpufreq_set_freq_update_hook);
 
 /**
- * cpufreq_update_util - Take a note about CPU utilization changes.
+ * cpufreq_trigger_update - Trigger CPU performance state evaluation if needed.
  * @time: Current time.
- * @util: Current utilization.
- * @max: Utilization ceiling.
  *
- * This function is called by the scheduler on every invocation of
- * update_load_avg() on the CPU whose utilization is being updated.
+ * The way cpufreq is currently arranged requires it to evaluate the CPU
+ * performance state (frequency/voltage) on a regular basis.  To facilitate
+ * that, this function is called by update_load_avg() in CFS when executed for
+ * the current CPU's runqueue.
  *
- * It can only be called from RCU-sched read-side critical sections.
+ * However, this isn't sufficient to prevent the CPU from being stuck in a
+ * completely inadequate performance level for too long, because the calls
+ * from CFS will not be made if RT or deadline tasks are active all the time
+ * (or there are RT and DL tasks only).
+ *
+ * As a workaround for that issue, this function is called by the RT and DL
+ * sched classes to trigger extra cpufreq updates to prevent it from stalling,
+ * but that really is a band-aid.  Going forward it should be replaced with
+ * solutions targeted more specifically at RT and DL tasks.
  */
-void cpufreq_update_util(u64 time, unsigned long util, unsigned long max)
+void cpufreq_trigger_update(u64 time)
 {
-	struct update_util_data *data;
+	struct freq_update_hook *hook;
 
 #ifdef CONFIG_LOCKDEP
 	WARN_ON(debug_locks && !rcu_read_lock_sched_held());
 #endif
 
-	data = rcu_dereference_sched(*this_cpu_ptr(&cpufreq_update_util_data));
+	hook = rcu_dereference_sched(*this_cpu_ptr(&cpufreq_freq_update_hook));
 	/*
 	 * If this isn't inside of an RCU-sched read-side critical section, data
 	 * may become NULL after the check below.
 	 */
-	if (data)
-		data->func(data, time, util, max);
+	if (hook)
+		hook->func(hook, time);
 }
 
 /* Flag to suspend/resume CPUFreq governors */
