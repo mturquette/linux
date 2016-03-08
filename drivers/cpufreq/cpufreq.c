@@ -428,6 +428,26 @@ void cpufreq_freq_transition_end(struct cpufreq_policy *policy,
 }
 EXPORT_SYMBOL_GPL(cpufreq_freq_transition_end);
 
+/*
+ * Fast frequency switching status count.  Positive means "enabled", negative
+ * means "disabled" and 0 means "don't care".
+ */
+static int cpufreq_fast_switch_count;
+static DEFINE_MUTEX(cpufreq_fast_switch_lock);
+
+void cpufreq_enable_fast_switch(struct cpufreq_policy *policy)
+{
+	mutex_lock(&cpufreq_fast_switch_lock);
+	if (cpufreq_fast_switch_count >= 0) {
+		cpufreq_fast_switch_count++;
+		policy->fast_switch_possible = true;
+	} else {
+		pr_warn("cpufreq: CPU%u: Fast freqnency switching not enabled\n",
+			policy->cpu);
+	}
+	mutex_unlock(&cpufreq_fast_switch_lock);
+}
+EXPORT_SYMBOL_GPL(cpufreq_enable_fast_switch);
 
 /*********************************************************************
  *                          SYSFS INTERFACE                          *
@@ -1074,6 +1094,23 @@ static void cpufreq_policy_free(struct cpufreq_policy *policy, bool notify)
 	kfree(policy);
 }
 
+static void cpufreq_driver_exit_policy(struct cpufreq_policy *policy)
+{
+	if (policy->fast_switch_possible) {
+		mutex_lock(&cpufreq_fast_switch_lock);
+
+		if (!WARN_ON(cpufreq_fast_switch_count <= 0))
+			cpufreq_fast_switch_count--;
+
+		mutex_unlock(&cpufreq_fast_switch_lock);
+	}
+
+	if (cpufreq_driver->exit) {
+		cpufreq_driver->exit(policy);
+		policy->freq_table = NULL;
+	}
+}
+
 static int cpufreq_online(unsigned int cpu)
 {
 	struct cpufreq_policy *policy;
@@ -1237,8 +1274,7 @@ static int cpufreq_online(unsigned int cpu)
 out_exit_policy:
 	up_write(&policy->rwsem);
 
-	if (cpufreq_driver->exit)
-		cpufreq_driver->exit(policy);
+	cpufreq_driver_exit_policy(policy);
 out_free_policy:
 	cpufreq_policy_free(policy, !new_policy);
 	return ret;
@@ -1335,10 +1371,7 @@ static void cpufreq_offline(unsigned int cpu)
 	 * since this is a core component, and is essential for the
 	 * subsequent light-weight ->init() to succeed.
 	 */
-	if (cpufreq_driver->exit) {
-		cpufreq_driver->exit(policy);
-		policy->freq_table = NULL;
-	}
+	cpufreq_driver_exit_policy(policy);
 
 unlock:
 	up_write(&policy->rwsem);
@@ -1665,8 +1698,18 @@ int cpufreq_register_notifier(struct notifier_block *nb, unsigned int list)
 
 	switch (list) {
 	case CPUFREQ_TRANSITION_NOTIFIER:
+		mutex_lock(&cpufreq_fast_switch_lock);
+
+		if (cpufreq_fast_switch_count > 0) {
+			mutex_unlock(&cpufreq_fast_switch_lock);
+			return -EPERM;
+		}
 		ret = srcu_notifier_chain_register(
 				&cpufreq_transition_notifier_list, nb);
+		if (!ret)
+			cpufreq_fast_switch_count--;
+
+		mutex_unlock(&cpufreq_fast_switch_lock);
 		break;
 	case CPUFREQ_POLICY_NOTIFIER:
 		ret = blocking_notifier_chain_register(
@@ -1699,8 +1742,14 @@ int cpufreq_unregister_notifier(struct notifier_block *nb, unsigned int list)
 
 	switch (list) {
 	case CPUFREQ_TRANSITION_NOTIFIER:
+		mutex_lock(&cpufreq_fast_switch_lock);
+
 		ret = srcu_notifier_chain_unregister(
 				&cpufreq_transition_notifier_list, nb);
+		if (!ret && !WARN_ON(cpufreq_fast_switch_count >= 0))
+			cpufreq_fast_switch_count++;
+
+		mutex_unlock(&cpufreq_fast_switch_lock);
 		break;
 	case CPUFREQ_POLICY_NOTIFIER:
 		ret = blocking_notifier_chain_unregister(
@@ -1718,6 +1767,30 @@ EXPORT_SYMBOL(cpufreq_unregister_notifier);
 /*********************************************************************
  *                              GOVERNORS                            *
  *********************************************************************/
+
+/**
+ * cpufreq_driver_fast_switch - Carry out a fast CPU frequency switch.
+ * @policy: cpufreq policy to switch the frequency for.
+ * @target_freq: New frequency to set (may be approximate).
+ *
+ * Carry out a fast frequency switch from interrupt context.
+ *
+ * This function must not be called if policy->fast_switch_possible is unset.
+ *
+ * Governors calling this function must guarantee that it will never be invoked
+ * twice in parallel for the same policy and that it will never be called in
+ * parallel with either ->target() or ->target_index() for the same policy.
+ *
+ * If CPUFREQ_ENTRY_INVALID is returned by the driver's ->fast_switch()
+ * callback to indicate an error condition, the hardware configuration must be
+ * preserved.
+ */
+unsigned int cpufreq_driver_fast_switch(struct cpufreq_policy *policy,
+					unsigned int target_freq)
+{
+	return cpufreq_driver->fast_switch(policy, target_freq);
+}
+EXPORT_SYMBOL_GPL(cpufreq_driver_fast_switch);
 
 /* Must set freqs->new to intermediate frequency */
 static int __target_intermediate(struct cpufreq_policy *policy,
