@@ -20,8 +20,8 @@ static DEFINE_PER_CPU(struct freq_update_hook *, cpufreq_freq_update_hook);
  *
  * Set and publish the freq_update_hook pointer for the given CPU.  That pointer
  * points to a struct freq_update_hook object containing a callback function
- * to call from cpufreq_trigger_update().  That function will be called from
- * an RCU read-side critical section, so it must not sleep.
+ * to call from cpufreq_update_util().  That function will be called from an
+ * RCU read-side critical section, so it must not sleep.
  *
  * Callers must use RCU-sched callbacks to free any memory that might be
  * accessed via the old update_util_data pointer or invoke synchronize_sched()
@@ -86,28 +86,4 @@ void cpufreq_update_util(u64 time, unsigned long util, unsigned long max)
 	 */
 	if (hook)
 		hook->func(hook, time, util, max);
-}
-
-/**
- * cpufreq_trigger_update - Trigger CPU performance state evaluation if needed.
- * @time: Current time.
- *
- * The way cpufreq is currently arranged requires it to evaluate the CPU
- * performance state (frequency/voltage) on a regular basis.  To facilitate
- * that, cpufreq_update_util() is called by update_load_avg() in CFS when
- * executed for the current CPU's runqueue.
- *
- * However, this isn't sufficient to prevent the CPU from being stuck in a
- * completely inadequate performance level for too long, because the calls
- * from CFS will not be made if RT or deadline tasks are active all the time
- * (or there are RT and DL tasks only).
- *
- * As a workaround for that issue, this function is called by the RT and DL
- * sched classes to trigger extra cpufreq updates to prevent it from stalling,
- * but that really is a band-aid.  Going forward it should be replaced with
- * solutions targeted more specifically at RT and DL tasks.
- */
-void cpufreq_trigger_update(u64 time)
-{
-	cpufreq_update_util(time, ULONG_MAX, 0);
 }
