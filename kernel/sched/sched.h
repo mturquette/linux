@@ -1477,7 +1477,21 @@ static inline int hrtick_enabled(struct rq *rq)
 #ifdef CONFIG_SMP
 extern void sched_avg_update(struct rq *rq);
 
-#ifndef arch_scale_freq_capacity
+/*
+ * arch_scale_freq_capacity can be implemented by cpufreq, platform code or
+ * arch code. We select the cpufreq-provided implementation first. If it
+ * doesn't exist then we default to any other implementation provided from
+ * platform/arch code. If those do not exist then we use the default
+ * SCHED_CAPACITY_SCALE value below.
+ *
+ * Note that if cpufreq drivers or platform/arch code have competing
+ * implementations it is up to those subsystems to select one at runtime with
+ * an efficient solution, as we cannot tolerate the overhead of indirect
+ * functions (e.g. function pointers) in the scheduler fast path
+ */
+#ifdef CONFIG_CPU_FREQ
+#define arch_scale_freq_capacity cpufreq_scale_freq_capacity
+#elif !defined(arch_scale_freq_capacity)
 static __always_inline
 unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
 {
