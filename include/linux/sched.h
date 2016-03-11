@@ -2372,6 +2372,9 @@ void cpufreq_set_freq_update_hook(int cpu, struct freq_update_hook *hook,
 			void (*func)(struct freq_update_hook *hook, u64 time,
 				     unsigned long util, unsigned long max));
 void cpufreq_clear_freq_update_hook(int cpu);
+unsigned long cpufreq_get_cfs_capacity_margin(void);
+void cpufreq_set_cfs_capacity_margin(unsigned long margin);
+void cpufreq_reset_cfs_capacity_margin(void);
 #endif
 
 #ifdef CONFIG_SCHED_AUTOGROUP
