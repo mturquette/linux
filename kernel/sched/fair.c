@@ -100,6 +100,19 @@ const_debug unsigned int sysctl_sched_migration_cost = 500000UL;
  */
 unsigned int __read_mostly sysctl_sched_shares_window = 10000000UL;
 
+/*
+ * Add a 25% margin globally to all capacity requests from cfs. This is
+ * equivalent to an 80% up_threshold in legacy governors like ondemand.
+ *
+ * This is required as task utilization increases. The frequency-invariant
+ * utilization will asymptotically approach the current capacity of the cpu and
+ * the additional margin will cross the threshold into the next capacity state.
+ *
+ * XXX someday expand to separate, per-call site margins? e.g. enqueue, fork,
+ * task_tick, load_balance, etc
+ */
+unsigned long cfs_capacity_margin = CAPACITY_MARGIN_DEFAULT;
+
 #ifdef CONFIG_CFS_BANDWIDTH
 /*
  * Amount of runtime to allocate from global (tg) to local (per-cfs_rq) pool
@@ -2869,6 +2882,8 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 
 	if (cpu == smp_processor_id() && &rq->cfs == cfs_rq) {
 		unsigned long max = rq->cpu_capacity_orig;
+		unsigned long cap = cfs_rq->utilization_load_avg *
+			cfs_capacity_margin / max;
 
 		/*
 		 * There are a few boundary cases this might miss but it should
@@ -2881,9 +2896,7 @@ static inline void update_entity_load_avg(struct sched_entity *se,
 		 * thread is a different class (!fair), nor will the utilization
 		 * number include things like RT tasks.
 		 */
-		cpufreq_update_util(rq_clock(rq),
-				    min(cfs_rq->utilization_load_avg, max),
-				    max);
+		cpufreq_update_util(rq_clock(rq), min(cap, max), max);
 	}
 }
 
