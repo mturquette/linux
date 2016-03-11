@@ -27,6 +27,9 @@ extern __read_mostly int scheduler_running;
 extern unsigned long calc_load_update;
 extern atomic_long_t calc_load_tasks;
 
+#define CAPACITY_MARGIN_DEFAULT 1280;
+extern unsigned long cfs_capacity_margin;
+
 extern void calc_global_load_tick(struct rq *this_rq);
 extern long calc_load_fold_active(struct rq *this_rq);
 
