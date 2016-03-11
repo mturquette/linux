@@ -246,8 +246,32 @@ static ssize_t rate_limit_us_store(struct gov_attr_set *attr_set, const char *bu
 
 static struct governor_attr rate_limit_us = __ATTR_RW(rate_limit_us);
 
+static ssize_t capacity_margin_show(struct gov_attr_set *not_used,
+					   char *buf)
+{
+	return sprintf(buf, "%lu\n", cpufreq_get_cfs_capacity_margin());
+}
+
+static ssize_t capacity_margin_store(struct gov_attr_set *attr_set,
+				  const char *buf, size_t count)
+{
+	unsigned long margin;
+	int ret;
+
+	ret = sscanf(buf, "%lu", &margin);
+	if (ret != 1)
+		return -EINVAL;
+
+	cpufreq_set_cfs_capacity_margin(margin);
+
+	return count;
+}
+
+static struct governor_attr capacity_margin = __ATTR_RW(capacity_margin);
+
 static struct attribute *sugov_attributes[] = {
 	&rate_limit_us.attr,
+	&capacity_margin.attr,
 	NULL
 };
 
@@ -381,6 +405,7 @@ static int sugov_exit(struct cpufreq_policy *policy)
 
 	mutex_lock(&global_tunables_lock);
 
+	cpufreq_reset_cfs_capacity_margin();
 	count = gov_attr_set_put(&tunables->attr_set, &sg_policy->tunables_hook);
 	policy->governor_data = NULL;
 	if (!count)
