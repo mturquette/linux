@@ -2362,6 +2362,13 @@ extern u64 scheduler_tick_max_deferment(void);
 static inline bool sched_can_stop_tick(void) { return false; }
 #endif
 
+enum sched_class_util {
+	cfs_util,
+	rt_util,
+	dl_util,
+	max_util_types,
+};
+//#define NR_SCHED_CLASS_UTIL 3
 #ifdef CONFIG_CPU_FREQ
 struct freq_update_hook {
 	void (*func)(struct freq_update_hook *hook, u64 time,

@@ -46,9 +46,17 @@ struct sugov_cpu {
 	struct freq_update_hook update_hook;
 	struct sugov_policy *sg_policy;
 
+#if 0
+	unsigned long cfs_util;
+	unsigned long rt_util;
+	unsigned long dl_util;
+#endif
+	unsigned long sc_util[NR_SCHED_CLASS];
+
 	/* The fields below are only needed when sharing a policy. */
-	unsigned long util;
-	unsigned long max;
+	/* FIXME not sure if I need total_util? */
+	//unsigned long total_util;
+	unsigned long max_capacity;
 	u64 last_update;
 };
 
@@ -106,7 +114,8 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 	trace_cpu_frequency(freq, smp_processor_id());
 }
 
-static void sugov_update_single(struct freq_update_hook *hook, u64 time,
+static void sugov_update_single(struct freq_update_hook *hook,
+				enum sched_class_util sched_class, u64 time,
 				unsigned long util, unsigned long max)
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_hook);
@@ -116,8 +125,15 @@ static void sugov_update_single(struct freq_update_hook *hook, u64 time,
 	if (!sugov_should_update_freq(sg_policy, time))
 		return;
 
+	sg_cpu->util[sched_class] = util;
+
+	/* sum the utilization of all sched classes */
+	sg_cpu->total_util = 0;
+	for (i = 0; i < nr_sched_class; i++)
+		sg_cpu->total_util += sg_cpu->util[i];
+
 	max_f = sg_policy->max_freq;
-	next_f = util > max ? max_f : util * max_f / max;
+	next_f = util > max ? max_f : util * max_f / max_capacity;
 	sugov_update_commit(sg_policy, time, next_f);
 }
 
@@ -152,8 +168,11 @@ static unsigned int sugov_next_freq(struct sugov_policy *sg_policy,
 		if ((s64)delta_ns > NSEC_PER_SEC / HZ)
 			continue;
 
-		j_util = j_sg_cpu->util;
-		j_max = j_sg_cpu->max;
+		/* sum the utilization of all sched classes */
+		for (i = 0; i < nr_sched_class; i++)
+			j_util += j_sg_cpu->util[i];
+
+		j_max = j_sg_cpu->max_capacity;
 		if (j_util > j_max)
 			return max_f;
 
@@ -163,10 +182,11 @@ static unsigned int sugov_next_freq(struct sugov_policy *sg_policy,
 		}
 	}
 
-	return  util * max_f / max;
+	return  util * max_f / max_capacity;
 }
 
-static void sugov_update_shared(struct freq_update_hook *hook, u64 time,
+static void sugov_update_shared(struct freq_update_hook *hook,
+				enum sched_class_util sched_class, u64 time,
 				unsigned long util, unsigned long max)
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_hook);
@@ -175,8 +195,8 @@ static void sugov_update_shared(struct freq_update_hook *hook, u64 time,
 
 	raw_spin_lock(&sg_policy->update_lock);
 
-	sg_cpu->util = util;
-	sg_cpu->max = max;
+	sg_cpu->util[sched_class] = util;
+	sg_cpu->max = max_capacity;
 	sg_cpu->last_update = time;
 
 	if (sugov_should_update_freq(sg_policy, time)) {
