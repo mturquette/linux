@@ -39,8 +39,10 @@ static void set_freq_update_hook(int cpu, struct freq_update_hook *hook)
  * @func: Callback function to use with the new hook.
  */
 void cpufreq_set_freq_update_hook(int cpu, struct freq_update_hook *hook,
-			void (*func)(struct freq_update_hook *hook, u64 time,
-				     unsigned long util, unsigned long max))
+			void (*func)(struct freq_update_hook *hook,
+				     enum sched_class_util sched_class,
+				     u64 time, unsigned long util,
+				     unsigned long max))
 {
 	if (WARN_ON(!hook || !func))
 		return;
@@ -124,7 +126,8 @@ EXPORT_SYMBOL_GPL(cpufreq_reset_cfs_capacity_margin);
  *
  * It can only be called from RCU-sched read-side critical sections.
  */
-void cpufreq_update_util(u64 time, unsigned long util, unsigned long max)
+void cpufreq_update_util(enum sched_class_util sc, u64 time,
+			 unsigned long util, unsigned long max)
 {
 	struct freq_update_hook *hook;
 
@@ -138,5 +141,5 @@ void cpufreq_update_util(u64 time, unsigned long util, unsigned long max)
 	 * may become NULL after the check below.
 	 */
 	if (hook)
-		hook->func(hook, time, util, max);
+		hook->func(hook, sc, time, util, max);
 }

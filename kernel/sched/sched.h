@@ -1853,8 +1853,10 @@ static inline u64 irq_time_read(int cpu)
 #endif /* CONFIG_IRQ_TIME_ACCOUNTING */
 
 #ifdef CONFIG_CPU_FREQ
-void cpufreq_update_util(u64 time, unsigned long util, unsigned long max);
+void cpufreq_update_util(enum sched_class_util sc, u64 time,
+			 unsigned long util, unsigned long max);
 #else
-static inline void cpufreq_update_util(u64 time, unsigned long util,
-				       unsigned long max) {}
+static inline void cpufreq_update_util(enum sched_class_util sc, u64 time,
+				       unsigned long util, unsigned long max)
+{}
 #endif /* CONFIG_CPU_FREQ */

@@ -248,8 +248,9 @@ static void dbs_irq_work(struct irq_work *irq_work)
 	schedule_work(&policy_dbs->work);
 }
 
-static void dbs_freq_update_handler(struct freq_update_hook *hook, u64 time,
-				    unsigned long util_not_used,
+static void dbs_freq_update_handler(struct freq_update_hook *hook,
+				    enum sched_class_util sc_not_used,
+				    u64 time, unsigned long util_not_used,
 				    unsigned long max_not_used)
 {
 	struct cpu_dbs_info *cdbs = container_of(hook, struct cpu_dbs_info, update_hook);

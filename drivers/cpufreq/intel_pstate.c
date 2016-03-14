@@ -996,8 +996,9 @@ static inline void intel_pstate_adjust_busy_pstate(struct cpudata *cpu)
 		sample->freq);
 }
 
-static void intel_pstate_freq_update(struct freq_update_hook *hook, u64 time,
-				     unsigned long util_not_used,
+static void intel_pstate_freq_update(struct freq_update_hook *hook,
+				     enum sched_class_util sc_not_used
+				     u64 time, unsigned long util_not_used,
 				     unsigned long max_not_used)
 {
 	struct cpudata *cpu = container_of(hook, struct cpudata, update_hook);

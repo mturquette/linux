@@ -957,7 +957,7 @@ static void update_curr_rt(struct rq *rq)
 
 	/* Kick cpufreq (see the comment in drivers/cpufreq/cpufreq.c). */
 	if (cpu_of(rq) == smp_processor_id())
-		cpufreq_update_util(rq_clock(rq), ULONG_MAX, 0);
+		cpufreq_update_util(rt_util, rq_clock(rq), ULONG_MAX, 0);
 
 	delta_exec = rq_clock_task(rq) - curr->se.exec_start;
 	if (unlikely((s64)delta_exec <= 0))

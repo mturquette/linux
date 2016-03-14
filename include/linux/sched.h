@@ -2336,15 +2336,25 @@ extern u64 scheduler_tick_max_deferment(void);
 static inline bool sched_can_stop_tick(void) { return false; }
 #endif
 
+enum sched_class_util {
+	cfs_util,
+	rt_util,
+	dl_util,
+	nr_util_types,
+};
+
 #ifdef CONFIG_CPU_FREQ
 struct freq_update_hook {
-	void (*func)(struct freq_update_hook *hook, u64 time,
+	void (*func)(struct freq_update_hook *hook,
+		     enum sched_class_util sched_class, u64 time,
 		     unsigned long util, unsigned long max);
 };
 
 void cpufreq_set_freq_update_hook(int cpu, struct freq_update_hook *hook,
-			void (*func)(struct freq_update_hook *hook, u64 time,
-				     unsigned long util, unsigned long max));
+			void (*func)(struct freq_update_hook *hook,
+				     enum sched_class_util sched_class,
+				     u64 time, unsigned long util,
+				     unsigned long max));
 void cpufreq_clear_freq_update_hook(int cpu);
 unsigned long cpufreq_get_cfs_capacity_margin(void);
 void cpufreq_set_cfs_capacity_margin(unsigned long margin);
