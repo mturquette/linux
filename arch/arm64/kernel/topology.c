@@ -24,8 +24,6 @@
 #include <asm/cputype.h>
 #include <asm/topology.h>
 
-<<<<<<< HEAD
-=======
 /*
  * cpu capacity scale management
  */
@@ -151,24 +149,6 @@ static void update_cpu_capacity(unsigned int cpu)
 		cpu, arch_scale_cpu_capacity(NULL, cpu));
 }
 
-/*
- * Scheduler load-tracking scale-invariance
- *
- * Provides the scheduler with a scale-invariance correction factor that
- * compensates for frequency scaling (arch_scale_freq_capacity()). The scaling
- * factor is updated in smp.c
- */
-unsigned long arm_arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
-{
-	unsigned long curr = atomic_long_read(&per_cpu(cpu_freq_capacity, cpu));
-
-	if (!curr)
-		return SCHED_CAPACITY_SCALE;
-
-	return curr;
-}
-
->>>>>>> be7ea4daf206... arm64: Add cpu capacity scale management for load-tracking
 static int __init get_cpu_for_node(struct device_node *node)
 {
 	struct device_node *cpu_node;

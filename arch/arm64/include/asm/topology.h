@@ -18,7 +18,6 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
 #define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
 #define topology_sibling_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
 
-#define arch_scale_cpu_capacity arm_arch_scale_cpu_capacity
 extern
 unsigned long arm_arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
 
