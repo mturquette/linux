@@ -2471,6 +2471,7 @@ static int __clk_init(struct device *dev, struct clk *clk_user)
 
 	/* check that clk_ops are sane.  See Documentation/clk.txt */
 
+	/* FIXME if (core->ops->select_coord_rates && !core->ops->coordinate_rates) ??? */
 	if (!!core->ops->select_coord_rates != !!core->ops->coordinate_rates) {
 		pr_warning("%s: %s must implement both .select_coord_rates and .coordinated_rates\n",
 				__func__, core->name);
