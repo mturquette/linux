@@ -106,7 +106,6 @@ static const struct clk_div_table cpu_div_table[] = {
 	{ /* sentinel */ },
 };
 
-PNAME(p_xtal)		= { "xtal" };
 PNAME(p_fclk_div)	= { "fixed_pll" };
 PNAME(p_cpu_clk)	= { "sys_pll" };
 PNAME(p_clk81)		= { "fclk_div3", "fclk_div4", "fclk_div5" };
@@ -115,19 +114,6 @@ PNAME(p_mali)		= { "fclk_div3", "fclk_div4", "fclk_div5",
 
 static u32 mux_table_clk81[]	= { 6, 5, 7 };
 static u32 mux_table_mali[]	= { 6, 5, 7, 4, 0 };
-
-static struct pll_conf pll_confs = {
-	.m		= PARM(0x00, 0,  9),
-	.n		= PARM(0x00, 9,  5),
-	.od		= PARM(0x00, 16, 2),
-};
-
-static struct pll_conf sys_pll_conf = {
-	.m		= PARM(0x00, 0,  9),
-	.n		= PARM(0x00, 9,  5),
-	.od		= PARM(0x00, 16, 2),
-	.rate_table	= sys_pll_rate_table,
-};
 
 static const struct composite_conf clk81_conf __initconst = {
 	.mux_table		= mux_table_clk81,
@@ -162,13 +148,90 @@ static struct clk_fixed_rate meson8b_zero = {
 	},
 };
 
+static struct meson_clk_pll meson8b_fixed_pll = {
+	.reg_off = MESON8B_REG_PLL_FIXED,
+	.m = {
+		.reg_off = 0x00,
+		.shift   = 0,
+		.width   = 9,
+	},
+	.n = {
+		.reg_off = 0x00,
+		.shift   = 9,
+		.width   = 5,
+	},
+	.od = {
+		.reg_off = 0x00,
+		.shift   = 16,
+		.width   = 2,
+	},
+	.lock = &clk_lock,
+	.hw.init = &(struct clk_init_data){
+		.name = "fixed_pll",
+		.ops = &meson_clk_pll_ro_ops,
+		.parent_names = (const char *[]){ "xtal" },
+		.num_parents = 1,
+		.flags = CLK_GET_RATE_NOCACHE,
+	},
+};
+
+static struct meson_clk_pll meson8b_vid_pll = {
+	.reg_off = MESON8B_REG_PLL_VID,
+	.m = {
+		.reg_off = 0x00,
+		.shift   = 0,
+		.width   = 9,
+	},
+	.n = {
+		.reg_off = 0x00,
+		.shift   = 9,
+		.width   = 5,
+	},
+	.od = {
+		.reg_off = 0x00,
+		.shift   = 16,
+		.width   = 2,
+	},
+	.lock = &clk_lock,
+	.hw.init = &(struct clk_init_data){
+		.name = "vid_pll",
+		.ops = &meson_clk_pll_ro_ops,
+		.parent_names = (const char *[]){ "xtal" },
+		.num_parents = 1,
+		.flags = CLK_GET_RATE_NOCACHE,
+	},
+};
+
+static struct meson_clk_pll meson8b_sys_pll = {
+	.reg_off = MESON8B_REG_PLL_SYS,
+	.m = {
+		.reg_off = 0x00,
+		.shift   = 0,
+		.width   = 9,
+	},
+	.n = {
+		.reg_off = 0x00,
+		.shift   = 9,
+		.width   = 5,
+	},
+	.od = {
+		.reg_off = 0x00,
+		.shift   = 16,
+		.width   = 2,
+	},
+	.rate_table = sys_pll_rate_table,
+	.rate_count = ARRAY_SIZE(sys_pll_rate_table),
+	.lock = &clk_lock,
+	.hw.init = &(struct clk_init_data){
+		.name = "sys_pll",
+		.ops = &meson_clk_pll_ops,
+		.parent_names = (const char *[]){ "xtal" },
+		.num_parents = 1,
+		.flags = CLK_GET_RATE_NOCACHE,
+	},
+};
+
 static const struct clk_conf meson8b_clk_confs[] __initconst = {
-	PLL(MESON8B_REG_PLL_FIXED, CLKID_PLL_FIXED, "fixed_pll",
-	    p_xtal, 0, &pll_confs),
-	PLL(MESON8B_REG_PLL_VID, CLKID_PLL_VID, "vid_pll",
-	    p_xtal, 0, &pll_confs),
-	PLL(MESON8B_REG_PLL_SYS, CLKID_PLL_SYS, "sys_pll",
-	    p_xtal, 0, &sys_pll_conf),
 	FIXED_FACTOR_DIV(CLKID_FCLK_DIV2, "fclk_div2", p_fclk_div, 0, 2),
 	FIXED_FACTOR_DIV(CLKID_FCLK_DIV3, "fclk_div3", p_fclk_div, 0, 3),
 	FIXED_FACTOR_DIV(CLKID_FCLK_DIV4, "fclk_div4", p_fclk_div, 0, 4),
@@ -193,14 +256,23 @@ static struct clk_hw_onecell_data meson8b_hw_onecell_data = {
 	.hws = {
 		[CLKID_XTAL] = &meson8b_xtal.hw,
 		[CLKID_ZERO] = &meson8b_zero.hw,
+		[CLKID_PLL_FIXED] = &meson8b_fixed_pll.hw,
+		[CLKID_PLL_VID] = &meson8b_vid_pll.hw,
+		[CLKID_PLL_SYS] = &meson8b_sys_pll.hw,
 	},
 	.num = CLK_NR_CLKS,
+};
+
+static struct meson_clk_pll *const meson_clk_plls[] = {
+	&meson8b_fixed_pll,
+	&meson8b_vid_pll,
+	&meson8b_sys_pll,
 };
 
 static void __init meson8b_clkc_init(struct device_node *np)
 {
 	void __iomem *clk_base;
-	int ret, clkid;
+	int ret, clkid, i;
 
 	if (!meson_clk_init(np, CLK_NR_CLKS))
 		return;
@@ -210,6 +282,13 @@ static void __init meson8b_clkc_init(struct device_node *np)
 	if (!clk_base) {
 		pr_err("%s: Unable to map clk base\n", __func__);
 		return;
+	}
+
+	/* Populate base address for PLLs */
+	for (i = 0; i < ARRAY_SIZE(meson_clk_plls); i++) {
+		struct meson_clk_pll *pll =
+			to_meson_clk_pll(&meson_clk_plls[i]->hw);
+		pll->base = clk_base + pll->reg_off;
 	}
 
 	/*
