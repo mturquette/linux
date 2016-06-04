@@ -23,99 +23,23 @@
 #include <linux/module.h>
 
 #include "clkc.h"
+#include "gxbb.h"
 
 static DEFINE_SPINLOCK(clk_lock);
 
 static const struct pll_rate_table sys_pll_rate_table[] = {
-	PLL_RATE(24, 56, 1, 2),
-	PLL_RATE(48, 64, 1, 2),
-	PLL_RATE(72, 72, 1, 2),
-	PLL_RATE(96, 64, 1, 2),
-	PLL_RATE(120, 80, 1, 2),
-	PLL_RATE(144, 96, 1, 2),
-	PLL_RATE(168, 56, 1, 1),
-	PLL_RATE(192, 64, 1, 1),
-	PLL_RATE(216, 72, 1, 1),
-	PLL_RATE(240, 80, 1, 1),
-	PLL_RATE(264, 88, 1, 1),
-	PLL_RATE(288, 96, 1, 1),
-	PLL_RATE(312, 52, 1, 2),
-	PLL_RATE(336, 56, 1, 2),
-	PLL_RATE(360, 60, 1, 2),
-	PLL_RATE(384, 64, 1, 2),
-	PLL_RATE(408, 68, 1, 2),
-	PLL_RATE(432, 72, 1, 2),
-	PLL_RATE(456, 76, 1, 2),
-	PLL_RATE(480, 80, 1, 2),
-	PLL_RATE(504, 84, 1, 2),
-	PLL_RATE(528, 88, 1, 2),
-	PLL_RATE(552, 92, 1, 2),
-	PLL_RATE(576, 96, 1, 2),
-	PLL_RATE(600, 50, 1, 1),
-	PLL_RATE(624, 52, 1, 1),
-	PLL_RATE(648, 54, 1, 1),
-	PLL_RATE(672, 56, 1, 1),
-	PLL_RATE(696, 58, 1, 1),
-	PLL_RATE(720, 60, 1, 1),
-	PLL_RATE(744, 62, 1, 1),
-	PLL_RATE(768, 64, 1, 1),
-	PLL_RATE(792, 66, 1, 1),
-	PLL_RATE(816, 68, 1, 1),
-	PLL_RATE(840, 70, 1, 1),
-	PLL_RATE(864, 72, 1, 1),
-	PLL_RATE(888, 74, 1, 1),
-	PLL_RATE(912, 76, 1, 1),
-	PLL_RATE(936, 78, 1, 1),
-	PLL_RATE(960, 80, 1, 1),
-	PLL_RATE(984, 82, 1, 1),
-	PLL_RATE(1008, 84, 1, 1),
-	PLL_RATE(1032, 86, 1, 1),
-	PLL_RATE(1056, 88, 1, 1),
-	PLL_RATE(1080, 90, 1, 1),
-	PLL_RATE(1104, 92, 1, 1),
-	PLL_RATE(1128, 94, 1, 1),
-	PLL_RATE(1152, 96, 1, 1),
-	PLL_RATE(1176, 98, 1, 1),
-	PLL_RATE(1200, 50, 1, 0),
-	PLL_RATE(1224, 51, 1, 0),
-	PLL_RATE(1248, 52, 1, 0),
-	PLL_RATE(1272, 53, 1, 0),
-	PLL_RATE(1296, 54, 1, 0),
-	PLL_RATE(1320, 55, 1, 0),
-	PLL_RATE(1344, 56, 1, 0),
-	PLL_RATE(1368, 57, 1, 0),
-	PLL_RATE(1392, 58, 1, 0),
-	PLL_RATE(1416, 59, 1, 0),
-	PLL_RATE(1440, 60, 1, 0),
-	PLL_RATE(1464, 61, 1, 0),
-	PLL_RATE(1488, 62, 1, 0),
-	PLL_RATE(1512, 63, 1, 0),
-	PLL_RATE(1536, 64, 1, 0),
-	PLL_RATE(1560, 65, 1, 0),
-	PLL_RATE(1584, 66, 1, 0),
-	PLL_RATE(1608, 67, 1, 0),
-	PLL_RATE(1632, 68, 1, 0),
-	PLL_RATE(1656, 68, 1, 0),
-	PLL_RATE(1680, 68, 1, 0),
-	PLL_RATE(1704, 68, 1, 0),
-	PLL_RATE(1728, 69, 1, 0),
-	PLL_RATE(1752, 69, 1, 0),
-	PLL_RATE(1776, 69, 1, 0),
-	PLL_RATE(1800, 69, 1, 0),
-	PLL_RATE(1824, 70, 1, 0),
-	PLL_RATE(1848, 70, 1, 0),
-	PLL_RATE(1872, 70, 1, 0),
-	PLL_RATE(1896, 70, 1, 0),
-	PLL_RATE(1920, 71, 1, 0),
-	PLL_RATE(1944, 71, 1, 0),
-	PLL_RATE(1968, 71, 1, 0),
-	PLL_RATE(1992, 71, 1, 0),
-	PLL_RATE(2016, 72, 1, 0),
-	PLL_RATE(2040, 72, 1, 0),
-	PLL_RATE(2064, 72, 1, 0),
-	PLL_RATE(2088, 72, 1, 0),
-	PLL_RATE(2112, 73, 1, 0),
-#if 0
+	PLL_RATE(24000000, 56, 1, 2),
+	PLL_RATE(48000000, 64, 1, 2),
+	PLL_RATE(72000000, 72, 1, 2),
+	PLL_RATE(96000000, 64, 1, 2),
+	PLL_RATE(120000000, 80, 1, 2),
+	PLL_RATE(144000000, 96, 1, 2),
+	PLL_RATE(168000000, 56, 1, 1),
+	PLL_RATE(192000000, 64, 1, 1),
+	PLL_RATE(216000000, 72, 1, 1),
+	PLL_RATE(240000000, 80, 1, 1),
+	PLL_RATE(264000000, 88, 1, 1),
+	PLL_RATE(288000000, 96, 1, 1),
 	PLL_RATE(312000000, 52, 1, 2),
 	PLL_RATE(336000000, 56, 1, 2),
 	PLL_RATE(360000000, 60, 1, 2),
@@ -168,7 +92,30 @@ static const struct pll_rate_table sys_pll_rate_table[] = {
 	PLL_RATE(1488000000, 62, 1, 0),
 	PLL_RATE(1512000000, 63, 1, 0),
 	PLL_RATE(1536000000, 64, 1, 0),
-#endif
+	PLL_RATE(1560000000, 65, 1, 0),
+	PLL_RATE(1584000000, 66, 1, 0),
+	PLL_RATE(1608000000, 67, 1, 0),
+	PLL_RATE(1632000000, 68, 1, 0),
+	PLL_RATE(1656000000, 68, 1, 0),
+	PLL_RATE(1680000000, 68, 1, 0),
+	PLL_RATE(1704000000, 68, 1, 0),
+	PLL_RATE(1728000000, 69, 1, 0),
+	PLL_RATE(1752000000, 69, 1, 0),
+	PLL_RATE(1776000000, 69, 1, 0),
+	PLL_RATE(1800000000, 69, 1, 0),
+	PLL_RATE(1824000000, 70, 1, 0),
+	PLL_RATE(1848000000, 70, 1, 0),
+	PLL_RATE(1872000000, 70, 1, 0),
+	PLL_RATE(1896000000, 70, 1, 0),
+	PLL_RATE(1920000000, 71, 1, 0),
+	PLL_RATE(1944000000, 71, 1, 0),
+	PLL_RATE(1968000000, 71, 1, 0),
+	PLL_RATE(1992000000, 71, 1, 0),
+	PLL_RATE(2016000000, 72, 1, 0),
+	PLL_RATE(2040000000, 72, 1, 0),
+	PLL_RATE(2064000000, 72, 1, 0),
+	PLL_RATE(2088000000, 72, 1, 0),
+	PLL_RATE(2112000000, 73, 1, 0),
 	{ /* sentinel */ },
 };
 
@@ -186,15 +133,6 @@ static const struct clk_div_table cpu_div_table[] = {
 	{ /* sentinel */ },
 };
 
-static struct clk_fixed_rate gxbb_xtal = {
-	.fixed_rate = 24000000,
-	.hw.init = &(struct clk_init_data){
-		.name = "xtal",
-		.num_parents = 0,
-		.ops = &clk_fixed_rate_ops,
-	},
-};
-
 /*
  * FIXME clk-gxbb.c has fixed rate clocks for:
  * clk_81
@@ -208,9 +146,8 @@ static struct clk_fixed_rate gxbb_xtal = {
  * Can I reuse the code from gxbb.c?
  */
 
-#if 0
-static struct gxbb_clk_pll gxbb_fixed_pll = {
-	.reg_off = HHI_PLL_FIXED,
+static struct meson_clk_pll gxbb_fixed_pll = {
+	.reg_off = HHI_MPLL_CNTL,
 	.m = {
 		.reg_off = 0x00,
 		.shift   = 0,
@@ -229,14 +166,15 @@ static struct gxbb_clk_pll gxbb_fixed_pll = {
 	.lock = &clk_lock,
 	.hw.init = &(struct clk_init_data){
 		.name = "fixed_pll",
-		.ops = &gxbb_clk_pll_ro_ops,
+		.ops = &meson_clk_pll_ro_ops,
 		.parent_names = (const char *[]){ "xtal" },
 		.num_parents = 1,
 		.flags = CLK_GET_RATE_NOCACHE,
 	},
 };
 
-static struct gxbb_clk_pll gxbb_vid_pll = {
+#if 0
+static struct meson_clk_pll gxbb_vid_pll = {
 	.reg_off = HHI_PLL_VID,
 	.m = {
 		.reg_off = 0x00,
@@ -256,7 +194,7 @@ static struct gxbb_clk_pll gxbb_vid_pll = {
 	.lock = &clk_lock,
 	.hw.init = &(struct clk_init_data){
 		.name = "vid_pll",
-		.ops = &gxbb_clk_pll_ro_ops,
+		.ops = &meson_clk_pll_ro_ops,
 		.parent_names = (const char *[]){ "xtal" },
 		.num_parents = 1,
 		.flags = CLK_GET_RATE_NOCACHE,
@@ -264,8 +202,8 @@ static struct gxbb_clk_pll gxbb_vid_pll = {
 };
 #endif
 
-static struct gxbb_clk_pll gxbb_sys_pll = {
-	.reg_off = HHI_PLL_SYS_CNTL,
+static struct meson_clk_pll gxbb_sys_pll = {
+	.reg_off = HHI_SYS_PLL_CNTL,
 	.m = {
 		.reg_off = 0x00,
 		.shift   = 0,
@@ -293,7 +231,6 @@ static struct gxbb_clk_pll gxbb_sys_pll = {
 	},
 };
 
-#if 0
 static struct clk_fixed_factor gxbb_fclk_div2 = {
 	.mult = 1,
 	.div = 2,
@@ -348,7 +285,6 @@ static struct clk_fixed_factor gxbb_fclk_div7 = {
 		.num_parents = 1,
 	},
 };
-#endif
 
 /*
  * FIXME cpu clocks and the legacy composite clocks (e.g. clk81) are both PLL
@@ -356,7 +292,7 @@ static struct clk_fixed_factor gxbb_fclk_div7 = {
  * forthcoming coordinated clock rates feature
  */
 static struct meson_clk_cpu gxbb_cpu_clk = {
-	.reg_off = HHI_SYS_CPU_CNTL1,
+	.reg_off = HHI_SYS_CPU_CLK_CNTL1,
 	.div_table = cpu_div_table,
 	.clk_nb.notifier_call = meson_clk_cpu_notifier_cb,
 	.hw.init = &(struct clk_init_data){
@@ -422,29 +358,23 @@ struct clk_gate gxbb_clk81 = {
 
 static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
 	.hws = {
-		[CLKID_XTAL] = &gxbb_xtal.hw,
-		[CLKID_PLL_SYS] = &gxbb_sys_pll.hw,
-		[CLKID_CPUCLK] = &gxbb_cpu_clk.hw,
-#if 0
+		[CLKID_SYS_PLL]   = &gxbb_sys_pll.hw,
+		[CLKID_CPUCLK]    = &gxbb_cpu_clk.hw,
+		//[CLKID_PLL_VID] = &meson8b_vid_pll.hw,
 		[CLKID_PLL_FIXED] = &gxbb_fixed_pll.hw,
-		[CLKID_PLL_VID] = &gxbb_vid_pll.hw,
 		[CLKID_FCLK_DIV2] = &gxbb_fclk_div2.hw,
 		[CLKID_FCLK_DIV3] = &gxbb_fclk_div3.hw,
 		[CLKID_FCLK_DIV4] = &gxbb_fclk_div4.hw,
 		[CLKID_FCLK_DIV5] = &gxbb_fclk_div5.hw,
 		[CLKID_FCLK_DIV7] = &gxbb_fclk_div7.hw,
-		[CLKID_MPEG_SEL] = &gxbb_mpeg_clk_sel.hw,
-		[CLKID_MPEG_DIV] = &gxbb_mpeg_clk_div.hw,
-		[CLKID_CLK81] = &gxbb_clk81.hw,
-#endif
 	},
 	.num = CLK_NR_CLKS,
 };
 
-static struct gxbb_clk_pll *const gxbb_clk_plls[] = {
+static struct meson_clk_pll *const meson_clk_plls[] = {
 	&gxbb_fixed_pll,
 	//&gxbb_vid_pll,
-	//&gxbb_sys_pll,
+	&gxbb_sys_pll,
 };
 
 static int gxbb_clkc_probe(struct platform_device *pdev)
@@ -463,9 +393,9 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
 	}
 
 	/* Populate base address for PLLs */
-	for (i = 0; i < ARRAY_SIZE(gxbb_clk_plls); i++) {
-		struct gxbb_clk_pll *pll =
-			to_gxbb_clk_pll(&gxbb_clk_plls[i]->hw);
+	for (i = 0; i < ARRAY_SIZE(meson_clk_plls); i++) {
+		struct meson_clk_pll *pll =
+			to_meson_clk_pll(&meson_clk_plls[i]->hw);
 		pll->base = clk_base + pll->reg_off;
 	}
 
@@ -483,7 +413,7 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
 	 * register all clks
 	 * CLKID_UNUSED = 0, so skip it and start with CLKID_XTAL = 1
 	 */
-	for (clkid = CLKID_XTAL; clkid < CLK_NR_CLKS; clkid++) {
+	for (clkid = 0; clkid < CLK_NR_CLKS; clkid++) {
 		/* array might be sparse */
 		if (!gxbb_hw_onecell_data.hws[clkid])
 			continue;
