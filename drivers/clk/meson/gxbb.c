@@ -557,11 +557,8 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
 	}
 
 	/* Populate base address for PLLs */
-	for (i = 0; i < ARRAY_SIZE(meson_clk_plls); i++) {
-		struct meson_clk_pll *pll =
-			to_meson_clk_pll(&meson_clk_plls[i]->hw);
-		pll->base = clk_base;
-	}
+	for (i = 0; i < ARRAY_SIZE(meson_clk_plls); i++)
+		meson_clk_plls[i]->base = clk_base;
 
 	/* Populate the base address for CPU clk */
 	gxbb_cpu_clk.base = clk_base;
@@ -569,18 +566,14 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
 	/* Populate the base address for the MPEG clks */
 	gxbb_mpeg_clk_sel.reg = clk_base + (u64)gxbb_mpeg_clk_sel.reg;
 	gxbb_mpeg_clk_div.reg = clk_base + (u64)gxbb_mpeg_clk_div.reg;
+
+	/* Populate the base addresses for the gate clocks */
 	gxbb_clk81.reg = clk_base + (u64)gxbb_clk81.reg;
 
 	/*
 	 * register all clks
-	 * CLKID_UNUSED = 0, so skip it and start with CLKID_XTAL = 1
 	 */
 	for (clkid = 0; clkid < CLK_NR_CLKS; clkid++) {
-		/* array might be sparse */
-		if (!gxbb_hw_onecell_data.hws[clkid])
-			continue;
-
-		/* FIXME convert to devm_clk_register */
 		ret = devm_clk_hw_register(dev, gxbb_hw_onecell_data.hws[clkid]);
 		if (ret)
 			goto iounmap;
