@@ -75,9 +75,21 @@ struct meson_clk_cpu {
 int meson_clk_cpu_notifier_cb(struct notifier_block *nb, unsigned long event,
 		void *data);
 
+struct meson_clk_mpll {
+	struct clk_hw hw;
+	void __iomem *base;
+	struct parm sdm;
+	struct parm n2;
+	/* FIXME ssen gate control? */
+	spinlock_t *lock;
+};
+
+#define to_meson_clk_mpll(_hw) container_of(_hw, struct meson_clk_mpll, hw)
+
 /* clk_ops */
 extern const struct clk_ops meson_clk_pll_ro_ops;
 extern const struct clk_ops meson_clk_pll_ops;
 extern const struct clk_ops meson_clk_cpu_ops;
+extern const struct clk_ops meson_clk_mpll_ops;
 
 #endif /* __CLKC_H */
