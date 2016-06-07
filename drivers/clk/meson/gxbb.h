@@ -4,7 +4,7 @@
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright (c) 2016 BayLibre, Inc.
+ * Copyright (c) 2016 AmLogic, Inc.
  * Author: Michael Turquette <mturquette@baylibre.com>
  *
  * This program is free software; you can redistribute it and/or modify
