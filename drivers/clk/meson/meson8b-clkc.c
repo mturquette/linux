@@ -121,19 +121,18 @@ static struct clk_fixed_rate meson8b_xtal = {
 };
 
 static struct meson_clk_pll meson8b_fixed_pll = {
-	.reg_off = MESON8B_REG_PLL_FIXED,
 	.m = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_FIXED,
 		.shift   = 0,
 		.width   = 9,
 	},
 	.n = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_FIXED,
 		.shift   = 9,
 		.width   = 5,
 	},
 	.od = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_FIXED,
 		.shift   = 16,
 		.width   = 2,
 	},
@@ -148,19 +147,18 @@ static struct meson_clk_pll meson8b_fixed_pll = {
 };
 
 static struct meson_clk_pll meson8b_vid_pll = {
-	.reg_off = MESON8B_REG_PLL_VID,
 	.m = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_VID,
 		.shift   = 0,
 		.width   = 9,
 	},
 	.n = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_VID,
 		.shift   = 9,
 		.width   = 5,
 	},
 	.od = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_VID,
 		.shift   = 16,
 		.width   = 2,
 	},
@@ -175,19 +173,18 @@ static struct meson_clk_pll meson8b_vid_pll = {
 };
 
 static struct meson_clk_pll meson8b_sys_pll = {
-	.reg_off = MESON8B_REG_PLL_SYS,
 	.m = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_SYS,
 		.shift   = 0,
 		.width   = 9,
 	},
 	.n = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_SYS,
 		.shift   = 9,
 		.width   = 5,
 	},
 	.od = {
-		.reg_off = 0x00,
+		.reg_off = MESON8B_REG_PLL_SYS,
 		.shift   = 16,
 		.width   = 2,
 	},
@@ -370,7 +367,7 @@ static int meson8b_clkc_probe(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(meson_clk_plls); i++) {
 		struct meson_clk_pll *pll =
 			to_meson_clk_pll(&meson_clk_plls[i]->hw);
-		pll->base = clk_base + pll->reg_off;
+		pll->base = clk_base;
 	}
 
 	/* Populate the base address for CPU clk */
