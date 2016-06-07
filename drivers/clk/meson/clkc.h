@@ -55,7 +55,9 @@ struct meson_clk_pll {
 	u16 reg_off;
 	struct parm m;
 	struct parm n;
+	struct parm frac;
 	struct parm od;
+	struct parm od2;
 	const struct pll_rate_table *rate_table;
 	unsigned int rate_count;
 	spinlock_t *lock;
