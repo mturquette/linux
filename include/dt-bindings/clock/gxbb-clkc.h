@@ -27,7 +27,8 @@
 #define CLKID_FCLK_DIV5		6
 #define CLKID_FCLK_DIV7		7
 #define CLKID_HDMI_PLL		8
+#define CLKID_GP0_PLL		9
 
-#define CLK_NR_CLKS		9
+#define CLK_NR_CLKS		10
 
 #endif /* __MESON8B_CLKC_H */
