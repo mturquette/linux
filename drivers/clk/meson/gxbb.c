@@ -464,11 +464,10 @@ static struct meson_clk_cpu gxbb_cpu_clk = {
 	},
 };
 
-#if 0
 static u32 mux_table_clk81[]	= { 6, 5, 7 };
 
 struct clk_mux gxbb_mpeg_clk_sel = {
-	.reg = (void *)HHI_MPEG,
+	.reg = (void *)HHI_MPEG_CLK_CNTL,
 	.mask = 0x7,
 	.shift = 12,
 	.flags = CLK_MUX_READ_ONLY,
@@ -490,7 +489,7 @@ struct clk_mux gxbb_mpeg_clk_sel = {
 };
 
 struct clk_divider gxbb_mpeg_clk_div = {
-	.reg = (void *)HHI_MPEG,
+	.reg = (void *)HHI_MPEG_CLK_CNTL,
 	.shift = 0,
 	.width = 7,
 	.lock = &clk_lock,
@@ -504,7 +503,7 @@ struct clk_divider gxbb_mpeg_clk_div = {
 };
 
 struct clk_gate gxbb_clk81 = {
-	.reg = (void *)HHI_MPEG,
+	.reg = (void *)HHI_MPEG_CLK_CNTL,
 	.bit_idx = 7,
 	.lock = &clk_lock,
 	.hw.init = &(struct clk_init_data){
@@ -515,7 +514,6 @@ struct clk_gate gxbb_clk81 = {
 		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
 	},
 };
-#endif
 
 static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
 	.hws = {
@@ -529,6 +527,9 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
 		[CLKID_FCLK_DIV5] = &gxbb_fclk_div5.hw,
 		[CLKID_FCLK_DIV7] = &gxbb_fclk_div7.hw,
 		[CLKID_GP0_PLL]   = &gxbb_gp0_pll.hw,
+		[CLKID_MPEG_SEL]  = &gxbb_mpeg_clk_sel.hw,
+		[CLKID_MPEG_DIV]  = &gxbb_mpeg_clk_div.hw,
+		[CLKID_CLK81]     = &gxbb_clk81.hw,
 	},
 	.num = CLK_NR_CLKS,
 };
@@ -565,12 +566,10 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
 	/* Populate the base address for CPU clk */
 	gxbb_cpu_clk.base = clk_base;
 
-#if 0
 	/* Populate the base address for the MPEG clks */
-	gxbb_mpeg_clk_sel.reg = clk_base + (u32)gxbb_mpeg_clk_sel.reg;
-	gxbb_mpeg_clk_div.reg = clk_base + (u32)gxbb_mpeg_clk_div.reg;
-	gxbb_clk81.reg = clk_base + (u32)gxbb_clk81.reg;
-#endif
+	gxbb_mpeg_clk_sel.reg = clk_base + (u64)gxbb_mpeg_clk_sel.reg;
+	gxbb_mpeg_clk_div.reg = clk_base + (u64)gxbb_mpeg_clk_div.reg;
+	gxbb_clk81.reg = clk_base + (u64)gxbb_clk81.reg;
 
 	/*
 	 * register all clks
