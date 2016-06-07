@@ -82,9 +82,6 @@ static unsigned long meson_clk_pll_recalc_rate(struct clk_hw *hw,
 	} else
 		rate_mhz = (parent_rate_mhz * m / n) >> od >> od2;
 
-	pr_err("%s n %u m %u od %u od2 %u frac %u parent_rate_mhz %lu rate_mhz %lu\n",
-			clk_hw_get_name(hw), n, m, od, od2, frac, parent_rate_mhz, rate_mhz);
-
 	return rate_mhz * 1000000;
 }
 
