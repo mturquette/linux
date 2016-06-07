@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 BayLibre, Inc.
+ * Copyright (c) 2016 AmLogic, Inc.
  * Michael Turquette <mturquette@baylibre.com>
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -147,19 +147,18 @@ static const struct clk_div_table cpu_div_table[] = {
  */
 
 static struct meson_clk_pll gxbb_fixed_pll = {
-	.reg_off = HHI_MPLL_CNTL,
 	.m = {
-		.reg_off = 0x00,
+		.reg_off = HHI_MPLL_CNTL,
 		.shift   = 0,
 		.width   = 9,
 	},
 	.n = {
-		.reg_off = 0x00,
+		.reg_off = HHI_MPLL_CNTL,
 		.shift   = 9,
 		.width   = 5,
 	},
 	.od = {
-		.reg_off = 0x00,
+		.reg_off = HHI_MPLL_CNTL,
 		.shift   = 16,
 		.width   = 2,
 	},
@@ -173,49 +172,55 @@ static struct meson_clk_pll gxbb_fixed_pll = {
 	},
 };
 
-#if 0
-static struct meson_clk_pll gxbb_vid_pll = {
-	.reg_off = HHI_PLL_VID,
+static struct meson_clk_pll gxbb_hdmi_pll = {
 	.m = {
-		.reg_off = 0x00,
+		.reg_off = HHI_HDMI_PLL_CNTL,
 		.shift   = 0,
 		.width   = 9,
 	},
 	.n = {
-		.reg_off = 0x00,
+		.reg_off = HHI_HDMI_PLL_CNTL,
 		.shift   = 9,
 		.width   = 5,
 	},
+	.frac = {
+		.reg_off = HHI_HDMI_PLL_CNTL2,
+		.shift   = 0,
+		.width   = 12,
+	},
 	.od = {
-		.reg_off = 0x00,
+		.reg_off = HHI_HDMI_PLL_CNTL2,
 		.shift   = 16,
+		.width   = 2,
+	},
+	.od2 = {
+		.reg_off = HHI_HDMI_PLL_CNTL2,
+		.shift   = 22,
 		.width   = 2,
 	},
 	.lock = &clk_lock,
 	.hw.init = &(struct clk_init_data){
-		.name = "vid_pll",
+		.name = "hdmi_pll",
 		.ops = &meson_clk_pll_ro_ops,
 		.parent_names = (const char *[]){ "xtal" },
 		.num_parents = 1,
 		.flags = CLK_GET_RATE_NOCACHE,
 	},
 };
-#endif
 
 static struct meson_clk_pll gxbb_sys_pll = {
-	.reg_off = HHI_SYS_PLL_CNTL,
 	.m = {
-		.reg_off = 0x00,
+		.reg_off = HHI_SYS_PLL_CNTL,
 		.shift   = 0,
 		.width   = 9,
 	},
 	.n = {
-		.reg_off = 0x00,
+		.reg_off = HHI_SYS_PLL_CNTL,
 		.shift   = 9,
 		.width   = 5,
 	},
 	.od = {
-		.reg_off = 0x00,
+		.reg_off = HHI_SYS_PLL_CNTL,
 		.shift   = 10,
 		.width   = 2,
 	},
@@ -360,8 +365,8 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
 	.hws = {
 		[CLKID_SYS_PLL]   = &gxbb_sys_pll.hw,
 		[CLKID_CPUCLK]    = &gxbb_cpu_clk.hw,
-		//[CLKID_PLL_VID] = &meson8b_vid_pll.hw,
-		[CLKID_PLL_FIXED] = &gxbb_fixed_pll.hw,
+		[CLKID_HDMI_PLL] = &gxbb_hdmi_pll.hw,
+		[CLKID_FIXED_PLL] = &gxbb_fixed_pll.hw,
 		[CLKID_FCLK_DIV2] = &gxbb_fclk_div2.hw,
 		[CLKID_FCLK_DIV3] = &gxbb_fclk_div3.hw,
 		[CLKID_FCLK_DIV4] = &gxbb_fclk_div4.hw,
@@ -373,7 +378,7 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
 
 static struct meson_clk_pll *const meson_clk_plls[] = {
 	&gxbb_fixed_pll,
-	//&gxbb_vid_pll,
+	&gxbb_hdmi_pll,
 	&gxbb_sys_pll,
 };
 
@@ -396,7 +401,7 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(meson_clk_plls); i++) {
 		struct meson_clk_pll *pll =
 			to_meson_clk_pll(&meson_clk_plls[i]->hw);
-		pll->base = clk_base + pll->reg_off;
+		pll->base = clk_base;
 	}
 
 	/* Populate the base address for CPU clk */
