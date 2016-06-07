@@ -30,7 +30,10 @@
 #define CLKID_MPEG_SEL		10
 #define CLKID_MPEG_DIV		11
 #define CLKID_CLK81		12
+#define CLKID_MPLL0		13
+#define CLKID_MPLL1		14
+#define CLKID_MPLL2		15
 
-#define CLK_NR_CLKS		13
+#define CLK_NR_CLKS		16
 
 #endif /* __MESON8B_CLKC_H */
