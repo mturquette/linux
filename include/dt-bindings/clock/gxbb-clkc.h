@@ -16,17 +16,18 @@
 #define CLKID_ZERO		13
 #define CLKID_MPEG_SEL		14
 #define CLKID_MPEG_DIV		15
-#else
+#endif
+
 #define CLKID_SYS_PLL		0
 #define CLKID_CPUCLK		1
-#define CLKID_PLL_FIXED		2
+#define CLKID_FIXED_PLL		2
 #define CLKID_FCLK_DIV2		3
 #define CLKID_FCLK_DIV3		4
 #define CLKID_FCLK_DIV4		5
 #define CLKID_FCLK_DIV5		6
 #define CLKID_FCLK_DIV7		7
-#endif
+#define CLKID_HDMI_PLL		8
 
-#define CLK_NR_CLKS		(CLKID_FCLK_DIV7 + 1)
+#define CLK_NR_CLKS		9
 
 #endif /* __MESON8B_CLKC_H */
