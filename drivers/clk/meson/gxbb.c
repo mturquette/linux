@@ -447,6 +447,66 @@ static struct clk_fixed_factor gxbb_fclk_div7 = {
 	},
 };
 
+static struct meson_clk_mpll gxbb_mpll0 = {
+	.sdm = {
+		.reg_off = HHI_MPLL_CNTL7,
+		.shift   = 0,
+		.width   = 14,
+	},
+	.n2 = {
+		.reg_off = HHI_MPLL_CNTL7,
+		.shift   = 16,
+		.width   = 9,
+	},
+	.lock = &clk_lock,
+	.hw.init = &(struct clk_init_data){
+		.name = "mpll0",
+		.ops = &meson_clk_mpll_ops,
+		.parent_names = (const char *[]){ "fixed_pll" },
+		.num_parents = 1,
+	},
+};
+
+static struct meson_clk_mpll gxbb_mpll1 = {
+	.sdm = {
+		.reg_off = HHI_MPLL_CNTL8,
+		.shift   = 0,
+		.width   = 14,
+	},
+	.n2 = {
+		.reg_off = HHI_MPLL_CNTL8,
+		.shift   = 16,
+		.width   = 9,
+	},
+	.lock = &clk_lock,
+	.hw.init = &(struct clk_init_data){
+		.name = "mpll1",
+		.ops = &meson_clk_mpll_ops,
+		.parent_names = (const char *[]){ "fixed_pll" },
+		.num_parents = 1,
+	},
+};
+
+static struct meson_clk_mpll gxbb_mpll2 = {
+	.sdm = {
+		.reg_off = HHI_MPLL_CNTL9,
+		.shift   = 0,
+		.width   = 14,
+	},
+	.n2 = {
+		.reg_off = HHI_MPLL_CNTL9,
+		.shift   = 16,
+		.width   = 9,
+	},
+	.lock = &clk_lock,
+	.hw.init = &(struct clk_init_data){
+		.name = "mpll2",
+		.ops = &meson_clk_mpll_ops,
+		.parent_names = (const char *[]){ "fixed_pll" },
+		.num_parents = 1,
+	},
+};
+
 /*
  * FIXME cpu clocks and the legacy composite clocks (e.g. clk81) are both PLL
  * post-dividers and should be modeled with their respective PLLs via the
@@ -530,6 +590,9 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
 		[CLKID_MPEG_SEL]  = &gxbb_mpeg_clk_sel.hw,
 		[CLKID_MPEG_DIV]  = &gxbb_mpeg_clk_div.hw,
 		[CLKID_CLK81]     = &gxbb_clk81.hw,
+		[CLKID_MPLL0]     = &gxbb_mpll0.hw,
+		[CLKID_MPLL1]     = &gxbb_mpll1.hw,
+		[CLKID_MPLL2]     = &gxbb_mpll2.hw,
 	},
 	.num = CLK_NR_CLKS,
 };
@@ -539,6 +602,12 @@ static struct meson_clk_pll *const meson_clk_plls[] = {
 	&gxbb_hdmi_pll,
 	&gxbb_sys_pll,
 	&gxbb_gp0_pll,
+};
+
+static struct meson_clk_mpll *const meson_clk_mplls[] = {
+	&gxbb_mpll0,
+	&gxbb_mpll1,
+	&gxbb_mpll2,
 };
 
 static int gxbb_clkc_probe(struct platform_device *pdev)
@@ -559,6 +628,10 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
 	/* Populate base address for PLLs */
 	for (i = 0; i < ARRAY_SIZE(meson_clk_plls); i++)
 		meson_clk_plls[i]->base = clk_base;
+
+	/* Populate base address for MPLLs */
+	for (i = 0; i < ARRAY_SIZE(meson_clk_mplls); i++)
+		meson_clk_mplls[i]->base = clk_base;
 
 	/* Populate the base address for CPU clk */
 	gxbb_cpu_clk.base = clk_base;
