@@ -52,7 +52,6 @@ struct pll_rate_table {
 struct meson_clk_pll {
 	struct clk_hw hw;
 	void __iomem *base;
-	u16 reg_off;
 	struct parm m;
 	struct parm n;
 	struct parm frac;
