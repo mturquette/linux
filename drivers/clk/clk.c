@@ -1743,6 +1743,7 @@ static void clk_core_reparent(struct clk_core *core,
 	__clk_recalc_rates(core, POST_RATE_CHANGE);
 }
 
+/* FIXME remove this after merging coordinated rates */
 void clk_hw_reparent(struct clk_hw *hw, struct clk_hw *new_parent)
 {
 	if (!hw)
