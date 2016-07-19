@@ -197,6 +197,7 @@ static struct tegra_emc *emc_ensure_emc_driver(struct tegra_clk_emc *tegra)
 	return tegra->emc;
 }
 
+/* FIXME convert to coordinated clk rates and drop clk_hw_reparent */
 static int emc_set_timing(struct tegra_clk_emc *tegra,
 			  struct emc_timing *timing)
 {
