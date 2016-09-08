@@ -77,6 +77,35 @@ struct coord_rate_domain {
 	void *priv;
 };
 
+/* --- NEW SHIT --- */
+
+/**
+ * coord_rate_clk - blah
+ * @parent_rate: Optional. Only used when the parent clock is not part of this
+ * 		 same coordinated rate group & CLK_SET_RATE_PARENT is set
+ */
+struct coord_rate_clk {
+	struct clk_hw *hw;
+	struct clk_hw *parent;
+	unsigned long rate;
+	unsigned long parent_rate;
+	u32 flags;
+};
+
+struct coord_rate_state {
+	int nr_hws;
+	void *priv;
+	struct coord_rate_clk *clks[];
+};
+
+struct coord_rate_group {
+	int nr_states;
+	void *priv; // don't use
+	struct coord_rate_state *states[];
+};
+
+/* --- END NEW SHIT --- */
+
 /**
  * struct clk_ops -  Callback operations for hardware clocks; these are to
  * be provided by the clock implementation, and will be called by drivers
