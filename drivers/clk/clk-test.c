@@ -57,6 +57,117 @@ static const struct clk_ops test_clk_ops = {
 	.coordinate_rates = test_coordinate_rates,
 };
 
+/* --- NEW SHIT --- */
+
+/*
+ * FIXME
+ * contrive a "safe hook" example with:
+ * fixed-rate osc
+ * adjustable PLL
+ * cpu mux
+ *
+ * The only rule is that the cpu mux must reparent to the osc during pll rate
+ * change/relock. Once settled we can switch the cpu back to the pll parent
+ */
+struct coord_rate_group coord_rate_cpu {
+	.nr_state = NR_RATE;
+	.states = {
+		/* OPP 1 */
+		/*(struct coord_rate_state [])*/{
+			.nr_hws = NR_CLKS,
+			.priv = NULL, // lol
+			.clks = {
+				{
+					.hw = &test_child.hw,
+					.parent_hw = &test_parent.hw,
+					.rate = 11,
+				},
+				{
+					.hw = &parent_child.hw,
+					.parent_hw = &osc.hw,
+					.rate = 25,
+				},
+				/*
+				 * FIXME do we need to represent the osc in
+				 * this structure? It's a transient state, a
+				 * temporary re-parent, so maybe not...
+				 */
+#if 0
+				{ .hw = &parent_child.hw,
+					.parent_hw = &osc.hw,
+					.rate = 100,
+				},
+#endif
+			},
+		},
+		/* OPP 2 */
+		/*(struct coord_rate_state [])*/{
+			.nr_hws = NR_CLKS,
+			.priv = NULL, // lol
+			.clks = {
+				{
+					.hw = &test_child.hw,
+					.parent_hw = &test_parent.hw,
+					.rate = 33,
+				},
+				{ .hw = &parent_child.hw,
+					.parent_hw = &osc.hw,
+					.rate = 50,
+				},
+			},
+		},
+		/* OPP 3 */
+		/*(struct coord_rate_state [])*/{
+			.nr_hws = NR_CLKS,
+			.priv = NULL, // lol
+			.clks = {
+				{
+					.hw = &test_child.hw,
+					.parent_hw = &test_parent.hw,
+					.rate = 66,
+				},
+				{
+					.hw = &parent_child.hw,
+					.parent_hw = &osc.hw,
+					.rate = 100,
+				},
+			},
+		},
+	};
+};
+
+/* XXX potential macro */
+struct coord_rate_group coord_rate_cpu {
+	.nr_state = NR_RATE;
+	.states = {
+		/* OPP 1 */
+		CR_STATE(NR_CLKS, NULL, CR_CLKS(
+				CR_CLK(&test_child.hw, &test_parent.hw, 11),
+				CR_CLK(&parent_child.hw, &osc_parent.hw, 25),
+				)),
+		/* OPP 2 */
+		CR_STATE(NR_CLKS, NULL, CR_CLKS(
+				CR_CLK(&test_child.hw, &test_parent.hw, 33),
+				CR_CLK(&parent_child.hw, &osc_parent.hw, 50),
+				)),
+		/* OPP 3 */
+		CR_STATE(NR_CLKS, NULL, CR_CLKS(
+				CR_CLK(&test_child.hw, &test_parent.hw, 66),
+				CR_CLK(&parent_child.hw, &osc_parent.hw, 100),
+				)),
+	};
+};
+
+/*
+ * FIXME
+ * now do it again, guardian! Dynamically allocate and initialize the above
+ * struct coord_rate_state!
+ */
+
+
+
+/* --- END NEW SHIT --- */
+
 /* coordinated rates static data, shared by test_parent & test_child */
 
 static struct coord_rate_entry *test_tbl[] = {
