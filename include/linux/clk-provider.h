@@ -84,6 +84,7 @@ struct coord_rate_domain {
  * @parent_rate: Optional. Only used when the parent clock is not part of this
  * 		 same coordinated rate group & CLK_SET_RATE_PARENT is set
  */
+// struct coord_rate_hw ?
 struct coord_rate_clk {
 	struct clk_hw *hw;
 	struct clk_hw *parent;
@@ -92,17 +93,42 @@ struct coord_rate_clk {
 	u32 flags;
 };
 
+// struct coord_rate ?
+// struct coord_rate_subtree ?
+// struct coord_rate_freq
 struct coord_rate_state {
 	int nr_hws;
 	void *priv;
 	struct coord_rate_clk *clks[];
+	bool needs_free = false;
 };
 
+// struct coord_rate_domain ?
+// struct coord_rate_freq_domain ?
 struct coord_rate_group {
 	int nr_states;
 	void *priv; // don't use
 	struct coord_rate_state *states[];
 };
+
+/* XXX Example of how this works */
+#if 0
+struct my_clk_hw foo_hw {
+	.hw.init = ...;
+	.coord_rate_group = my_cr_group;
+};
+
+struct coord_rate_state *get_my_coord_rates(struct clk_hw *hw,
+		unsigned long rate)
+{
+	int index = figure_out_index;
+	return hw->coord_rate_group->states[index];
+}
+
+struct clk_ops my_ops = {
+	.get_coord_rates = get_my_coord_rates;
+};
+#endif
 
 /* --- END NEW SHIT --- */
 
