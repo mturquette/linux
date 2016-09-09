@@ -55,6 +55,7 @@ struct clk_core {
 	unsigned long		rate;
 	unsigned long		req_rate;
 	unsigned long		new_rate;
+	struct coord_rate_state *new_coord_rate;
 	struct clk_core		*new_parent;
 	struct clk_core		*new_child;
 	unsigned long		flags;
@@ -1375,7 +1376,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 	clk_core_get_boundaries(core, &min_rate, &max_rate);
 
 	/* FIXME consider rate range boundaries? */
-	if (core->ops->get_coord_rates && core->new_rate == NEW_RATE_POISON) {
+	if (core->ops->get_coord_rates && core->new_coord_rate == NULL) {
 		/*
 		 * this is the first pass for the set of clocks coordinating
 		 * rates. Copy the coordinated rate table data over for each
@@ -1383,19 +1384,9 @@ static int clk_calc_new_rates(struct clk_core *core,
 		 * into clk_calc_new_rates so we have a chance to propagate
 		 * parent rates, if necessary. See else statement below.
 		 */
-		struct clk_core *core_tmp;
-		struct coord_rate **cr_head, **cr_tmp;
-
-		/*
-		 * cr_head points to the first element in the array of
-		 * coordinated rates returned by the call to .get_coord_rates.
-		 * This array must be NULL terminated so that we can walk it
-		 * without knowing the length
-		 */
-		cr_head = cr_tmp = core->ops->get_coord_rates(core->hw,
-				req->rate);
-		if (IS_ERR(cr_head))
-			return PTR_ERR(cr_head);
+		/* FIXME better to use 'ccr' abbrev? */
+		struct coord_rate_state *state =
+			core->ops->get_coord_rates(core->hw, rate);
 
 		/*
 		 * populate core->new_rate and core->new_parent for all
@@ -1412,11 +1403,12 @@ static int clk_calc_new_rates(struct clk_core *core,
 		 * clocks of the coordinated clock subtree are also the
 		 * "highest" clocks in this parent chain traversal.
 		 */
-		while (*cr_tmp) {
-			core_tmp = cr_tmp->hw->core;
-			core_tmp->new_rate = cr_tmp->rate;
-			core_tmp->new_parent = cr_tmp->parent;
-			cr_tmp++;
+		for (i = 0; i < state->nr_hws; i++) {
+			ccr_clk = state->clks[i];
+			core_tmp = ccr_clk->hw->core;
+
+			core_tmp->new_rate = ccr_clk->rate;
+			core_tmp->new_parent = ccr_clk->parent;
 		}
 
 		/*
@@ -1426,15 +1418,16 @@ static int clk_calc_new_rates(struct clk_core *core,
 		 * uncoordinated parent. See else statement below.
 		 *
 		 * To do this, we re-use the existing best_parent and
-		 * best_parent rate logic at the bottom of this function so we
-		 * have a chance to propagate parent rates across the
+		 * best_parent rate logic at the bottom of clk_calc_new_rates
+		 * so we have a chance to propagate parent rates across the
 		 * coordinated rate boundary, if necessary
 		 */
-		cr_tmp = cr_head;
-		while (*cr_tmp) {
-			cr_core = cr_tmp->hw->core;
-			clk_calc_new_rates(cr_core, cr_tmp->rate, top_list);
-			cr_tmp++;
+		for (i = 0; i < state->nr_hws; i++) {
+			ccr_clk = state->clks[i];
+			core_tmp = ccr_clk->hw->core;
+
+			core_tmp->new_rate = ccr_clk->rate;
+			core_tmp->new_parent = ccr_clk->parent;
 		}
 
 		/*
@@ -1444,36 +1437,39 @@ static int clk_calc_new_rates(struct clk_core *core,
 		 */
 		goto out;
 	} else if (core->ops->get_coord_rates &&
-			core->new_rate != NEW_RATE_POISON) {
+			core->new_coord_rate != NULL) {
 		/*
-		 * this is not the first pass for the set of clocks
-		 * coordinating rates. core->new_rate and core->new_parent were
-		 * set for each clocks in the coordinated rate set during the
-		 * first pass. Now all that is left is to set best_parent_rate
-		 * for any of the root clocks of the coordinated group sub-tree
-		 * that will propagate a rate change request to a parent clock
-		 * that is on the other side of the boundary of this
-		 * coordinated rate set.
+		 * This is not the first pass in clk_calc_new_rates for this
+		 * coord_rate_group. core->new_rate and core->new_parent were
+		 * set for each clk in the coord_rate_group during the first
+		 * pass.
+		 *
+		 * Now we must set best_parent_rate for any of the root clocks
+		 * in the struct coord_rate_group that will propagate a rate
+		 * change request to a parent clock that is outside of the
+		 * coord_rate_group
+		 *
+		 * ATTN: clk provider authors! setting both CLK_SET_RATE_PARENT
+		 * (hw.init.flags) and CLK_COORD_ROOT (coord_rate_clk.flags) on
+		 * a root clk in the coordinated rate group is the only way to
+		 * change the rate of a parent clock, if that parent is not a
+		 * part of the coordinated rate set
 		 */
-		if (core->flags & CLK_COORD_ROOT) {
+		if (core->new_coord_rate->flags & CLK_COORD_ROOT) {
 			/*
-			 * root clocks of the coordinated rate sub-tree must be
-			 * added to &top_list
+			 * root clocks of the coordinated rate sub-tree are
+			 * added to &top_list, unless they have a parent that
+			 * it outside of the struct coord_rate_group that needs
+			 * to have it's rate changed
 			 */
 			if (core->flags & CLK_SET_RATE_PARENT)
 				/*
-				 * clk provider authors:
-				 * set both the CLK_SET_RATE_PARENT and
-				 * CLK_COORD_ROOT flags on the same clk if it
-				 * needs to change the rate of its parent
-				 * clock, and that parent is not a part of the
-				 * coordinated rate set
 				 */
 				best_parent_rate = cr_tmp->parent_rate;
 		} else {
 			/*
-			 * conversely, non-root coordinated rates should not be
-			 * added to &top_list, so bail out early here
+			 * non-root coordinated rates should not be added to
+			 * &top_list, so bail out
 			 */
 			goto out;
 		}
@@ -1598,7 +1594,8 @@ static void clk_change_rate(struct clk_core *core)
 	bool skip_set_rate = false;
 	struct clk_core *old_parent;
 	struct clk_core *parent = NULL;
-	const struct coord_rate_domain *crd = core->hw->cr_domain;
+	//const struct coord_rate_domain *crd = core->hw->cr_domain;
+	const struct coord_rate_state *cr_state = core->hw->new_coord_rate;
 
 	old_rate = core->rate;
 
@@ -1644,6 +1641,7 @@ static void clk_change_rate(struct clk_core *core)
 	if (!skip_set_rate && core->ops->set_rate)
 		core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
 
+#if 0
 	/* program changes to all clks in a coordinated rate domain at once */
 	if (crd && core->cr_rate_index >= 0) {
 		struct coord_rate_entry **tbl = crd->table;
@@ -1658,6 +1656,28 @@ static void clk_change_rate(struct clk_core *core)
 			coord_core = tbl[i][core->cr_rate_index].hw->core;
 			coord_core->cr_rate_index = -1;
 		}
+	}
+#endif
+	/* coordinate rate change for all clocks in a coord_rate_group */
+	if (cr_state && core->ops->coord_rates) {
+		ret = core->ops->coord_rates(cr_state);
+		if (ret)
+			pr_err("%s: coordinated rate change failed for clk %s\n",
+					__func__, core->name);
+
+		for (i = 0; i < cr_state->nr_hws; i++) {
+			core_tmp = ccr_clk->hw->core;
+			core_tmp->new_coord_rate = NULL;
+		}
+
+		/*
+		 * needs_free is only set when coord_rate_state is dynamically
+		 * allocated and there is no associated coord_rate_group. Clock
+		 * providers that use static tables and coord_rate_group can
+		 * ignore this flag.
+		 */
+		if (cr_state.needs_free)
+			kfree(cr_state);
 	}
 
 	trace_clk_set_rate_complete(core, core->new_rate);
@@ -1699,6 +1719,9 @@ static void clk_change_rate(struct clk_core *core)
 	/* handle the new child who might not be in core->children yet */
 	if (core->new_child)
 		clk_change_rate(core->new_child);
+
+	/* reset new_coord_rate */
+	core->new_coord_rate = NULL;
 }
 
 #define for_each_top_clk() \
