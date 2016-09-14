@@ -865,14 +865,14 @@ static int clk_core_round_rate_nolock(struct clk_core *core,
 		int rate_idx;
 		struct coord_rate_entry **tbl = crd->table;
 
-		rate_idx = core->ops->select_coord_rates(core->hw, req->rate);
+		rate_idx = core->ops->get_coord_rates(core->hw, req->rate);
 		req->rate = tbl[core->hw->cr_clk_index][rate_idx].rate;
 #endif
 	if (core->ops->get_coord_rates) {
-		coord_rates = core->ops->get_coord_rates(core->hw, req->rate);
-		if (IS_ERR(coord_rates)
-			goto flip_the_fuck_out;
-		req->rate = coord_rates[core->hw->coord_rates_index];
+		new_coord_rates = core->ops->get_coord_rates(core->hw, req->rate);
+		if (IS_ERR(new_coord_rates)
+			return PTR_ERR(new_coord_rates);
+		req->rate = new_coord_rates[core->hw->set_coord_rates_index];
 		coord_rate = helper_function_get_specific(core->hw
 	} else if (core->ops->determine_rate) {
 		return core->ops->determine_rate(core->hw, req);
@@ -1659,8 +1659,8 @@ static void clk_change_rate(struct clk_core *core)
 	}
 #endif
 	/* coordinate rate change for all clocks in a coord_rate_group */
-	if (cr_state && core->ops->coord_rates) {
-		ret = core->ops->coord_rates(cr_state);
+	if (cr_state && core->ops->set_coord_rates) {
+		ret = core->ops->set_coord_rates(cr_state);
 		if (ret)
 			pr_err("%s: coordinated rate change failed for clk %s\n",
 					__func__, core->name);
@@ -1728,17 +1728,17 @@ static void clk_change_rate(struct clk_core *core)
 	hlist_for_each_entry_safe(top, tmp, &top_list, top_node)
 
 /*
- * generic_select_coord_rates - returns index to first matching rate
+ * generic_get_coord_rates - returns index to first matching rate
  * @hw: clock hardware whose rate is being changed
  * @rate: requested rate
  *
- * This generic implementation of the clk_ops.select_coord_rates callback may
+ * This generic implementation of the clk_ops.get_coord_rates callback may
  * be used for simple cases where picking the first matching entry in the
  * coord_rate table is sufficient. Drivers with more complicated rate selection
- * criteria should implement their own .select_coord_rates callback. Returns
+ * criteria should implement their own .get_coord_rates callback. Returns
  * -ENOENT if an exact matching rate is not found (it does no rounding).
  */
-int generic_select_coord_rates(struct clk_hw *hw, unsigned long rate)
+int generic_get_coord_rates(struct clk_hw *hw, unsigned long rate)
 {
 	struct coord_rate_entry *cre = hw->cr_domain->table[hw->cr_clk_index];
 	int nr_rates = hw->cr_domain->nr_rates;
@@ -2558,15 +2558,15 @@ static int __clk_core_init(struct clk_core *core)
 
 	/* check that clk_ops are sane.  See Documentation/clk.txt */
 
-	/* FIXME if (core->ops->select_coord_rates && !core->ops->coordinate_rates) ??? */
-	if (!!core->ops->select_coord_rates != !!core->ops->coordinate_rates) {
-		pr_warning("%s: %s must implement both .select_coord_rates and .coordinated_rates\n",
+	/* FIXME if (core->ops->get_coord_rates && !core->ops->coordinate_rates) ??? */
+	if (!!core->ops->get_coord_rates != !!core->ops->coordinate_rates) {
+		pr_warning("%s: %s must implement both .get_coord_rates and .coordinated_rates\n",
 				__func__, core->name);
 		ret = -EINVAL;
 		goto out;
 	}
 
-	if (core->ops->select_coord_rates && (core->ops->round_rate
+	if (core->ops->get_coord_rates && (core->ops->round_rate
 				|| core->ops->determine_rate
 				|| core->ops->set_rate
 				|| core->ops->set_parent)) {
