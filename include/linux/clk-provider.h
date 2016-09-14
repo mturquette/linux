@@ -63,6 +63,7 @@ struct clk_rate_request {
 	struct clk_hw *best_parent_hw;
 };
 
+#if 0
 struct coord_rate_entry {
 	struct clk_hw *hw;
 	struct clk_hw *parent_hw;
@@ -76,6 +77,7 @@ struct coord_rate_domain {
 	struct coord_rate_entry **table;
 	void *priv;
 };
+#endif
 
 /* --- NEW SHIT --- */
 
@@ -99,8 +101,8 @@ struct coord_rate_clk {
 struct coord_rate_state {
 	int nr_hws;
 	void *priv;
+	bool needs_free;// = false;
 	struct coord_rate_clk *clks[];
-	bool needs_free = false;
 };
 
 // struct coord_rate_domain ?
@@ -297,10 +299,10 @@ struct clk_ops {
 	int		(*set_phase)(struct clk_hw *hw, int degrees);
 	void		(*init)(struct clk_hw *hw);
 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
-	int		(*select_coord_rates)(struct clk_hw *hw,
+	struct coord_rate_state *(*get_coord_rates)(struct clk_hw *hw,
 					//struct clk_hw *parent_hw,
 					unsigned long rate);
-	int		(*coordinate_rates)(const struct coord_rate_domain *,
+	int		(*set_coord_rates)(const struct coord_rate_state *,
 					int index);
 };
 
