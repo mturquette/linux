@@ -170,6 +170,7 @@ struct coord_rate_group coord_rate_cpu {
 
 /* coordinated rates static data, shared by test_parent & test_child */
 
+#if 0
 static struct coord_rate_entry *test_tbl[] = {
 	(struct coord_rate_entry []){	/* test_parent */
 		{ .rate = 100, },
@@ -213,6 +214,7 @@ static struct test_clk test_child = {
 	.hw.cr_domain = &test_coord_domain,
 	.hw.cr_clk_index = 1,
 };
+#endif
 
 static int __init clk_test_init(void)
 {
