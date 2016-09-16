@@ -1462,6 +1462,9 @@ static int clk_calc_new_rates(struct clk_core *core,
 		struct cr_clk *cr_clk = clk_simple_get_cr_clk(core->hw,
 				core->new_cr_state);
 
+		/* FIXME can non-root CCR clocks even get here? */
+		new_rate = cr_clk->rate;
+
 		if (cr_clk->is_root && (core->flags & CLK_SET_RATE_PARENT)) {
 			best_parent_rate = cr_clk->parent_rate;
 		} else {
@@ -1641,12 +1644,14 @@ static void clk_change_rate(struct clk_core *core)
 
 	/* coordinate rate change for all clocks in cr_state */
 	if (cr_state && core->ops->set_cr_state) {
-		ret = core->ops->set_cr_state(cr_state);
-		if (ret)
+		int i;
+		struct clk_core *core_tmp;
+
+		if (core->ops->set_cr_state(cr_state))
 			pr_err("%s: coordinated rate change failed for clk %s\n",
 					__func__, core->name);
 
-		for (i = 0; i < cr_state->nr_hws; i++) {
+		for (i = 0; i < cr_state->nr_clk; i++) {
 			core_tmp = cr_state->clks[i]->hw->core;
 			core_tmp->new_cr_state = NULL;
 		}
@@ -1657,7 +1662,7 @@ static void clk_change_rate(struct clk_core *core)
 		 * providers that use static tables and cr_state_group can
 		 * ignore this flag.
 		 */
-		if (cr_state.needs_free)
+		if (cr_state->needs_free)
 			kfree(cr_state);
 	}
 
@@ -1717,14 +1722,11 @@ static bool _cr_state_match_rate(struct clk_hw *hw, struct cr_state *cr_state,
 {
 	int nr_clk = cr_state->nr_clk;
 	int i;
-	bool match = false;
 
-	for (i = 0; i < nr_rates; i++) {
+	for (i = 0; i < nr_clk; i++) {
 		if (cr_state->clks[i]->hw == hw &&
 				cr_state->clks[i]->rate == rate) {
 			return true;
-			//match = true;
-			//break;
 		}
 	}
 
@@ -1764,7 +1766,6 @@ struct cr_state *clk_simple_get_cr_state(struct clk_hw *hw,
 	int nr_state = cr_domain->nr_state;
 	struct cr_state *cr_state;
 	int i;
-	bool match = false;
 
 	for (i = 0; i < nr_state; i++) {
 		cr_state = cr_domain->states[i];
