@@ -257,7 +257,7 @@ struct clk_ops {
 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
 	struct cr_state *(*get_cr_state)(struct clk_hw *hw,
 					unsigned long rate);
-	int		(*set_cr_state)(const struct cr_state *, int index);
+	int		(*set_cr_state)(const struct cr_state *);
 };
 
 /**
