@@ -63,76 +63,32 @@ struct clk_rate_request {
 	struct clk_hw *best_parent_hw;
 };
 
-#if 0
-struct coord_rate_entry {
-	struct clk_hw *hw;
-	struct clk_hw *parent_hw;
-	unsigned long rate;
-	unsigned long parent_rate;
-};
-
-struct coord_rate_domain {
-	int nr_clks;
-	int nr_rates;
-	struct coord_rate_entry **table;
-	void *priv;
-};
-#endif
-
-/* --- NEW SHIT --- */
-
 /**
  * coord_rate_clk - blah
  * @parent_rate: Optional. Only used when the parent clock is not part of this
  * 		 same coordinated rate group & CLK_SET_RATE_PARENT is set
  */
-// struct coord_rate_hw ?
-struct coord_rate_clk {
+struct cr_clk {
 	struct clk_hw *hw;
-	struct clk_hw *parent;
+	struct clk_hw *parent_hw;
 	unsigned long rate;
 	unsigned long parent_rate;
-	u32 flags;
+	//u32 flags;
+	bool is_root;
 };
 
-// struct coord_rate ?
-// struct coord_rate_subtree ?
-// struct coord_rate_freq
-struct coord_rate_state {
-	int nr_hws;
+struct cr_state {
+	int nr_clk;
 	void *priv;
 	bool needs_free;// = false;
-	struct coord_rate_clk *clks[];
+	struct cr_clk *clks[];
 };
 
-// struct coord_rate_domain ?
-// struct coord_rate_freq_domain ?
-struct coord_rate_group {
-	int nr_states;
+struct cr_domain {
+	int nr_state;
 	void *priv; // don't use
-	struct coord_rate_state *states[];
+	struct cr_state *states[];
 };
-
-/* XXX Example of how this works */
-#if 0
-struct my_clk_hw foo_hw {
-	.hw.init = ...;
-	.coord_rate_group = my_cr_group;
-};
-
-struct coord_rate_state *get_my_coord_rates(struct clk_hw *hw,
-		unsigned long rate)
-{
-	int index = figure_out_index;
-	return hw->coord_rate_group->states[index];
-}
-
-struct clk_ops my_ops = {
-	.get_coord_rates = get_my_coord_rates;
-};
-#endif
-
-/* --- END NEW SHIT --- */
 
 /**
  * struct clk_ops -  Callback operations for hardware clocks; these are to
@@ -248,13 +204,13 @@ struct clk_ops my_ops = {
  *		directory is provided as an argument.  Called with
  *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
  *
- * @select_coord_rates:	Returns an index to an entry in the coordinated rate
+ * @get_cr_state:	FIXME Returns an index to an entry in the coordinated rate
  *			table that satisfies a rate-change request from
  *			clk_set_rate() or clk_set_parent().  Returns -ENODATA
  *			if the table does not exist or -EINVAL if the request
  *			cannot be satisfied.
  *
- * @coordinate_rates:	Programs the hardware to satisify the rate-change or
+ * @set_cr_state:	Programs the hardware to satisify the rate-change or
  *			parent-change request. This may involve adjusting the
  *			rates coming out of multiple clock nodes as well as
  *			changing multiple parent muxes. Returns 0 on success,
@@ -299,11 +255,9 @@ struct clk_ops {
 	int		(*set_phase)(struct clk_hw *hw, int degrees);
 	void		(*init)(struct clk_hw *hw);
 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
-	struct coord_rate_state *(*get_coord_rates)(struct clk_hw *hw,
-					//struct clk_hw *parent_hw,
+	struct cr_state *(*get_cr_state)(struct clk_hw *hw,
 					unsigned long rate);
-	int		(*set_coord_rates)(const struct coord_rate_state *,
-					int index);
+	int		(*set_cr_state)(const struct cr_state *, int index);
 };
 
 /**
@@ -351,8 +305,6 @@ struct clk_hw {
 	struct clk_core *core;
 	struct clk *clk;
 	const struct clk_init_data *init;
-	const struct coord_rate_domain *cr_domain;
-	const int cr_clk_index;
 };
 
 /**
@@ -366,7 +318,8 @@ struct clk_hw {
  * criteria should implement their own .select_coord_rates callback. Returns
  * -ENOENT if an exact matching rate is not found (it does no rounding).
  */
-int generic_select_coord_rates(struct clk_hw *hw, unsigned long rate);
+struct cr_state *clk_simple_get_cr_state(struct clk_hw *hw,
+		struct cr_domain *cr_domain, unsigned long rate);
 
 /*
  * DOC: Basic clock implementations common to many platforms
