@@ -59,6 +59,25 @@ static const struct clk_ops test_clk_ops = {
 
 /* --- NEW SHIT --- */
 
+/* XXX Example of how this works */
+#if 0
+struct my_clk_hw foo_hw {
+	.hw.init = ...;
+	.coord_rate_group = my_cr_group;
+};
+
+struct coord_rate_state *get_my_coord_rates(struct clk_hw *hw,
+		unsigned long rate)
+{
+	int index = figure_out_index;
+	return hw->coord_rate_group->states[index];
+}
+
+struct clk_ops my_ops = {
+	.get_coord_rates = get_my_coord_rates;
+};
+#endif
+
 /*
  * FIXME
  * contrive a "safe hook" example with:
