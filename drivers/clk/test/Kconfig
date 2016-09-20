@@ -1,0 +1,18 @@
+config COMMON_CLK_TEST
+	tristate "Unit tests for the Common Clock Framework"
+	---help---
+	  This option allows for selection of various unit tests. Selecting it
+	  also builds the clk_test_provider driver which runs the optional
+	  tests found under this config option
+
+config COMMON_CLK_TEST_CR
+	bool "Unit tests for coordinated clock rates"
+	depends on COMMON_CLK_TEST
+	---help---
+	  Forces clk_test_provider to register clocks with coordinated rates
+	  using both static rate tables and dynamic rates. Tests: rate change
+	  operations are done at .probe with debug output, and can also be
+	  inspected via debugfs
+
+#source "drivers/clk/test/Kconfig.debug"
+
