@@ -12,12 +12,15 @@
 #include <linux/module.h>
 #include "clk-test.h"
 
-static int clk_test_probe(struct platform_device *pdev)
+//static int clk_test_probe(struct platform_device *pdev)
+static int clk_test_probe(void)
 {
-	clk_test_cr_probe(pdev);
+	pr_err("%s: here\n", __func__);
+	clk_test_cr_probe(NULL);
 	return 0;
 }
 
+#if 0
 static int clk_test_remove(struct platform_device *pdev)
 {
 	clk_test_cr_remove(pdev);
@@ -40,19 +43,25 @@ static int clk_test_resume(struct platform_device *pdev)
 	clk_test_cr_resume(pdev);
 	return 0;
 }
+#endif
 
+#if 0
 static struct platform_driver clk_test_driver = {
 	.driver	= {
 		.name = "clk_test",
 		//.of_match_table = clk_test_ids,
 	},
 	.probe = clk_test_probe,
+#if 0
 	.remove = clk_test_remove,
 	.shutdown = clk_test_shutdown,
 	.suspend = clk_test_suspend,
 	.resume = clk_test_resume,
+#endif
 };
-module_platform_driver(clk_test_driver);
+#endif
+//module_platform_driver(clk_test_driver);
+module_init(clk_test_probe);
 
 MODULE_AUTHOR("Michael Turquette <mturquette@baylibre.com>");
 MODULE_DESCRIPTION("Common Clock Framework Unit Tests");
