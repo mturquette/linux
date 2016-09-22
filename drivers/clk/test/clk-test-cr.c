@@ -614,14 +614,18 @@ int clk_test_cr_probe(void)
 	for (i = 0; i < NR_CLK; i++) {
 		//ret = devm_clk_hw_register(dev, clk_test_cr_hw[i]);
 		ret = clk_hw_register(NULL, clk_test_cr_hw[i]);
-		clk_hw_register_clkdev(clk_test_cr_hw[i], NULL, clk_test_cr_hw[i]->init->name);
+		clk_hw_register_clkdev(clk_test_cr_hw[i], clk_test_cr_hw[i]->init->name, NULL);
+		pr_err("%s: clk_test_cr_hw[i]->init->name %s\n", __func__, clk_test_cr_hw[i]->init->name);
 		if (ret)
 			pr_err("%s: unable to register test_clk_cr hw\n", __func__);
 	}
 
 	cpu_mux = clk_get(NULL, "test_static_cpu_mux");
-	if (IS_ERR(cpu_mux))
+	if (IS_ERR(cpu_mux)) {
 		pr_err("%s: could not get cpu_mux clk\n", __func__);
+		return 0;
+	}
+
 	clk_set_rate(cpu_mux, 1000000000);
 	pr_debug("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
