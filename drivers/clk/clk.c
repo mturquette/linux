@@ -1785,21 +1785,26 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	HLIST_HEAD(top_list);
 	struct hlist_node *tmp;
 
+	pr_err("%s: here0\n", __func__);
 	if (!core)
 		return 0;
 
+	pr_err("%s: here1\n", __func__);
 	/* bail early if nothing to do */
 	if (rate == clk_core_get_rate_nolock(core))
 		return 0;
 
+	pr_err("%s: here2\n", __func__);
 	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
 		return -EBUSY;
 
+	pr_err("%s: here3\n", __func__);
 	/* calculate new rates and get the topmost changed clocks */
 	ret = clk_calc_new_rates(core, rate, &top_list);
 	if (ret)
 		return ret;
 
+	pr_err("%s: here4\n", __func__);
 	/* notify that we are about to change rates */
 	for_each_top_clk() {
 		fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
@@ -1810,6 +1815,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 		}
 	}
 
+	pr_err("%s: here5\n", __func__);
 	/* change the rates, delete list */
 	hlist_for_each_entry_safe(top, tmp, &top_list, top_node) {
 		clk_change_rate(top);
@@ -1860,7 +1866,9 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 	/* prevent racing with updates to the clock topology */
 	clk_prepare_lock();
 
+	pr_err("%s: here0\n", __func__);
 	ret = clk_core_set_rate_nolock(clk->core, rate);
+	pr_err("%s: here1\n", __func__);
 
 	clk_prepare_unlock();
 
