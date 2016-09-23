@@ -309,7 +309,7 @@ static struct cr_state state_middle = {
 			.hw = &test_static_mux.hw,
 			.parent_hw = &test_static_div.hw,
 			.rate = 500000000,
-			.is_root = true, // FIXME try to remove this
+			.is_root = false,
 		},
 	},
 };
@@ -336,7 +336,7 @@ static struct cr_state state_high = {
 			.hw = &test_static_mux.hw,
 			.parent_hw = &test_static_div.hw,
 			.rate = 1000000000,
-			.is_root = true, // FIXME try to remove this
+			.is_root = false,
 		},
 	},
 };
@@ -652,6 +652,12 @@ int clk_test_cr_probe(void)
 	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	clk_set_rate(cpu_mux, 500000000);
+	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+
+	clk_set_rate(cpu_mux, 24000000);
+	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+
+	clk_set_rate(cpu_mux, 1000000000);
 	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	return 0;
