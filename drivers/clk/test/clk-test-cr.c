@@ -125,7 +125,8 @@ static struct cr_state *test_clk_static_get_cr_state(struct clk_hw *hw,
 		pr_err("%s: failed to get cr_state for clk %s with code %ld\n",
 				__func__, clk_hw_get_name(hw), PTR_ERR(state));
 
-	pr_debug("%s: clk %s selected cr_state for rate %lu\n",
+	// debug
+	pr_err("%s: clk %s selected cr_state for rate %lu\n",
 			__func__, clk_hw_get_name(hw), rate);
 	return state;
 }
@@ -137,10 +138,11 @@ static int test_clk_static_set_cr_state(const struct cr_state *state)
 	struct test_clk_static *test_clk;
 	struct test_clk_priv_data *priv = state->priv;
 
-	pr_debug("%s: setting cr_state:\n", __func__);
+	// debug x2
+	pr_err("%s: setting cr_state:\n", __func__);
 	for (i = 0; i < state->nr_clk; i++) {
 		cr_clk = state->clks[i];
-		pr_debug("%s: clk %s, rate %lu, parent %s\n", __func__,
+		pr_err("%s: clk %s, rate %lu, parent %s\n", __func__,
 				clk_hw_get_name(cr_clk->hw), cr_clk->rate,
 				clk_hw_get_name(cr_clk->parent_hw));
 	}
@@ -163,6 +165,24 @@ static int test_clk_static_set_cr_state(const struct cr_state *state)
 	test_clk->div = priv->post_divider_div;
 	test_clk = to_test_clk_static(state->clks[2]->hw);
 	test_clk->parent_idx = priv->cpu_mux_parent_idx;
+
+	/*
+	 * FIXME
+	 * at this point the .recalc_rate callbacks will Do The Right Thing for
+	 * pll and div.
+	 * However the clock tree hierarchy is NOT changed for mux. The clk
+	 * core does not realize that osc is no longer the parent, and div is
+	 * the new parent.
+	 *
+	 * There are two places we can fix this:
+	 * 1) here, in the .set_cr_state callback or,
+	 * 2) in clk_change_rate or some generic code that has access core->new_cr_state or,
+	 * 3) in clk_calc_new_rates, where we get access to the new_cr_state
+	 *
+	 * Fuck, very confusing.
+	 *
+	 * How is new_parent and best_parent_rate handled?
+	 */
 	return 0;
 }
 
@@ -224,11 +244,11 @@ static struct test_clk_static test_static_div = {
 	},
 };
 
-static struct test_clk_static test_static_cpu_mux = {
+static struct test_clk_static test_static_mux = {
 	.parent_idx = 0,
 	.domain = &test_static_cr_domain,
 	.hw.init = &(struct clk_init_data){
-		.name = "test_static_cpu_mux",
+		.name = "test_static_mux",
 		.ops = &test_clk_mux_static_ops,
 		.parent_names = (const char *[]){ "test_osc",
 			"test_static_div" },
@@ -259,7 +279,7 @@ static struct cr_state state_bypass = {
 			.is_root = false,
 		},
 		&(struct cr_clk){
-			.hw = &test_static_cpu_mux.hw,
+			.hw = &test_static_mux.hw,
 			.parent_hw = &test_osc.hw,
 			.rate = 24000000,
 			.is_root = true,
@@ -286,10 +306,10 @@ static struct cr_state state_middle = {
 			.is_root = false,
 		},
 		&(struct cr_clk){
-			.hw = &test_static_cpu_mux.hw,
+			.hw = &test_static_mux.hw,
 			.parent_hw = &test_static_div.hw,
 			.rate = 500000000,
-			.is_root = false,
+			.is_root = true, // FIXME try to remove this
 		},
 	},
 };
@@ -313,10 +333,10 @@ static struct cr_state state_high = {
 			.is_root = false,
 		},
 		&(struct cr_clk){
-			.hw = &test_static_cpu_mux.hw,
+			.hw = &test_static_mux.hw,
 			.parent_hw = &test_static_div.hw,
 			.rate = 1000000000,
-			.is_root = false,
+			.is_root = true, // FIXME try to remove this
 		},
 	},
 };
@@ -567,7 +587,7 @@ struct clk_hw *clk_test_cr_hw[] = {
 	&test_osc.hw,
 	&test_static_pll.hw,
 	&test_static_div.hw,
-	&test_static_cpu_mux.hw,
+	&test_static_mux.hw,
 	//&test_dynamic_pll.hw,
 	//&test_dynamic_div.hw,
 	//&test_dynamic_cpu_mux.hw,
@@ -620,17 +640,19 @@ int clk_test_cr_probe(void)
 			pr_err("%s: unable to register test_clk_cr hw\n", __func__);
 	}
 
-	cpu_mux = clk_get(NULL, "test_static_cpu_mux");
+	cpu_mux = clk_get(NULL, "test_static_mux");
 	if (IS_ERR(cpu_mux)) {
-		pr_err("%s: could not get cpu_mux clk\n", __func__);
+		pr_err("%s: could not get cpu_mux clk %ld\n", __func__, PTR_ERR(cpu_mux));
 		return 0;
 	}
+	// debug x3
+	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	clk_set_rate(cpu_mux, 1000000000);
-	pr_debug("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	clk_set_rate(cpu_mux, 500000000);
-	pr_debug("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	return 0;
 }
