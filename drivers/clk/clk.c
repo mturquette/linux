@@ -1415,8 +1415,8 @@ static int clk_calc_new_rates(struct clk_core *core,
 			core_tmp = cr_clk->hw->core;
 			pr_err("%s: first pass for clk %s\n", __func__, core_tmp->name);
 
-			core_tmp->new_rate = cr_clk->rate;
-			core_tmp->new_parent = cr_clk->parent_hw->core;
+			//core_tmp->new_rate = cr_clk->rate;
+			//core_tmp->new_parent = cr_clk->parent_hw->core;
 			core_tmp->new_cr_state = state;
 		}
 
@@ -1479,8 +1479,12 @@ static int clk_calc_new_rates(struct clk_core *core,
 		pr_err("%s: here0 second pass for clk %s\n", __func__, core->name);
 		/* FIXME can non-root CCR clocks even get here? */
 		//new_rate = cr_clk->rate;
+#if 0
 		parent = core->new_parent;
 		new_rate = core->new_rate;
+#endif
+		parent = cr_clk->parent_hw->core;
+		new_rate = cr_clk->rate;
 
 		/*
 		 * if clk is root, check if it has the flag. If so, set
@@ -1504,7 +1508,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 		 * parent_rate to be garbage or zero in that case
 		 */
 		if (cr_clk->is_root) {
-			pr_err("%s: here1 second pass clk %s setting cr_is_root\n", __func__, core->name);
+			pr_err("%s: here1 second pass clk %s setting is_cr_root\n", __func__, core->name);
 			is_cr_root = true;
 			best_parent_rate = cr_clk->parent_rate;
 		}
@@ -1698,6 +1702,13 @@ static void clk_change_rate(struct clk_core *core)
 		int i;
 		struct clk_core *core_tmp;
 
+		/*
+		 * FIXME we do not handle errors gracefully
+		 * This is a bigger problem with clk_calc_new_rates, where we
+		 * expect to pick a rate no matter what. In the mean time,
+		 * should we select the highest rate that is less than or equal
+		 * to the requested rate?
+		 */
 		if (core->ops->set_cr_state(cr_state))
 			pr_err("%s: coordinated rate change failed for clk %s\n",
 					__func__, core->name);
@@ -1769,6 +1780,10 @@ static void clk_change_rate(struct clk_core *core)
 /* XXX FIXME is this dangerous? Can clk provider drivers use it? */
 #define generic_to_cr_domain(_x) _x->cr_domain
 
+/*
+ * FIXME should this pick the highest rate that is less than or equal to the
+ * requested rate? We cannot tolerate failures in clk_calc_new_rates
+ */
 static bool _cr_state_match_rate(struct clk_hw *hw, struct cr_state *cr_state,
 		unsigned long rate)
 {
