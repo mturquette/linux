@@ -1380,6 +1380,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 	unsigned long max_rate;
 	int p_index = 0;
 	long ret;
+	bool is_cr_root = false;
 
 	/* sanity */
 	if (IS_ERR_OR_NULL(core))
@@ -1412,6 +1413,7 @@ static int clk_calc_new_rates(struct clk_core *core,
 		for (i = 0; i < state->nr_clk; i++) {
 			cr_clk = state->clks[i];
 			core_tmp = cr_clk->hw->core;
+			pr_err("%s: first pass for clk %s\n", __func__, core_tmp->name);
 
 			core_tmp->new_rate = cr_clk->rate;
 			core_tmp->new_parent = cr_clk->parent_hw->core;
@@ -1438,8 +1440,18 @@ static int clk_calc_new_rates(struct clk_core *core,
 		for (i = 0; i < state->nr_clk; i++) {
 			cr_clk = state->clks[i];
 			core_tmp = cr_clk->hw->core;
+			pr_err("%s: first pass for clk %s part 2\n", __func__, core_tmp->name);
+			//if (cr_clk->is_root)
+				clk_calc_new_rates(core_tmp, cr_clk->rate, top_list);
+			/* FIXME */
+#if 0 /* DON'T DELETE! THIS MIGHT CLEAN THINGS UP A LOT */
 			if (cr_clk->is_root)
 				clk_calc_new_rates(core_tmp, cr_clk->rate, top_list);
+			else {
+				new_rate = cr_clk->rate;
+				goto out;
+			}
+#endif /* NOPE, DOESN'T MAKE SENSE */
 		}
 		goto out;
 	} else if (core->ops->get_cr_state && core->new_cr_state != NULL) {
@@ -1459,22 +1471,57 @@ static int clk_calc_new_rates(struct clk_core *core,
 		 * FIXME can non-root CCR clocks even get here? if not then
 		 * remove the the CR_ROOT check and the else statement
 		 */
+		//struct clk_core *core_tmp;
 		struct cr_clk *cr_clk = clk_simple_get_cr_clk(core->hw,
 				core->new_cr_state);
+		//core_tmp = cr_clk->hw->core;
 
+		pr_err("%s: here0 second pass for clk %s\n", __func__, core->name);
 		/* FIXME can non-root CCR clocks even get here? */
-		new_rate = cr_clk->rate;
+		//new_rate = cr_clk->rate;
+		parent = core->new_parent;
+		new_rate = core->new_rate;
 
-		if (cr_clk->is_root && (core->flags & CLK_SET_RATE_PARENT)) {
+		/*
+		 * if clk is root, check if it has the flag. If so, set
+		 * best_parent rate. If not, then add to top_list.
+		 * if clk is not root, then bail early.
+		 */
+		/*
+		 * non-root coordinated rates should not be added to
+		 * &top_list, so bail out
+		 */
+		//new_rate = cr_clk->new_rate;
+#if 0
+		if (!cr_clk->is_root) {
+			pr_err("%s: here1 second pass clk %s bails early\n", __func__, core->name);
+			goto calc_subtree;
+		}
+#endif
+		/*
+		 * the value of parent_rate is ignored if CLK_SET_RATE_PARENT
+		 * is not set or if is_root is not true; it is OK for
+		 * parent_rate to be garbage or zero in that case
+		 */
+		if (cr_clk->is_root) {
+			pr_err("%s: here1 second pass clk %s setting cr_is_root\n", __func__, core->name);
+			is_cr_root = true;
+			best_parent_rate = cr_clk->parent_rate;
+		}
+
+		pr_err("%s: here1 second pass for root clk %s\n", __func__, core->name);
+		/*
+		 * clean this up? We check the flag below, right? So why not
+		 * always set best_parent_rate?
+		 */
+#if 0
+		if (core->flags & CLK_SET_RATE_PARENT)) {
+			pr_err("%s: here2 second pass for root clk %s w/ flag\n", __func__, core->name);
 			best_parent_rate = cr_clk->parent_rate;
 		} else {
-			/*
-			 * non-root coordinated rates should not be added to
-			 * &top_list, so bail out
-			 */
-			pr_err("%s: clk %s should not be here!\n", __func__, core->name);
-			goto out;
+			pr_err("%s: here2 second pass for root clk %s w/o flag\n", __func__, core->name);
 		}
+#endif
 	} else if (core->ops->determine_rate) {
 		struct clk_rate_request req;
 
@@ -1535,9 +1582,10 @@ static int clk_calc_new_rates(struct clk_core *core,
 	if ((core->flags & CLK_SET_RATE_PARENT) && parent &&
 	    best_parent_rate != parent->rate)
 		ret = clk_calc_new_rates(parent, best_parent_rate, top_list);
-	else
+	else if (!core->ops->get_cr_state || is_cr_root)
 		hlist_add_head(&core->top_node, top_list);
 
+//calc_subtree:
 	clk_calc_subtree(core, new_rate, parent, p_index);
 
 out:
@@ -1600,10 +1648,13 @@ static void clk_change_rate(struct clk_core *core)
 
 	old_rate = core->rate;
 
+	pr_err("%s: here0 core %s\n", __func__, core->name);
 	if (core->new_parent) {
+		pr_err("%s: here1 core %s\n", __func__, core->name);
 		parent = core->new_parent;
 		best_parent_rate = core->new_parent->rate;
 	} else if (core->parent) {
+		pr_err("%s: here2 core %s\n", __func__, core->name);
 		parent = core->parent;
 		best_parent_rate = core->parent->rate;
 	}
@@ -1653,6 +1704,7 @@ static void clk_change_rate(struct clk_core *core)
 
 		for (i = 0; i < cr_state->nr_clk; i++) {
 			core_tmp = cr_state->clks[i]->hw->core;
+			// FIXME should I reparent here?
 			core_tmp->new_cr_state = NULL;
 		}
 
@@ -1785,26 +1837,26 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	HLIST_HEAD(top_list);
 	struct hlist_node *tmp;
 
-	pr_err("%s: here0\n", __func__);
+	//pr_err("%s: here0\n", __func__);
 	if (!core)
 		return 0;
 
-	pr_err("%s: here1\n", __func__);
+	//pr_err("%s: here1\n", __func__);
 	/* bail early if nothing to do */
 	if (rate == clk_core_get_rate_nolock(core))
 		return 0;
 
-	pr_err("%s: here2\n", __func__);
+	//pr_err("%s: here2\n", __func__);
 	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
 		return -EBUSY;
 
-	pr_err("%s: here3\n", __func__);
+	//pr_err("%s: here3\n", __func__);
 	/* calculate new rates and get the topmost changed clocks */
 	ret = clk_calc_new_rates(core, rate, &top_list);
 	if (ret)
 		return ret;
 
-	pr_err("%s: here4\n", __func__);
+	//pr_err("%s: here4\n", __func__);
 	/* notify that we are about to change rates */
 	for_each_top_clk() {
 		fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
@@ -1815,7 +1867,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 		}
 	}
 
-	pr_err("%s: here5\n", __func__);
+	//pr_err("%s: here5\n", __func__);
 	/* change the rates, delete list */
 	hlist_for_each_entry_safe(top, tmp, &top_list, top_node) {
 		clk_change_rate(top);
