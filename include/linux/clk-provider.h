@@ -318,7 +318,7 @@ struct clk_hw {
  * criteria should implement their own .select_coord_rates callback. Returns
  * -ENOENT if an exact matching rate is not found (it does no rounding).
  */
-struct cr_state *clk_simple_get_cr_state(struct clk_hw *hw,
+struct cr_state *clk_get_cr_state_from_domain(struct clk_hw *hw,
 		struct cr_domain *cr_domain, unsigned long rate);
 
 /*

@@ -1807,13 +1807,13 @@ static bool _cr_state_match_rate(struct clk_hw *hw, struct cr_state *cr_state,
 }
 
 /*
- * simple_get_cr_state - returns cr_state that matches rate
+ * clk_get_cr_state_from_domain - return cr_state from domain w/ matching rate
  * @hw: clock hardware whose rate is being changed
  * @cr_domain: pointer to table of all cr_states for this clock
  * @rate: requested rate
  *
- * Both simple_get_cr_state and struct cr_domain are optional helper functions
- * for simple clock providers that statically initialize discrete frequency
+ * Both clk_get_cr_state_from_domain() and struct cr_domain are optional
+ * helpers for clock providers that statically initialize discrete frequency
  * tables. These helpers are not relevant for clock provider drivers that
  * dynamically allocate a struct cr_state for every .round_rate or
  * .get_cr_state callback.
@@ -1825,9 +1825,10 @@ static bool _cr_state_match_rate(struct clk_hw *hw, struct cr_state *cr_state,
  *
  * This helper may be used for simple cases where picking the first matching
  * entry in the cr_rate table is sufficient. Drivers with more complicated rate
- * selection criteria should implement their own methods in .get_cr_state.
+ * selection criteria should implement their own methods in .get_cr_state and
+ * avoid using clk_get_cr_state_from_domain.
  */
-struct cr_state *clk_simple_get_cr_state(struct clk_hw *hw,
+struct cr_state *clk_get_cr_state_from_domain(struct clk_hw *hw,
 		struct cr_domain *cr_domain, unsigned long rate)
 {
 	int nr_state = cr_domain->nr_state;
@@ -1842,6 +1843,7 @@ struct cr_state *clk_simple_get_cr_state(struct clk_hw *hw,
 
 	return ERR_PTR(-ENOENT);
 }
+EXPORT_SYMBOL_GPL(clk_get_cr_state_from_domain);
 
 static int clk_core_set_rate_nolock(struct clk_core *core,
 				    unsigned long req_rate)
