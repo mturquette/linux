@@ -1352,7 +1352,7 @@ static void clk_calc_subtree(struct clk_core *core, unsigned long new_rate,
 	}
 }
 
-struct cr_clk *clk_simple_get_cr_clk(struct clk_hw *hw, struct cr_state *state)
+struct cr_clk *clk_get_cr_clk_from_state(struct clk_hw *hw, struct cr_state *state)
 {
 	struct cr_clk *cr_clk;
 	int i;
@@ -1410,122 +1410,62 @@ static int clk_calc_new_rates(struct clk_core *core,
 		 * parent_rate is only useful when crossing the boundary from a
 		 * coordinated clock to a parent clock that is uncoordinated.
 		 */
+		/* XXX test if this works. If so, then delete all of this block */
+#if 0
 		for (i = 0; i < state->nr_clk; i++) {
 			cr_clk = state->clks[i];
 			core_tmp = cr_clk->hw->core;
-			pr_err("%s: first pass for clk %s\n", __func__, core_tmp->name);
-
-			//core_tmp->new_rate = cr_clk->rate;
-			//core_tmp->new_parent = cr_clk->parent_hw->core;
 			core_tmp->new_cr_state = state;
 		}
+#endif
 
 		/*
-		 * recurse into clk_calc_new_rates for the set of coordinated
-		 * clks that are root clocks of the cr_state subtree. These
-		 * clocks must be added to top_list so that we can propagate
-		 * rate changes and recalc later on
-		 *
-		 * We could do add these clocks to top_list here without
-		 * recursion, but we must also handle the case where a root
-		 * clock of a cr_state subtree needs to change the rate of its
-		 * parent via CLK_SET_RATE_PARENT, and this parent is not a
-		 * part of the coordinated cr_state
-		 *
-		 * to handle this case, we re-use the existing best_parent and
-		 * best_parent rate logic at the bottom of clk_calc_new_rates
-		 * so we have a chance to propagate parent rates across the
-		 * coordinated rate boundary, if necessary
+		 * handling coordinated rate clocks in clk_calc_new_rates is a
+		 * bit tricky; on the first call to clk_calc_new_rates for a
+		 * coordinated rate clock, we find the appropriate cr_state and
+		 * set the core->new_cr_state pointer for every clock in that
+		 * cr_state. Then we recurse into clk_calc_new_rates for every
+		 * clock in that cr_state for the second pass. See comment
+		 * block below for more details on the second pass.
 		 */
 		for (i = 0; i < state->nr_clk; i++) {
 			cr_clk = state->clks[i];
 			core_tmp = cr_clk->hw->core;
-			pr_err("%s: first pass for clk %s part 2\n", __func__, core_tmp->name);
-			//if (cr_clk->is_root)
-				clk_calc_new_rates(core_tmp, cr_clk->rate, top_list);
-			/* FIXME */
-#if 0 /* DON'T DELETE! THIS MIGHT CLEAN THINGS UP A LOT */
-			if (cr_clk->is_root)
-				clk_calc_new_rates(core_tmp, cr_clk->rate, top_list);
-			else {
-				new_rate = cr_clk->rate;
-				goto out;
-			}
-#endif /* NOPE, DOESN'T MAKE SENSE */
+			core_tmp->new_cr_state = state;
+			clk_calc_new_rates(core_tmp, cr_clk->rate, top_list);
 		}
 		goto out;
 	} else if (core->ops->get_cr_state && core->new_cr_state != NULL) {
 		/*
-		 * this is not the first pass in clk_calc_new_rates for this
-		 * cr_state. core->new_cr_state, core->new_rate and
-		 * core->new_parent were all set for each clk in the crd_state
-		 * during the first pass
+		 * this is the second pass through clk_calc_new_rates for this
+		 * cr_state. See comment block above for context.
 		 *
-		 * as stated in the above code block, we must now set
-		 * best_parent_rate for any of the root clocks in the cr_state
-		 * subtree that will propagate a rate change request to a
-		 * parent clock that is outside of the cr_state
+		 * In the second pass through clk_calc_new_rates, we set the
+		 * local variables used in this function: new_rate, parent &
+		 * best_parent_rate.  The rest of the logic in this function is
+		 * used as-is with the exception of &top_list. The only clocks
+		 * we want to add to &top_list are sub-root clocks in this
+		 * cr_state or potentially the parents of these sub-root clocks
+		 * in the case of CLK_SET_RATE_PARENT. Either way we rely on
+		 * cr_clk.is_root for this check.
 		 */
-		/*
-		 * XXX
-		 * FIXME can non-root CCR clocks even get here? if not then
-		 * remove the the CR_ROOT check and the else statement
-		 */
-		//struct clk_core *core_tmp;
-		struct cr_clk *cr_clk = clk_simple_get_cr_clk(core->hw,
+		struct cr_clk *cr_clk = clk_get_cr_clk_from_state(core->hw,
 				core->new_cr_state);
-		//core_tmp = cr_clk->hw->core;
 
-		pr_err("%s: here0 second pass for clk %s\n", __func__, core->name);
-		/* FIXME can non-root CCR clocks even get here? */
-		//new_rate = cr_clk->rate;
-#if 0
-		parent = core->new_parent;
-		new_rate = core->new_rate;
-#endif
+		/*
+		 * set parent, new_rate and best_parent_rate based on the
+		 * values in cr_state. Note that best_parent_rate doesn't
+		 * matter unless the clk is both a subroot of the cr_state and
+		 * also has the CLK_SET_RATE_PARENT flag set. We check for
+		 * CLK_SET_PARENT_RATE at the end of clk_calc_new_rates, so we
+		 * only bother checking for .is_root here
+		 */
 		parent = cr_clk->parent_hw->core;
 		new_rate = cr_clk->rate;
-
-		/*
-		 * if clk is root, check if it has the flag. If so, set
-		 * best_parent rate. If not, then add to top_list.
-		 * if clk is not root, then bail early.
-		 */
-		/*
-		 * non-root coordinated rates should not be added to
-		 * &top_list, so bail out
-		 */
-		//new_rate = cr_clk->new_rate;
-#if 0
-		if (!cr_clk->is_root) {
-			pr_err("%s: here1 second pass clk %s bails early\n", __func__, core->name);
-			goto calc_subtree;
-		}
-#endif
-		/*
-		 * the value of parent_rate is ignored if CLK_SET_RATE_PARENT
-		 * is not set or if is_root is not true; it is OK for
-		 * parent_rate to be garbage or zero in that case
-		 */
 		if (cr_clk->is_root) {
-			pr_err("%s: here1 second pass clk %s setting is_cr_root\n", __func__, core->name);
 			is_cr_root = true;
 			best_parent_rate = cr_clk->parent_rate;
 		}
-
-		pr_err("%s: here1 second pass for root clk %s\n", __func__, core->name);
-		/*
-		 * clean this up? We check the flag below, right? So why not
-		 * always set best_parent_rate?
-		 */
-#if 0
-		if (core->flags & CLK_SET_RATE_PARENT)) {
-			pr_err("%s: here2 second pass for root clk %s w/ flag\n", __func__, core->name);
-			best_parent_rate = cr_clk->parent_rate;
-		} else {
-			pr_err("%s: here2 second pass for root clk %s w/o flag\n", __func__, core->name);
-		}
-#endif
 	} else if (core->ops->determine_rate) {
 		struct clk_rate_request req;
 
@@ -1589,7 +1529,6 @@ static int clk_calc_new_rates(struct clk_core *core,
 	else if (!core->ops->get_cr_state || is_cr_root)
 		hlist_add_head(&core->top_node, top_list);
 
-//calc_subtree:
 	clk_calc_subtree(core, new_rate, parent, p_index);
 
 out:
@@ -1854,26 +1793,21 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 	HLIST_HEAD(top_list);
 	struct hlist_node *tmp;
 
-	//pr_err("%s: here0\n", __func__);
 	if (!core)
 		return 0;
 
-	//pr_err("%s: here1\n", __func__);
 	/* bail early if nothing to do */
 	if (rate == clk_core_get_rate_nolock(core))
 		return 0;
 
-	//pr_err("%s: here2\n", __func__);
 	if ((core->flags & CLK_SET_RATE_GATE) && core->prepare_count)
 		return -EBUSY;
 
-	//pr_err("%s: here3\n", __func__);
 	/* calculate new rates and get the topmost changed clocks */
 	ret = clk_calc_new_rates(core, rate, &top_list);
 	if (ret)
 		return ret;
 
-	//pr_err("%s: here4\n", __func__);
 	/* notify that we are about to change rates */
 	for_each_top_clk() {
 		fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
@@ -1884,7 +1818,6 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
 		}
 	}
 
-	//pr_err("%s: here5\n", __func__);
 	/* change the rates, delete list */
 	hlist_for_each_entry_safe(top, tmp, &top_list, top_node) {
 		clk_change_rate(top);
