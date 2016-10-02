@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 BayLibre, Inc.
+ * Michael Turquette <mturquette@baylibre.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,14 +10,14 @@
  */
 
 #include <linux/clk-provider.h>
-#include <linux/platform_device.h>
+//#include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/clkdev.h>
+#include <linux/module.h>
 #if 0
 #include <linux/clk.h>
 #include <linux/clkdev.h>
 #include <linux/init.h>
-#include <linux/module.h>
 #include <linux/printk.h>
 #endif
 
@@ -69,10 +70,10 @@ static struct clk_fixed_rate test_osc = {
 struct test_clk_static {
 	struct clk_hw hw;
 	struct cr_domain *domain;
-	//struct cr_state *curr_state; // optional
 	/*
-	 * XXX everything below here is a hack because these are fake clocks.
-	 * Normally this info would come from reading the state from hardware
+	 * Normally the info from the three struct members below would come
+	 * from reading the state from hardware. Instead we used cache values
+	 * because these clocks are fake
 	 */
 	unsigned long pll_rate;
 	int div;
@@ -88,6 +89,11 @@ struct test_clk_priv_data {
 
 /* clk_ops */
 
+/*
+ * all of the clk_ops below rely on the cached values declared above in struct
+ * test_clk_static. Normally these values would come from reading the hardware
+ * state
+ */
 #define to_test_clk_static(_hw) container_of(_hw, struct test_clk_static, hw)
 
 static unsigned long test_clk_pll_static_recalc_rate(struct clk_hw *hw,
@@ -117,17 +123,13 @@ static struct cr_state *test_clk_static_get_cr_state(struct clk_hw *hw,
 		unsigned long rate)
 {
 	struct cr_state *state;
-	//struct cr_domain *domain;
 	struct test_clk_static *test = to_test_clk_static(hw);
 
-	state = clk_simple_get_cr_state(hw, test->domain, rate);
+	state = clk_get_cr_state_from_domain(hw, test->domain, rate);
 	if (IS_ERR(state))
 		pr_err("%s: failed to get cr_state for clk %s with code %ld\n",
 				__func__, clk_hw_get_name(hw), PTR_ERR(state));
 
-	// debug
-	pr_err("%s: clk %s selected cr_state for rate %lu\n",
-			__func__, clk_hw_get_name(hw), rate);
 	return state;
 }
 
@@ -138,26 +140,26 @@ static int test_clk_static_set_cr_state(const struct cr_state *state)
 	struct test_clk_static *test_clk;
 	struct test_clk_priv_data *priv = state->priv;
 
-	// debug x2
-	pr_err("%s: setting cr_state:\n", __func__);
+	pr_debug("%s: setting cr_state:\n", __func__);
 	for (i = 0; i < state->nr_clk; i++) {
 		cr_clk = state->clks[i];
-		pr_err("%s: clk %s, rate %lu, parent %s\n", __func__,
+		pr_debug("%s: clk %s, rate %lu, parent %s\n", __func__,
 				clk_hw_get_name(cr_clk->hw), cr_clk->rate,
 				clk_hw_get_name(cr_clk->parent_hw));
 	}
 
 	/*
-	 * XXX note to clock provider drivers implementers:
+	 * XXX note to clock provider driver implementers:
 	 *
 	 * machine-specific register writes would go here for an implementation
-	 * on real hardware, perhaps making use of the cr_state->priv data
+	 * on real hardware, perhaps making use of the cr_state->priv data.
+	 * After setting the hardware, the clock framework will read back this
+	 * info in the usual .recalc_rate and .get_parent callbacks.
 	 *
-	 * everything below here is a super ugly hack because these are fake
-	 * clocks. Normally this info would come from reading the hardware
-	 * state. For this unit test we hard-code the pll rate, post-divider
-	 * divisor, and mux parent so that .recalc and .get_parent continue to
-	 * work
+	 * For this unit test we store cached values for pll rate, post-divider
+	 * divisor, and mux parent in memory so that .recalc_rate and
+	 * .get_parent work correctly. Those callbacks simply return the cached
+	 * values.
 	 */
 	test_clk = to_test_clk_static(state->clks[0]->hw);
 	test_clk->pll_rate = priv->pll_rate;
@@ -166,36 +168,10 @@ static int test_clk_static_set_cr_state(const struct cr_state *state)
 	test_clk = to_test_clk_static(state->clks[2]->hw);
 	test_clk->parent_idx = priv->cpu_mux_parent_idx;
 
-	/*
-	 * FIXME
-	 * at this point the .recalc_rate callbacks will Do The Right Thing for
-	 * pll and div.
-	 * However the clock tree hierarchy is NOT changed for mux. The clk
-	 * core does not realize that osc is no longer the parent, and div is
-	 * the new parent.
-	 *
-	 * There are two places we can fix this:
-	 * 1) here, in the .set_cr_state callback or,
-	 * 2) in clk_change_rate or some generic code that has access core->new_cr_state or,
-	 * 3) in clk_calc_new_rates, where we get access to the new_cr_state
-	 *
-	 * Fuck, very confusing.
-	 *
-	 * How is new_parent and best_parent_rate handled?
-	 */
 	return 0;
 }
 
-/*
- * XXX separate ops are not always necessary, but make this test easier to read
- */
-#if 0
-static const struct clk_ops test_clk_static_ops = {
-	.recalc_rate = test_clk_static_recalc_rate,
-	.get_cr_state = test_clk_static_get_cr_state,
-	.set_cr_state = test_clk_static_set_cr_state,
-};
-#endif
+/* separate clk_ops are not necessary here, but aid readability */
 
 /* pll requires .recalc_rate */
 static const struct clk_ops test_clk_pll_static_ops = {
@@ -214,7 +190,6 @@ static const struct clk_ops test_clk_div_static_ops = {
 /* cpu mux requires .get_parent */
 static const struct clk_ops test_clk_mux_static_ops = {
 	.get_parent = test_clk_static_get_parent,
-	//.recalc_rate = test_clk_static_recalc_rate,
 	.get_cr_state = test_clk_static_get_cr_state,
 	.set_cr_state = test_clk_static_set_cr_state,
 };
@@ -256,6 +231,7 @@ static struct test_clk_static test_static_mux = {
 	},
 };
 
+/* machine-specific private data used in struct cr_state */
 struct test_clk_priv_data bypass = { 1000000000, 2, 0 };
 struct test_clk_priv_data middle = { 1000000000, 2, 1 };
 struct test_clk_priv_data high = { 1000000000, 1, 1 };
@@ -346,10 +322,10 @@ static struct cr_state state_high = {
  *
  * cr_domain is an optional helper data structure. It provides a useful
  * starting point for tables of discretized rates. It is possible to invent
- * your own data structure for tables without using struct cr_domain. The ccf
+ * your own data structure for tables without using struct cr_domain. The clk
  * core does not use cr_domain at all. However, struct cr_domain does pair
- * nicely with clk_simple_get_cr_state, an optional helper function for finding
- * the first matching cr_state for a given (clk, rate) tuple.
+ * nicely with clk_get_cr_state_from_domain, an optional helper function for
+ * finding the first matching cr_state for a given (clk,rate) pair.
  */
 static struct cr_domain test_static_cr_domain = {
 	.nr_state = 3,
@@ -357,231 +333,17 @@ static struct cr_domain test_static_cr_domain = {
 	.states = { &state_bypass, &state_middle, &state_high, },
 };
 
-/* --- NEW SHIT --- */
-
-/* XXX Example of how this works */
-#if 0
-struct my_clk_hw foo_hw {
-	.hw.init = ...;
-	.coord_rate_group = my_cr_group;
-};
-
-struct coord_rate_state *get_my_coord_rates(struct clk_hw *hw,
-		unsigned long rate)
-{
-	int index = figure_out_index;
-	return hw->coord_rate_group->states[index];
-}
-
-struct clk_ops my_ops = {
-	.get_coord_rates = get_my_coord_rates;
-};
-#endif
-
-#if 0
-/*
- * FIXME
- * contrive a "safe hook" example with:
- * fixed-rate osc
- * adjustable PLL
- * cpu mux
- *
- * The only rule is that the cpu mux must reparent to the osc during pll rate
- * change/relock. Once settled we can switch the cpu back to the pll parent
- */
-struct coord_rate_group coord_rate_cpu {
-	.nr_state = NR_RATE;
-	.states = {
-		/* OPP 1 */
-		/*(struct coord_rate_state [])*/{
-			.nr_hws = NR_CLKS,
-			.priv = NULL, // lol
-			.clks = {
-				{
-					.hw = &test_child.hw,
-					.parent_hw = &test_parent.hw,
-					.rate = 11,
-				},
-				{
-					.hw = &parent_child.hw,
-					.parent_hw = &osc.hw,
-					.rate = 25,
-				},
-				/*
-				 * FIXME do we need to represent the osc in
-				 * this structure? It's a transient state, a
-				 * temporary re-parent, so maybe not...
-				 */
-#if 0
-				{ .hw = &parent_child.hw,
-					.parent_hw = &osc.hw,
-					.rate = 100,
-				},
-#endif
-			},
-		},
-		/* OPP 2 */
-		/*(struct coord_rate_state [])*/{
-			.nr_hws = NR_CLKS,
-			.priv = NULL, // lol
-			.clks = {
-				{
-					.hw = &test_child.hw,
-					.parent_hw = &test_parent.hw,
-					.rate = 33,
-				},
-				{ .hw = &parent_child.hw,
-					.parent_hw = &osc.hw,
-					.rate = 50,
-				},
-			},
-		},
-		/* OPP 3 */
-		/*(struct coord_rate_state [])*/{
-			.nr_hws = NR_CLKS,
-			.priv = NULL, // lol
-			.clks = {
-				{
-					.hw = &test_child.hw,
-					.parent_hw = &test_parent.hw,
-					.rate = 66,
-				},
-				{
-					.hw = &parent_child.hw,
-					.parent_hw = &osc.hw,
-					.rate = 100,
-				},
-			},
-		},
-	};
-};
-
-/* XXX potential macro */
-struct coord_rate_group coord_rate_cpu {
-	.nr_state = NR_RATE;
-	.states = {
-		/* OPP 1 */
-		CR_STATE(NR_CLKS, NULL, CR_CLKS(
-				CR_CLK(&test_child.hw, &test_parent.hw, 11),
-				CR_CLK(&parent_child.hw, &osc_parent.hw, 25),
-				)),
-		/* OPP 2 */
-		CR_STATE(NR_CLKS, NULL, CR_CLKS(
-				CR_CLK(&test_child.hw, &test_parent.hw, 33),
-				CR_CLK(&parent_child.hw, &osc_parent.hw, 50),
-				)),
-		/* OPP 3 */
-		CR_STATE(NR_CLKS, NULL, CR_CLKS(
-				CR_CLK(&test_child.hw, &test_parent.hw, 66),
-				CR_CLK(&parent_child.hw, &osc_parent.hw, 100),
-				)),
-	};
-};
-#endif
-/*
- * FIXME
- * now do it again, guardian! Dynamically allocate and initialize the above
- * struct coord_rate_state!
- */
-
 /*
  * =====================================================================
  * dynamic rate tables example
  * =====================================================================
  */
 
-
-
-/* --- END NEW SHIT --- */
-
-/* coordinated rates static data, shared by test_parent & test_child */
-
-#if 0
-static struct coord_rate_entry *test_tbl[] = {
-	(struct coord_rate_entry []){	/* test_parent */
-		{ .rate = 100, },
-		{ .rate = 50,  },
-		{ .rate = 25,  },
-	},
-	(struct coord_rate_entry []){	/* test_child */
-		{ .rate = 66, .parent_rate = 100, },
-		{ .rate = 33, .parent_rate = 500, },
-		{ .rate = 11, .parent_rate = 25,  },
-	},
-};
-
-static struct coord_rate_domain test_coord_domain = {
-	.nr_clks = NR_CLK,
-	.nr_rates = NR_RATE,
-	.table = test_tbl,
-};
-
-/* individual clk static data */
-
-static struct test_clk test_parent = {
-	.hw.init = &(struct clk_init_data){
-		.name = "test_parent",
-		.parent_names = NULL,
-		.num_parents = 0,
-		.ops = &test_clk_ops,
-		.flags = CLK_IS_ROOT,
-	},
-	.hw.cr_domain = &test_coord_domain,
-	.hw.cr_clk_index = 0,
-};
-
-static struct test_clk test_child = {
-	.hw.init = &(struct clk_init_data){
-		.name = "test_child",
-		.parent_names = (const char *[]){ "test_parent" },
-		.num_parents = 1,
-		.ops = &test_clk_ops,
-	},
-	.hw.cr_domain = &test_coord_domain,
-	.hw.cr_clk_index = 1,
-};
-#endif
-
-#if 0
-static int __init clk_test_init(void)
-{
-	struct clk *parent, *child;
-	int i, ret;
-
-	/* FIXME convert to platform_device & devm_clk_register */
-
-	/* assign clk_hw pointers and cr_clk_index now that we know them */
-	for (i = 0; i < NR_RATE; i++) {
-		test_parent.hw.cr_domain->table[test_parent.hw.cr_clk_index][i].hw = &test_parent.hw;
-		test_child.hw.cr_domain->table[test_child.hw.cr_clk_index][i].hw = &test_child.hw;
-		test_child.hw.cr_domain->table[test_child.hw.cr_clk_index][i].parent_hw = &test_parent.hw;
-	}
-
-	parent = clk_register(NULL, &test_parent.hw);
-	child = clk_register(NULL, &test_child.hw);
-
-	printk("---------- coordinated clk rate test results ------------\n");
-
-	ret = clk_set_rate(child, 11);
-	pr_err("ret is %d\n", ret);
-
-	ret = clk_set_rate(child, 66);
-	pr_err("ret is %d\n", ret);
-
-	ret = clk_set_rate(child, 33);
-	pr_err("ret is %d\n", ret);
-
-	printk("---------------------------------------------------------\n");
-
-	return 0;
-}
-
-module_init(clk_test_init);
-
-MODULE_LICENSE("GPL");
-#endif
-
-/* -------------------------------- */
+/*
+ * =====================================================================
+ * module boilerplate
+ * =====================================================================
+ */
 
 struct clk_hw *clk_test_cr_hw[] = {
 	&test_osc.hw,
@@ -594,71 +356,45 @@ struct clk_hw *clk_test_cr_hw[] = {
 };
 
 int clk_test_cr_probe(void)
-//int clk_test_cr_probe(struct platform_device *pdev)
 {
 	int i, ret;
 	struct clk *cpu_mux;
-	//struct device *dev = &pdev->dev;
 
 	pr_err("%s: I'm here!\n", __func__);
 
-#if 0
-	int ret;
-	struct device *dev = &pdev->dev;
-	struct device_node *child, *np = dev->of_node;
-	const struct of_device_id *match;
-
-	if (!get_scpi_ops())
-		return -ENXIO;
-
-	for_each_available_child_of_node(np, child) {
-		match = of_match_node(scpi_clk_match, child);
-		if (!match)
-			continue;
-		ret = scpi_clk_add(dev, child, match);
-		if (ret) {
-			clk_test_remove(pdev);
-			of_node_put(child);
-			return ret;
-		}
-	}
-	/* Add the virtual cpufreq device */
-	cpufreq_dev = platform_device_register_simple("scpi-cpufreq",
-						      -1, NULL, 0);
-	if (IS_ERR(cpufreq_dev))
-		pr_warn("unable to register cpufreq device");
-#endif
 	/*
 	 * register all clks
 	 */
 	for (i = 0; i < NR_CLK; i++) {
-		//ret = devm_clk_hw_register(dev, clk_test_cr_hw[i]);
 		ret = clk_hw_register(NULL, clk_test_cr_hw[i]);
 		clk_hw_register_clkdev(clk_test_cr_hw[i], clk_test_cr_hw[i]->init->name, NULL);
-		pr_err("%s: clk_test_cr_hw[i]->init->name %s\n", __func__, clk_test_cr_hw[i]->init->name);
+		pr_debug("%s: clk_test_cr_hw[i]->init->name %s\n", __func__, clk_test_cr_hw[i]->init->name);
 		if (ret)
 			pr_err("%s: unable to register test_clk_cr hw\n", __func__);
 	}
 
+	/* run the tests for static table clocks */
 	cpu_mux = clk_get(NULL, "test_static_mux");
 	if (IS_ERR(cpu_mux)) {
 		pr_err("%s: could not get cpu_mux clk %ld\n", __func__, PTR_ERR(cpu_mux));
 		return 0;
 	}
-	// debug x3
-	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+	pr_debug("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	clk_set_rate(cpu_mux, 1000000000);
-	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+	pr_debug("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	clk_set_rate(cpu_mux, 500000000);
-	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+	pr_debug("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	clk_set_rate(cpu_mux, 24000000);
-	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+	pr_debug("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	clk_set_rate(cpu_mux, 1000000000);
-	pr_err("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
+	pr_debug("%s: cpu_mux rate is %lu\n", __func__, clk_get_rate(cpu_mux));
 
 	return 0;
 }
+
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("Michael Turquette <mturquette@baylibre.com>");

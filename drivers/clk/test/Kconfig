@@ -6,13 +6,11 @@ config COMMON_CLK_TEST
 	  tests found under this config option
 
 config COMMON_CLK_TEST_CR
-	bool "Unit tests for coordinated clock rates"
+	tristate "Unit tests for coordinated clock rates"
 	depends on COMMON_CLK_TEST
 	---help---
-	  Forces clk_test_provider to register clocks with coordinated rates
-	  using both static rate tables and dynamic rates. Tests: rate change
-	  operations are done at .probe with debug output, and can also be
-	  inspected via debugfs
-
-#source "drivers/clk/test/Kconfig.debug"
-
+	  clk_test_provider registers clocks with coordinated rates using both
+	  static rate tables and dynamic rates.
+	  Test description: rate change operations are done at .init. State
+	  changes may be observed if debug prints are enabled. The final state
+	  of the coordinated clocks may also be inspected via debugfs
