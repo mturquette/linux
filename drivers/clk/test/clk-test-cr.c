@@ -339,6 +339,210 @@ static struct cr_domain test_static_cr_domain = {
  * =====================================================================
  */
 
+struct test_clk_dynamic {
+	struct clk_hw hw;
+	struct cr_domain *domain;
+	/*
+	 * Normally the info from the three struct members below would come
+	 * from reading the state from hardware. Instead we used cache values
+	 * because these clocks are fake
+	 */
+	unsigned long pll_rate;
+	int div;
+	u8 parent_idx;
+};
+
+/* private data used in struct cr_state */
+struct test_clk_priv_data {
+	unsigned long pll_rate;
+	int post_divider_div;
+	u8 cpu_mux_parent_idx;
+};
+
+/* clk_ops */
+
+/*
+ * all of the clk_ops below rely on the cached values declared above in struct
+ * test_clk_dynamic. Normally these values would come from reading the hardware
+ * state
+ */
+#define to_test_clk_dynamic(_hw) container_of(_hw, struct test_clk_dynamic, hw)
+
+static unsigned long test_clk_pll_dynamic_recalc_rate(struct clk_hw *hw,
+					  unsigned long parent_rate)
+{
+	struct test_clk_dynamic *test_clk_dynamic = to_test_clk_dynamic(hw);
+
+	return test_clk_dynamic->pll_rate;
+}
+
+static unsigned long test_clk_div_dynamic_recalc_rate(struct clk_hw *hw,
+					  unsigned long parent_rate)
+{
+	struct test_clk_dynamic *test_clk_dynamic = to_test_clk_dynamic(hw);
+
+	return parent_rate / test_clk_dynamic->div;
+}
+
+static u8 test_clk_dynamic_get_parent(struct clk_hw *hw)
+{
+	struct test_clk_dynamic *test = to_test_clk_dynamic(hw);
+
+	return test->parent_idx;
+}
+
+#if 0
+struct cr_clk {
+	struct clk_hw *hw;
+	struct clk_hw *parent_hw;
+	unsigned long rate;
+	unsigned long parent_rate;
+	//u32 flags;
+	bool is_root;
+};
+#endif
+static struct cr_state *test_clk_dynamic_get_cr_state(struct clk_hw *hw,
+		unsigned long rate)
+{
+	struct test_clk_dynamic *test = to_test_clk_dynamic(hw);
+	struct cr_state *state = kzalloc(sizeof(struct cr_state), GFP_KERNEL);
+	if (!state)
+		return ERR_PTR(-ENOMEM);
+
+	state->nr_clk = NR_CLK;
+	//state->priv = NULL;
+	state->needs_free = true;
+	state->clks = kcalloc(NR_CLK, sizeof(*state->clks), GFP_KERNEL);
+	if (!state->clks)
+		return ERR_PTR(-ENOMEM);
+
+	/* I can either set each element manually here, like:
+	 * state->clk[0].hw = blah_hw;
+	 * state->clk[0].rate = blah_rate;
+	 *
+	 * or I can already have the cr_clk allocated and just fill in the
+	 * details, like:
+	 * state->clk[0] = cr_clk_pll;
+	 * state->clk[0].rate = some_rate;
+	 *
+	 * or I can have all possible cr_clks statically initialized and just
+	 * assign the right one, like:
+	 * state->clk[0] = cr_clk_pll_slow_opp;
+	 *
+	 * Hmm, should each clock have it's own .get_state? That would be an
+	 * alternative to using static tables. Each function would encode the
+	 * data for each cr_clk inside of that cr_state...
+	 */
+
+	return state;
+#if 0
+	core->parents = kcalloc(core->num_parents, sizeof(*core->parents),
+				GFP_KERNEL);
+	if (!core->parents) {
+		ret = -ENOMEM;
+		goto fail_parents;
+	};
+#endif
+}
+
+static int test_clk_dynamic_set_cr_state(const struct cr_state *state)
+{
+	int i;
+	struct cr_clk *cr_clk;
+	struct test_clk_dynamic *test_clk;
+	struct test_clk_priv_data *priv = state->priv;
+
+	pr_debug("%s: setting cr_state:\n", __func__);
+	for (i = 0; i < state->nr_clk; i++) {
+		cr_clk = state->clks[i];
+		pr_debug("%s: clk %s, rate %lu, parent %s\n", __func__,
+				clk_hw_get_name(cr_clk->hw), cr_clk->rate,
+				clk_hw_get_name(cr_clk->parent_hw));
+	}
+
+	/*
+	 * XXX note to clock provider driver implementers:
+	 *
+	 * machine-specific register writes would go here for an implementation
+	 * on real hardware, perhaps making use of the cr_state->priv data.
+	 * After setting the hardware, the clock framework will read back this
+	 * info in the usual .recalc_rate and .get_parent callbacks.
+	 *
+	 * For this unit test we store cached values for pll rate, post-divider
+	 * divisor, and mux parent in memory so that .recalc_rate and
+	 * .get_parent work correctly. Those callbacks simply return the cached
+	 * values.
+	 */
+	test_clk = to_test_clk_dynamic(state->clks[0]->hw);
+	test_clk->pll_rate = priv->pll_rate;
+	test_clk = to_test_clk_dynamic(state->clks[1]->hw);
+	test_clk->div = priv->post_divider_div;
+	test_clk = to_test_clk_dynamic(state->clks[2]->hw);
+	test_clk->parent_idx = priv->cpu_mux_parent_idx;
+
+	return 0;
+}
+
+/* separate clk_ops are not necessary here, but aid readability */
+
+/* pll requires .recalc_rate */
+static const struct clk_ops test_clk_pll_dynamic_ops = {
+	.recalc_rate = test_clk_pll_dynamic_recalc_rate,
+	.get_cr_state = test_clk_dynamic_get_cr_state,
+	.set_cr_state = test_clk_dynamic_set_cr_state,
+};
+
+/* post divider requires .recalc_rate */
+static const struct clk_ops test_clk_div_dynamic_ops = {
+	.recalc_rate = test_clk_div_dynamic_recalc_rate,
+	.get_cr_state = test_clk_dynamic_get_cr_state,
+	.set_cr_state = test_clk_dynamic_set_cr_state,
+};
+
+/* cpu mux requires .get_parent */
+static const struct clk_ops test_clk_mux_dynamic_ops = {
+	.get_parent = test_clk_dynamic_get_parent,
+	.get_cr_state = test_clk_dynamic_get_cr_state,
+	.set_cr_state = test_clk_dynamic_set_cr_state,
+};
+
+/* forward declaration to keep things tidy */
+static struct cr_domain test_dynamic_cr_domain;
+
+static struct test_clk_dynamic test_dynamic_pll = {
+	.pll_rate = 1000000000,
+	.domain = &test_dynamic_cr_domain,
+	.hw.init = &(struct clk_init_data){
+		.name = "test_dynamic_pll",
+		.ops = &test_clk_pll_dynamic_ops,
+		.parent_names = (const char *[]){ "test_osc" },
+		.num_parents = 1,
+	},
+};
+
+static struct test_clk_dynamic test_dynamic_div = {
+	.div = 1,
+	.domain = &test_dynamic_cr_domain,
+	.hw.init = &(struct clk_init_data){
+		.name = "test_dynamic_div",
+		.ops = &test_clk_div_dynamic_ops,
+		.parent_names = (const char *[]){ "test_dynamic_pll" },
+		.num_parents = 1,
+	},
+};
+
+static struct test_clk_dynamic test_dynamic_mux = {
+	.parent_idx = 0,
+	.domain = &test_dynamic_cr_domain,
+	.hw.init = &(struct clk_init_data){
+		.name = "test_dynamic_mux",
+		.ops = &test_clk_mux_dynamic_ops,
+		.parent_names = (const char *[]){ "test_osc",
+			"test_dynamic_div" },
+		.num_parents = 2,
+	},
+};
+
 /*
  * =====================================================================
  * module boilerplate
